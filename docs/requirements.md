@@ -287,27 +287,29 @@ THE SYSTEM SHALL provide each pledge with a sponsor name, sponsor role, pledge t
 6. Status is exactly one of {tentative, confirmed, received}.
 7. Both partners can create, read, update, and delete any pledge.
 
-**REQ-PL-2 [v1] — Gross and net displayed together**
-THE SYSTEM SHALL display gross event total and net out-of-pocket simultaneously, and SHALL compute net as gross minus the sum of confirmed and received pledge values.
+**REQ-PL-2 [v1] — Gross and net displayed together; net reduced only on fulfillment**
+THE SYSTEM SHALL display gross event total and net out-of-pocket simultaneously, and SHALL compute net as gross minus the sum of **fulfilled (`received`) pledge values only**. *(Amended per Decision D2: a pledge reduces the couple's real out-of-pocket total only on fulfillment. Promised-but-unfulfilled pledges never reduce net.)*
 
 1. Both figures are visible on the dashboard without navigation or scrolling past a fold.
-2. Net equals gross when no pledge has status confirmed or received.
-3. A confirmed pledge of ₱50,000 against a gross of ₱350,000 yields a net of ₱300,000.
-4. Gross never changes as a consequence of any pledge status change.
-5. WHEN a pledge status changes, both figures update within the same operation.
+2. Net equals gross when no pledge has status `received`.
+3. A `received` pledge of ₱50,000 against a gross of ₱350,000 yields a net of ₱300,000.
+4. A `confirmed` (promised, not yet fulfilled) pledge of ₱50,000 leaves net **unchanged** at ₱350,000; it appears only in the expected figure of REQ-PL-3.
+5. Gross never changes as a consequence of any pledge status change.
+6. WHEN a pledge status changes to or from `received`, both figures update within the same operation.
 
-**REQ-PL-3 [v1] — Tentative pledges excluded from net**
-THE SYSTEM SHALL exclude pledges with status `tentative` from the net out-of-pocket calculation, and SHALL display their summed value separately as potential relief.
+**REQ-PL-3 [v1] — Expected pledges shown distinctly and excluded from net**
+THE SYSTEM SHALL compute an **expected pledge** figure as the summed value of pledges that are promised but not yet fulfilled (status `tentative` or `confirmed`), SHALL display it as a separate line distinct from net, and SHALL exclude it from the net out-of-pocket calculation. *(Amended per Decision D2: expected vs fulfilled are shown as two distinct figures; only fulfilled reduces the real number.)*
 
-1. A tentative pledge of ₱50,000 leaves net unchanged.
-2. Summed tentative value is displayed under a label distinguishing it from net.
-3. WHEN a tentative pledge is changed to confirmed, net decreases by exactly that pledge's value.
-4. Potential relief and net are never summed into a single displayed figure.
+1. A `tentative` or `confirmed` pledge of ₱50,000 leaves net unchanged and adds ₱50,000 to the expected figure.
+2. The expected figure is displayed under a label that distinguishes it from net (e.g. "expected pledge support"), never merged into net.
+3. WHEN a pledge changes to `received`, net decreases by exactly that pledge's value and the expected figure decreases by the same value in the same operation.
+4. The expected figure and net are never summed into a single displayed figure.
+5. THE SYSTEM SHALL make clear in the display that the expected figure is not yet realized money.
 
-**REQ-PL-4 [v1] — Outstanding pledge exposure**
-THE SYSTEM SHALL compute outstanding pledge exposure as the summed value of pledges with status `confirmed`, and SHALL display it distinctly from both gross and net.
+**REQ-PL-4 [v1] — Outstanding (confirmed-but-unfulfilled) exposure**
+THE SYSTEM SHALL compute outstanding pledge exposure as the summed value of pledges with status `confirmed` (promised and accepted but not yet fulfilled), and SHALL display it distinctly from gross, net, and the total expected figure.
 
-1. A pledge moved from confirmed to received decreases outstanding exposure by its value and leaves net unchanged.
+1. A pledge moved from `confirmed` to `received` decreases outstanding exposure by its value **and decreases net by the same value** (fulfillment is the point at which net moves, per REQ-PL-2).
 2. The system lists the individual pledges comprising outstanding exposure, each with sponsor name and value.
 3. Outstanding exposure displays as ₱0.00, not blank, when no pledge is confirmed-not-received.
 
@@ -316,7 +318,7 @@ WHEN a partner inspects net out-of-pocket, THE SYSTEM SHALL show which pledges r
 
 1. The breakdown lists each contributing pledge with sponsor name, status, and value.
 2. The listed values sum exactly to the difference between gross and net.
-3. Tentative pledges are absent from this breakdown.
+3. Only `received` pledges appear in this breakdown; `tentative` and `confirmed` pledges are absent because they do not reduce net (Decision D2).
 
 ---
 
@@ -456,14 +458,15 @@ THE SYSTEM SHALL support exactly two partner accounts per plan, with identical r
 6. WHEN the second partner joins, they see every existing figure identically, including manual overrides.
 
 **REQ-SE-2 [v1] — Field-level last-write-wins**
-WHEN two partners have edited the same plan and their changes reconcile, THE SYSTEM SHALL resolve conflicts at field granularity using last-write-wins by write timestamp.
+WHEN two partners have edited the same plan and their changes reconcile, THE SYSTEM SHALL resolve conflicts at field granularity using last-write-wins ordered by a **server-assigned timestamp applied at sync time**, with a device-side monotonic counter used only as a deterministic tiebreaker. *(Amended per Decision D1: device wall-clocks are never authoritative for ordering.)*
 
 1. Concurrent edits to different fields of the same entry both persist.
 2. Concurrent edits to different entries both persist.
-3. Concurrent edits to the same field resolve to the write with the later timestamp.
-4. IF two writes to the same field carry identical timestamps, THEN THE SYSTEM SHALL resolve deterministically by a stable tiebreaker such that both devices converge on the same winner.
-5. Resolution never discards an accepted local write without recording it in the change log per REQ-SE-4.
-6. THE SYSTEM SHALL NOT use inference, heuristics, or any AI component in conflict resolution.
+3. Concurrent edits to the same field resolve to the write bearing the later **server-assigned** timestamp. Device wall-clock time SHALL NOT determine the winner.
+4. THE SYSTEM SHALL record, on every write, a device-side monotonic counter and a stable device identifier. IF two writes to the same field carry the same server-assigned timestamp, THEN THE SYSTEM SHALL resolve by the higher monotonic counter, and if still equal, by the stable device identifier, such that both devices converge on the same winner.
+5. The server-assigned timestamp is applied when the write is accepted at sync; a write that has not yet synced carries no authoritative order and SHALL NOT win a conflict against an already-synced write purely by an earlier device clock reading.
+6. Resolution never discards an accepted local write without recording it in the change log per REQ-SE-4.
+7. THE SYSTEM SHALL NOT use inference, heuristics, or any AI component in conflict resolution.
 
 **REQ-SE-3 [v1] — Convergence**
 WHEN all queued writes from both devices have been applied, THE SYSTEM SHALL present identical values on both devices.
@@ -488,7 +491,7 @@ THE SYSTEM SHALL restrict plan deletion to the creating partner, SHALL permit ei
 2. IF the non-creating partner attempts plan deletion, THEN THE SYSTEM SHALL refuse and state that only the plan creator may delete it.
 3. Plan deletion requires an explicit typed or equivalent confirmation from the creator beyond a single tap.
 4. Transferring ownership requires affirmative confirmation from both partners before it takes effect; this is the only lifecycle action that requires two-party confirmation. *(Amended per Decision 1: two-party confirmation is scoped to ownership transfer only. Partner removal is governed by REQ-SE-6.)*
-5. *(Reserved. The former clause 5 — "transferring ownership requires affirmative confirmation from both partners" — is consolidated into clause 4 by Decision 1. Retained as a numbered placeholder so downstream clause references are not renumbered.)*
+5. Defensive partner removal is NOT a two-party action and is governed entirely by REQ-SE-6; this clause exists so that any reference to "REQ-SE-5 clause 5" resolves to a substantive statement rather than a placeholder. *(Per Decision D5: the former reserved placeholder is replaced with real content; the consolidation of the old ownership-transfer clause into clause 4 is recorded in the retired-IDs appendix, §14.)*
 6. WHILE an ownership-transfer confirmation is pending, both partners retain full data access unchanged.
 7. A pending ownership-transfer confirmation expires if not completed by both partners, and expiry leaves the plan unchanged.
 8. Every lifecycle action and confirmation is recorded in the change log per REQ-SE-4.
@@ -505,6 +508,9 @@ THE SYSTEM SHALL permit either paired partner to unilaterally revoke the other p
 6. Following removal, the removed partner's server access stops and no future edits from that partner sync in either direction.
 7. THE SYSTEM MAY offer the removed partner a local wipe on their own device, but SHALL NOT represent it as enforceable against an offline or uncooperative device.
 8. Removal does not delete the plan and does not remove the acting partner; the plan continues under the remaining partner's account.
+9. IF both partners each remove the other — including from two offline devices whose removals sync in either order — THEN THE SYSTEM SHALL resolve to a single deterministic winner: the removal bearing the earlier server-assigned timestamp (REQ-SE-2) prevails; the partner named in that winning removal is the one removed, and the acting partner of that winning removal remains. *(Added per Decision D4: no undefined "whoever syncs first" behaviour in the removal path.)*
+10. IF the two competing removals carry the same server-assigned timestamp, THEN THE SYSTEM SHALL break the tie by the stable device identifier of REQ-SE-2 clause 4, so both servers and both devices converge on the same surviving partner.
+11. The losing removal is recorded in the change log as superseded, with its actor and timestamp preserved per REQ-SE-4; the plan is never left with zero members as a result of simultaneous removal.
 
 ---
 
@@ -587,11 +593,11 @@ All previously open items are now closed.
 | # | Decision | Requirements |
 |---|---|---|
 | 1 | Payment states are `paid` / `pending` / `overdue`, derived not editable, with deposits modelled separately and partial payment as an indicator on `pending`. | REQ-LG-4, REQ-LG-5 |
-| 2 | Sync conflicts resolve by field-level last-write-wins on write timestamp, with an immutable change log preserving superseded writes. | REQ-SE-2, REQ-SE-4 |
+| 2 | Sync conflicts resolve by field-level last-write-wins ordered by a **server-assigned timestamp** applied at sync time (device wall-clocks never authoritative), with a device monotonic counter + stable device id as tiebreaker, and an immutable change log preserving superseded writes. *(D1)* | REQ-SE-2, REQ-SE-4 |
 | 3 | Region is a first-class setup input on a versioned taxonomy of three cost tiers: Metro 1.00, Provincial 0.85, Destination 1.20. | REQ-BS-4 |
 | 4 | Baseline allocations are Catering & Venue 40%, Photo & Video 15%, Attire & Styling 10%, Coordination 10%, Entourage & Miscellaneous 5%, Buffer 20%. | REQ-AE-1 |
 | 5 | The regional cost index drives cost expectation, budget adequacy, and rate suggestions — not allocation shares. See section 12. | REQ-AE-2 |
-| 6 | Plan deletion is creator-only. Two-party confirmation applies to ownership transfer only. Either partner may defensively remove the other without consent (mutual, one-sided); the removed partner keeps their existing local copy, which is not remotely wiped. Data access stays symmetric. | REQ-SE-5, REQ-SE-6 |
+| 6 | Plan deletion is creator-only. Two-party confirmation applies to ownership transfer only. Either partner may defensively remove the other without consent (mutual, one-sided); the removed partner keeps their existing local copy, which is not remotely wiped. Simultaneous mutual removal resolves to a deterministic winner by server timestamp then stable id. Data access stays symmetric. *(D3, D4)* | REQ-SE-5, REQ-SE-6 |
 | 7 | Platform is Flutter on Android and iOS, SQLite (`drift` or `sqflite`) for local persistence, web excluded from v1. | REQ-PLT-1, REQ-PLT-2 |
 | 8 | New guests default to priority tier Tier 2, with Tier 1 reserved for close family and principal sponsors. | REQ-GM-1 |
 | 9 | Partner invites expire 7 days after issuance. | REQ-SE-1 |
@@ -599,6 +605,8 @@ All previously open items are now closed.
 | 11 | One active plan per account. | REQ-PLT-3 |
 | 12 | Bento tiles may use a constrained monetary form (centavos dropped below ₱1M, `₱1.25M` shorthand above, truncated toward zero); full two-decimal form is mandatory everywhere else and in every screen-reader label. | REQ-GEN-2, REQ-GEN-2A |
 | 13 | Ruleset config is a JSON asset bundled in the app binary for v1, validated at app load. No web authoring dashboard. | REQ-AE-1 |
+| 14 | A pledge reduces the couple's out-of-pocket total ONLY on fulfillment (`received`). Promised-but-unfulfilled pledges (`tentative`, `confirmed`) show as a separate "expected" figure and never reduce net. Both figures shown distinctly. *(D2)* | REQ-PL-2, REQ-PL-3, REQ-PL-4 |
+| 15 | Retired or merged requirement IDs are recorded in the retired-IDs appendix (§14), never left as hollow live "reserved" clauses. *(D5)* | §14 |
 
 ## 12. Two decisions I adjusted, and why
 
@@ -643,3 +651,17 @@ Platform, database engine, monetary display, and ruleset management are now all 
 2. **Designated driving RSVP status default.** REQ-GM-1 clause 6 makes it designated but does not fix the default. `invited` is the safer planning default, since budgeting for fewer guests than show up is the expensive failure.
 3. **Tier-specific per-head rates.** REQ-GM-1 clause 9 permits them but no requirement sets any. Confirm whether Tier 1 guests should ever carry a different per-head rate, or whether tier is purely a cut-list device.
 4. **Ownership-transfer confirmation expiry.** REQ-SE-5 clause 7 requires expiry but does not fix the duration. Now scoped to ownership transfer only (Decision 1); defensive removal under REQ-SE-6 is immediate and has no pending-confirmation window. The 7-day invite window remains an obvious candidate for consistency.
+
+---
+
+## 14. Retired / merged IDs (redirect appendix)
+
+*Per Decision D5. When a requirement or a numbered clause is retired, merged, or superseded, it is recorded here with a redirect to what replaces it — never left as a hollow live "reserved" clause. An ID once assigned is never reused for a different meaning.*
+
+**Format:** `retired ID/clause | disposition (merged / superseded / withdrawn) | redirect target | decision | date`
+
+| Retired ID / clause | Disposition | Redirect to | Decision | Date |
+|---|---|---|---|---|
+| REQ-SE-5 clause 5 (former text: "Transferring ownership requires affirmative confirmation from both partners") | Merged into REQ-SE-5 clause 4 | REQ-SE-5 clause 4 | D1, D5 | 2026-09-13 |
+
+*No whole REQ IDs have been retired. REQ-SE-5 clause 5 now carries substantive content (a redirect to REQ-SE-6), so it is not a hollow placeholder; this table records the historical merge of its former text.*

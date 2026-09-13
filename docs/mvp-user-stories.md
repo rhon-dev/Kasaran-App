@@ -20,8 +20,8 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 10. **Overtime and venue power remain unfilled and stay visibly flagged as outstanding**, so the couple can see exactly which known-risk fees they have not yet priced.
 11. **The dashboard shows the gross event total**, including all filled hidden fees, and the variance against the ₱350,000 budget.
 12. **B logs a pledge**: Ninong Ramon, principal sponsor, ₱50,000 cash, status *tentative*. B's device and A's device both show it.
-13. **The dashboard shows gross and net side by side.** The tentative pledge does **not** reduce net out-of-pocket; it appears separately as potential relief. Net still equals the full gross at this point.
-14. **B marks the pledge confirmed.** Net out-of-pocket drops by ₱50,000, gross is unchanged, and the ₱50,000 now appears as outstanding pledge exposure (confirmed but not yet received).
+13. **The dashboard shows gross and net side by side.** The tentative pledge does **not** reduce net out-of-pocket; it appears separately in the expected-pledge figure. Net still equals the full gross at this point (Decision D2).
+14. **B marks the pledge confirmed, then received.** Confirming leaves net unchanged and adds the ₱50,000 to outstanding exposure (promised, not yet fulfilled). Only when B marks it **received** does net out-of-pocket drop by ₱50,000; gross is unchanged throughout (Decision D2).
 15. **A runs a guest what-if**, changing 150 guests to 180, and sees a **preview** of the impact before committing anything.
 16. **Every per-head cost recomputes in the preview** — catering, favors, invitations, seating. Crew meals do **not** change, because crew headcount is tracked separately from guest headcount.
 17. **A commits the what-if.** The dashboard updates gross, net, per-category variance, and the over/under-budget state consistently. B's device reflects the same figures.
@@ -162,8 +162,8 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 *As a partner, I want to see both what the wedding costs and what we personally pay, so that we can plan our own cash instead of guessing.*
 
 1. The dashboard SHALL display gross event total and net couple out-of-pocket as two distinct, simultaneously visible figures.
-2. Net out-of-pocket SHALL equal gross total minus the sum of *confirmed* and *received* pledges.
-3. *Tentative* pledges SHALL NOT reduce net out-of-pocket, and SHALL be shown separately as potential relief.
+2. Net out-of-pocket SHALL equal gross total minus the sum of *received* (fulfilled) pledges only (Decision D2). *(Was "confirmed and received"; amended so only fulfillment reduces net.)*
+3. *Tentative* and *confirmed* (promised, not yet fulfilled) pledges SHALL NOT reduce net out-of-pocket, and SHALL be shown separately as an expected-pledge figure (Decision D2).
 4. Changing a pledge status SHALL update net immediately.
 5. The system SHALL let a partner see which pledges are reducing net, and by how much.
 

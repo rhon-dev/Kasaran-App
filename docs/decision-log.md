@@ -1,6 +1,8 @@
 # Kasaran — Decision Log
 
-*Architecture Decision Records. Each row: ID, decision, status, date, driving requirement/security IDs. This file did not exist when earlier documents were written; it is created here to record decisions that were previously scattered across requirements.md §11–13 and security-plan.md §11, plus the two decisions taken on 2026-09-13.*
+*Architecture Decision Records. Each row: ID, decision, status, date, driving requirement/security IDs. Records earlier decisions (ADR-01..20) plus the decisions taken 2026-09-14 and labelled D1–D6 by the decision-maker: D1 → ADR-21, D2 → ADR-22, D3 → ADR-23 (consolidating the earlier ADR-18/19/20), D4 → ADR-24, D5 → ADR-25, D6 → ADR-26. IDs are never reused; new decisions take new ADR numbers.*
+
+*Reconciled in place (option C): the on-disk doc set is the source of truth. `docs/locked-decisions.md` was named as an input but does not exist in the repository — its intended contents were not invented; the locked decisions are the ADR rows below. If that file is created later, reconcile against this log.*
 
 ## Status legend
 
@@ -31,6 +33,42 @@
 | **ADR-18** | **Partner removal is defensive and one-sided. Two-party confirmation is scoped to ownership transfer only; removing a partner does NOT require the removed party's consent.** | **DECIDED** | **2026-09-13** | **REQ-SE-5 (cl. 4), REQ-SE-6, SEC-07** |
 | **ADR-19** | **Defensive removal is MUTUAL: either paired partner may remove the other, not creator-only.** | **DECIDED** | **2026-09-13** | **REQ-SE-6 (cl. 1), SEC-07** |
 | ADR-20 | Removed partner retains their existing local copy; there is no remote wipe. Server access stops; future edits do not sync. | DECIDED | 2026-09-13 | REQ-SE-6 (cl. 5, 6) |
+| **ADR-21 (D1)** | **LWW clock authority: ordering source of record is a SERVER-ASSIGNED timestamp applied at sync time. Device wall-clocks never authoritative. Device monotonic counter + stable device id are tiebreakers only.** | **DECIDED** | **2026-09-14** | **REQ-SE-2, design §2.2/§2.4/§4.6, TC-SE-20, TC-SE-21** |
+| **ADR-22 (D2)** | **Pledge semantics: a pledge reduces the couple's out-of-pocket total ONLY on fulfillment (`received`). Promised-but-unfulfilled (`tentative`, `confirmed`) appear as a separate "expected" figure and never reduce net. Both shown distinctly.** | **DECIDED** | **2026-09-14** | **REQ-PL-2, REQ-PL-3, REQ-PL-4, TC-PL-10, TC-PL-11** |
+| **ADR-23 (D3)** | **Partner removal is defensive, one-sided, and mutual; two-party confirmation scoped to ownership transfer only; removed partner keeps local copy, no remote wipe; logged and attributed. (Consolidates ADR-18/19/20 under the D-label.)** | **DECIDED** | **2026-09-14** | **REQ-SE-5 (cl. 4), REQ-SE-6, SEC-07, TC-SE-10..15** |
+| **ADR-24 (D4)** | **Simultaneous mutual removal has a deterministic winner: order by the D1 server timestamp, tiebreak on stable id. No undefined "whoever syncs first".** | **DECIDED** | **2026-09-14** | **REQ-SE-6 (cl. 9–11), SEC-07, TC-SE-22** |
+| **ADR-25 (D5)** | **Retired/merged requirement IDs are recorded in a redirect appendix (requirements §14), never left as hollow live "reserved" clauses.** | **DECIDED** | **2026-09-14** | **requirements §14, REQ-SE-5 (cl. 5)** |
+| **ADR-26 (D6)** | **Shared-record erasure test cases are left UN-STUBBED and marked blocked-pending-counsel, with no asserted expected value. A guessed expected result is forbidden.** | **DECIDED (as a process rule)** | **2026-09-14** | **testing-plan §5, SEC-33, SEC-38** |
+
+## ADR-21 (D1) — Server-assigned LWW clock authority
+
+**Context.** The prior design ordered field-level LWW by a hybrid logical clock seeded from the device wall clock (design §2.2). A device with a wrong clock could still distort ordering.
+
+**Decision.** The ordering source of record is a **server-assigned timestamp** applied when a change-log row is accepted at sync. Device wall-clocks are never authoritative. A device-side monotonic counter, then a stable device id, are tiebreakers only.
+
+**Rationale.** Removes device time from the authority chain entirely, rather than merely bounding its error as an HLC does. An unsynced write carries no authoritative order and cannot beat an already-synced write by an earlier clock reading.
+
+**Consequences.** REQ-SE-2 rewritten (clauses 3–5 changed, clause added); design §2.2, §2.4, §2.5, §4.6, §7.5 updated from `hlc_*` to `server_ts` + `device_monotonic`; TC-SE-20 and TC-SE-21 added.
+
+## ADR-22 (D2) — Pledge reduces out-of-pocket only on fulfillment
+
+**Context.** The prior model reduced net by both `confirmed` and `received` pledges; only `tentative` was excluded (former REQ-PL-2).
+
+**Decision.** Net out-of-pocket is reduced **only** by fulfilled (`received`) pledges. `tentative` and `confirmed` are "expected" support, shown as a distinct figure, and never reduce the real number.
+
+**Rationale.** A promised pledge is not money in hand. Counting a confirmed-but-unfulfilled Ninong pledge against the real out-of-pocket recreates the over-optimism the product exists to prevent. The couple must see the real number and the hoped-for number separately.
+
+**Consequences.** REQ-PL-2, REQ-PL-3, REQ-PL-4 rewritten (IDs preserved); dashboard shows net (fulfilled only) and an expected figure distinctly; TC-PL-10 and TC-PL-11 added.
+
+## ADR-24 (D4) — Deterministic winner for simultaneous mutual removal
+
+**Context.** Mutual one-sided removal (ADR-23/D3) raises the case where each partner removes the other, possibly from two offline devices.
+
+**Decision.** Resolve to a single deterministic winner: the removal with the earlier server-assigned timestamp (ADR-21/D1) prevails; ties break on stable device id. The plan is never left with zero members.
+
+**Rationale.** "Whoever syncs first" is undefined and non-reproducible. Reusing the D1 ordering authority gives one answer both servers and devices agree on.
+
+**Consequences.** REQ-SE-6 clauses 9–11 added; TC-SE-22 asserts the winner from two offline devices.
 
 ## ADR-18 — Partner removal is defensive and one-sided
 

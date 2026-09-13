@@ -80,7 +80,7 @@ Field sources cite entities and derived calculations from design.md sections 1.4
 ### SCR-02 Invite Acceptance
 **Regions:** inviter identity; plan summary; accept/decline; expiry/error slot.
 **Fields:** inviter display name → `users` via `invites.inviter_user_id`; wedding date → `plans`; expiry → `invites.expires_at`.
-**Actions:** Accept → write `plan_members`, then full replay pull from `since_hlc = 0` (design.md 2.5) → SCR-06. Decline → SCR-01.
+**Actions:** Accept → write `plan_members`, then full replay pull from `since_server_ts = 0` (design.md 2.5) → SCR-06. Decline → SCR-01.
 **States of note:** expired, revoked, already accepted — each names the reason (REQ-SE-1 clause 5).
 **Nav in:** deep link. **Nav out:** SCR-06, SCR-01.
 
@@ -160,16 +160,16 @@ Six typed variants sharing one shell. Per-type field differences in section 5.1.
 **Nav in:** SCR-12, dashboard guest tile. **Nav out:** SCR-12 or SCR-06.
 
 ### SCR-14 Pledges List
-**Regions:** gross/net pair; potential relief; outstanding exposure with contributing list; pledge list grouped by status; add.
-**Fields:** `pledges.*`; **net** (derived: gross − confirmed − received, REQ-PL-2 clause 2); **potential relief** (derived: sum tentative, REQ-PL-3 clause 2); **outstanding exposure** (derived: sum confirmed-not-received, REQ-PL-4).
-**Actions:** row tap → SCR-15; status change inline. Tap net → breakdown of contributing pledges summing exactly to gross − net, tentative absent (REQ-PL-5).
-**Displays:** exposure renders `₱0.00`, never blank, when nothing is confirmed-not-received (REQ-PL-4 clause 3).
+**Regions:** gross/net pair; expected-pledge figure; outstanding exposure with contributing list; pledge list grouped by status; add.
+**Fields:** `pledges.*`; **net** (derived: gross − **received only**, REQ-PL-2 clause 2, Decision D2); **expected pledge support** (derived: Σ `tentative` + `confirmed`, REQ-PL-3); **outstanding exposure** (derived: Σ confirmed-not-received, REQ-PL-4).
+**Actions:** row tap → SCR-15; status change inline. Tap net → breakdown of contributing pledges summing exactly to gross − net, containing only `received` pledges (REQ-PL-5 clause 3).
+**Displays:** exposure renders `₱0.00`, never blank, when nothing is confirmed-not-received (REQ-PL-4 clause 3). The expected figure carries a label making clear it is not yet realized money (REQ-PL-3 clause 5).
 **Nav in:** Pledges tab; dashboard net tile. **Nav out:** SCR-15.
 
 ### SCR-15 Pledge Editor
 **Regions:** sponsor name; role picker; type toggle; item description (item type only); value; status; link to category or entry; save/delete.
 **Fields:** all of `pledges` per REQ-PL-1.
-**Actions:** status change updates net and exposure in the same operation (REQ-PL-2 clause 5). Moving tentative → confirmed decreases net by exactly the pledge value (REQ-PL-3 clause 3). Confirmed → received leaves net unchanged and decreases exposure (REQ-PL-4 clause 1) — stated inline, because that pairing is counterintuitive.
+**Actions:** status change updates net, expected, and exposure in the same operation (REQ-PL-2 clause 6). Moving tentative → confirmed leaves **net unchanged** and moves the value within the expected figure (still promised, not fulfilled). Confirmed → received **decreases net** by the pledge value and decreases both expected and exposure (REQ-PL-2 clause 3, REQ-PL-4 clause 1, Decision D2) — stated inline, because fulfillment, not confirmation, is the point at which the couple's real cost drops.
 **Copy:** role picker uses **Ninong** and **Ninang** untranslated (section 8.4).
 **Nav in:** SCR-14. **Nav out:** SCR-14.
 
@@ -191,7 +191,7 @@ Specified in section 6.
 
 ### SCR-19 Sync Detail
 **Regions:** connection state; pending-write count and list; last successful sync; failure detail; manual retry.
-**Fields:** `sync_state.last_pushed_hlc`, `last_pulled_hlc`; local queue depth.
+**Fields:** `sync_state.last_pushed_server_ts`, `last_pulled_server_ts`; local queue depth.
 **Actions:** retry. Replay is automatic and requires no action here (REQ-OF-5 clauses 1, 2) — the button exists for reassurance, and the screen says so.
 **Nav in:** sync badge, any screen. **Nav out:** dismiss.
 
@@ -224,7 +224,7 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 | SCR-11 | N/A — only reachable from an existing figure | Explanation shown | N/A | Badge; explanation is local | Badge | N/A — explanation is derived, not user-written | Read-only, still viewable | Missing explanation payload → figure is not rendered upstream, so this screen is unreachable (REQ-AE-4 clause 4) |
 | SCR-12 | Zero guests; crew block still shown | Matrix and list | N/A | Badge | Badge | Stamp on changed guest rows | Read-only; add suppressed | Driving count above guest cap (REQ-BS-5 clause 2) |
 | SCR-13 | N/A — requires a plan; runs with zero guests and reports zero deltas | Before/after comparison | N/A | Badge; computes fully offline (REQ-OF-2 clause 2) | Badge; preview unaffected as it is local-only | **N/A — a preview is never synced (REQ-GM-5 clause 8), so no remote write can touch it** | Read-only; commit suppressed, preview still viewable | Over-cap with full calculation still returned (REQ-GM-5 clause 4) |
-| SCR-14 | Zero pledges; gross shown, net equals gross, exposure `₱0.00` | Grouped list with all three figures | N/A | Badge | Badge | Banner when a pledge status changed remotely | Read-only | None defined — pledge values cannot be invalid; negative is rejected at entry |
+| SCR-14 | Zero pledges; gross shown, net equals gross, expected `₱0.00`, exposure `₱0.00` | Grouped list with net, expected, and exposure figures | N/A | Badge | Badge | Banner when a pledge status changed remotely | Read-only | None defined — pledge values cannot be invalid; negative is rejected at entry |
 | SCR-15 | Blank form | Populated | N/A | Badge | Badge | Field stamp | Read-only; save suppressed | Sponsor name empty, negative value, item type without description |
 | SCR-16 | Contains setup entries from the moment a plan exists; never empty | Full feed | Pagination on long histories | Badge; local entries listed as not-yet-synced | Badge | **This is where resolution surfaces** — see 6.4 | Read-only; history retained in full | N/A — log entries are facts, not calculations |
 | SCR-17 | Solo: no partner, invite prompt | Partner present, with mutual remove action available to either partner | N/A | Badge; invite generation and ownership transfer blocked offline, but a queued removal is permitted and takes effect server-side on reconnect | Badge | N/A — membership does not flow through the log (design.md 2.5) | Terminal state for the removed partner: explains removal, offers exit | Ownership-transfer confirmation with no defined expiry — see 1.1 gap. Defensive removal is immediate, so it has no pending state |
@@ -280,8 +280,8 @@ Tiles A and B are adjacent and equal in visual weight because REQ-PL-2 clause 1 
 | Header | Sync badge | Local queue depth, connection state (section 7) |
 | A | Gross event total | Derived: Σ effective across `ledger_entries` incl. hidden fees |
 | A | Total budget | `plans.total_budget_cents` |
-| B | Net out-of-pocket | Derived: gross − confirmed − received (REQ-PL-2 clause 2) |
-| B | Potential relief | Derived: Σ tentative, labelled separately, never summed into net (REQ-PL-3 clauses 2, 4) |
+| B | Net out-of-pocket | Derived: gross − **received only** (REQ-PL-2 clause 2, Decision D2). Confirmed-but-unfulfilled pledges do NOT reduce net. |
+| B | Expected pledge support | Derived: Σ of `tentative` + `confirmed` (promised, not yet fulfilled), labelled separately, never summed into net (REQ-PL-3, Decision D2) |
 | C | Budget health | Section 4.3 |
 | D | Buffer remaining | Derived per REQ-AE-6 clauses 1, 2; pesos and percent of original (clause 4) |
 | E | Outstanding exposure | Derived: Σ confirmed-not-received (REQ-PL-4) |
@@ -405,9 +405,9 @@ Overtime (`quantity` = hours, `unit_rate` = hourly) and venue power (three fixed
 3. Choose cash or item. Item reveals a description field and optional link to a category or entry.
 4. Enter value. Set status: tentative, confirmed, or received.
 5. Save.
-6. **End state, tentative:** pledge listed under Tentative; net **unchanged**; value appears in potential relief; exposure unchanged. Inline copy explains that tentative pledges do not reduce what the couple pays until confirmed.
-7. **End state, confirmed:** net decreases by exactly the value; exposure increases by the value; the pledge appears in the net breakdown on tile B.
-8. **End state, received:** net unchanged from confirmed; exposure decreases by the value. Labelled inline, because "money arrived and my net did not move" reads as a bug otherwise.
+6. **End state, tentative:** pledge listed under Tentative; net **unchanged**; value appears in the expected figure; exposure unchanged. Inline copy explains that promised pledges do not reduce what the couple pays until the money is actually received (Decision D2).
+7. **End state, confirmed:** net still **unchanged**; value remains in the expected figure and now also in outstanding exposure (confirmed-but-unfulfilled). The pledge does not appear in the net breakdown, because it has not reduced net. Inline copy: confirming a pledge is a promise, not yet cash.
+8. **End state, received:** net **decreases** by exactly the value; the expected figure and outstanding exposure both decrease by the value; the pledge now appears in the net breakdown on tile B. This is the only status at which net moves (Decision D2).
 
 ### 5.3 Guest what-if, commit or discard · REQ-GM-2, REQ-GM-3, REQ-GM-5, REQ-BS-5
 
@@ -426,9 +426,9 @@ Overtime (`quantity` = hours, `unit_rate` = hourly) and venue power (three fixed
 
 1. Partner B goes offline on SCR-08 and sets an entry's actual amount to ₱62,000. Local write commits; queue depth 1.
 2. Partner A, online, sets the **same field** on the same entry to ₱58,000. A's write syncs immediately.
-3. B reconnects. Queued row pushes with its **original HLC preserved**, not reconnect time (REQ-OF-5 clause 3).
-4. Both devices order the two log rows by `(hlc_physical, hlc_counter, device_id)` and independently select the same winner (REQ-SE-2 clauses 3, 4).
-5. Projections converge. Both devices show the same value (REQ-SE-3 clause 2).
+3. B reconnects. The queued row pushes and the **server assigns its `server_ts` on acceptance** (Decision D1); B's device sequence (`device_monotonic`) is preserved but is not the ordering authority. Because A's write was accepted earlier, A's write carries the earlier `server_ts`.
+4. Both devices order the two log rows by `(server_ts, device_monotonic, device_id)` and independently select the same winner. Under D1 the winner is A's ₱58,000, since it holds the earlier server timestamp — B's later-on-the-wall-clock entry does not win by virtue of B's device clock (REQ-SE-2 clauses 3, 4, 5).
+5. Projections converge. Both devices show the same value, ₱58,000 (REQ-SE-3 clause 2).
 6. **Neither write is discarded.** Both remain in `change_log`; the loser is superseded, computed at read time (design.md 4.6).
 7. The losing device shows a banner naming the field and the winning value, linking to SCR-16.
 8. SCR-16 shows both rows in clock order, the winner marked current and the loser marked superseded with its value intact and its author attributed.
@@ -660,7 +660,7 @@ Every numeric tile carries an explicit label. The visual figure alone is insuffi
 | Tile | Spoken label |
 |---|---|
 | A | "Gross event total, 350,000 pesos, out of a 350,000 peso budget" |
-| B | "Net out of pocket, 300,000 pesos. Potential relief from tentative pledges, 50,000 pesos" |
+| B | "Net out of pocket, 300,000 pesos, counting only fulfilled pledges. Expected pledge support not yet received, 50,000 pesos" |
 | C | "Budget health. 5 of 6 checks passing. Budget adequacy not available" |
 | D | "Buffer remaining, 58,000 pesos, 82 percent of buffer" |
 | E | "Outstanding pledge exposure, 50,000 pesos" |
@@ -711,7 +711,7 @@ Names, inputs, and states only.
 | `FeeComponentRow` | componentType, label, quantity, unitRate, amount | quantity-rate mode, amount mode, incomplete, read-only | SCR-09 |
 | `FeePromptCard` | feeType, state, total, dismissedBy, dismissedAt | prompted-unfilled, filled, dismissed, region-defaulted | SCR-05, SCR-06 tile H |
 | `PledgeStatusControl` | status, value | tentative, confirmed, received, read-only | SCR-14, 15 |
-| `GrossNetPair` | gross, net, potentialRelief | equal, net-reduced, zero-state | SCR-06 tiles A/B, SCR-14 |
+| `GrossNetPair` | gross, net (fulfilled only), expectedPledgeSupport | equal, net-reduced, zero-state | SCR-06 tiles A/B, SCR-14 |
 | `RsvpTierMatrix` | counts by status and tier, drivingStatus | populated, empty, driving-highlighted | SCR-12 |
 | `CrewHeadcountBlock` | headcount | zero, populated, read-only | SCR-12, SCR-09 crew variant |
 | `WhatIfComparison` | before, after, affectedCategories, excludedItems | neutral, increase, decrease, over-cap | SCR-13 |

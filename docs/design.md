@@ -43,7 +43,7 @@ data/
   changelog/             append-only writer (section 2)
 sync/
   queue/                 outbound cursor and batching
-  clock/                 hybrid logical clock (section 2.2)
+  clock/                 device monotonic counter; server assigns ordering ts (D1, section 2.2)
   transport/             HTTP client, retry, idempotency
 platform/
   db/                    SQLite open, migrate, encrypt
@@ -122,17 +122,21 @@ The alternative — sync whole rows and keep the log as a side audit table — c
 
 ### 2.2 Clocks: hybrid logical clock, not wall time
 
-REQ-SE-2 clause 3 resolves conflicts by "later timestamp" and clause 4 requires a deterministic tiebreaker. Device wall clocks make this unsafe: a phone running ten minutes fast wins every conflict regardless of actual causality, and REQ-OF-4 explicitly anticipates devices disagreeing about the date.
+REQ-SE-2 (amended per Decision D1) resolves conflicts by a **server-assigned timestamp applied at sync time**, with a device-side monotonic counter as tiebreaker. Device wall clocks are never authoritative for ordering: a phone running ten minutes fast must not win a conflict, and REQ-OF-4 explicitly anticipates devices disagreeing about the date.
 
-**Use a hybrid logical clock.** Each log row carries `hlc = (physical_ms, counter, device_id)`, compared lexicographically in that order.
+**The ordering source of record is the server.** When the server accepts a change-log row at sync, it stamps `server_ts` (a monotonic server clock / commit sequence). That value, not any device time, orders writes to the same field.
 
-- `physical_ms` — max of local wall clock and highest observed remote physical time
-- `counter` — increments when physical time does not advance
-- `device_id` — stable UUID, the tiebreaker required by REQ-SE-2 clause 4
+Each log row carries an ordering key `(server_ts, device_monotonic, device_id)`, compared lexicographically:
 
-Both devices independently compute the same winner from the same triple, and modest clock skew stops silently deciding outcomes. A device with a badly wrong clock still distorts ordering; HLC bounds the damage rather than eliminating it.
+- `server_ts` — assigned by the server on acceptance; the authoritative order. Null on the device until the row has synced.
+- `device_monotonic` — a per-device counter that only ever increases, recorded at write time. Used as a tiebreaker when two rows share a `server_ts`, and to order a device's own not-yet-synced writes locally.
+- `device_id` — stable UUID, the final deterministic tiebreaker required by REQ-SE-2 clause 4.
 
-**Expensive to reverse.** The HLC lives in a column on every log row and in every comparison. Retrofitting it after shipping wall-clock timestamps means a migration plus re-deriving order for existing data.
+**Why not a hybrid logical clock seeded from the wall clock (prior design):** an HLC still folds the device wall clock into `physical_ms`, so a badly-set clock still distorts ordering — HLC only bounds the damage. D1 removes device time from the authority chain entirely by deferring the ordering stamp to the server. The device monotonic counter carries no wall-clock meaning; it is a pure sequence.
+
+**Consequence for offline writes.** A write made offline has no `server_ts` until it syncs (REQ-SE-2 clause 5). Locally it is ordered after the device's last-synced state by `device_monotonic`; on sync the server assigns `server_ts` and the authoritative order is settled then. An offline write therefore cannot beat an already-synced write merely because the offline device's clock reads earlier.
+
+**Expensive to reverse.** The ordering key lives in a column on every log row and in every comparison. This is a change from the earlier HLC design; the schema (§4.6) reflects `server_ts` + `device_monotonic` rather than `hlc_physical` + `hlc_counter`.
 
 ### 2.3 Identifiers and tombstones
 
@@ -147,18 +151,18 @@ Both are expensive to reverse. See sections 7.3 and 7.4.
 Two operations, both idempotent:
 
 ```
-POST /sync/push   { plan_id, rows: ChangeLogRow[] }
-                  → { accepted: [ids], server_hlc }
-                  insert-ignore on primary key
+POST /sync/push   { plan_id, rows: ChangeLogRow[] }   -- rows carry device_monotonic, not server_ts
+                  → { accepted: [{id, server_ts}], server_ts_high }
+                  insert-ignore on primary key; server assigns server_ts on accept (D1)
 
-GET  /sync/pull   ?plan_id&since_hlc&limit
+GET  /sync/pull   ?plan_id&since_server_ts&limit
                   → { rows: ChangeLogRow[], next_cursor, has_more }
 ```
 
-- Pull is cursor-paged on HLC so a long offline period syncs incrementally rather than in one oversized response.
+- Pull is cursor-paged on `server_ts` so a long offline period syncs incrementally rather than in one oversized response.
 - Push batches with a cap; partial success is fine because retry is idempotent.
-- Original `hlc` is preserved on push, never rewritten to server receipt time — required by REQ-OF-5 clause 3.
-- `sync_state` holds `last_pushed_hlc` and `last_pulled_hlc` per device per plan.
+- **The server assigns `server_ts` on acceptance (D1); the device never sends an authoritative ordering timestamp.** The device sends `device_monotonic` and `device_id`, which the server preserves for tiebreaking. This differs from a preserved-client-timestamp scheme: the ordering authority is the server, per Decision D1, so REQ-OF-5 clause 3's "preserve original ordering" means preserving the device sequence, with `server_ts` settled at first acceptance and never rewritten thereafter.
+- `sync_state` holds `last_pushed_server_ts`, `last_pulled_server_ts`, and the device's `device_monotonic` per device per plan.
 
 ### 2.5 First login on a second device
 
@@ -166,12 +170,12 @@ REQ-SE-1 clause 5 requires the joining partner to see every existing figure iden
 
 1. Partner B accepts the invite deep link. Server validates the token against `invites` — unexpired per REQ-SE-1 clause 4, not revoked, not already accepted.
 2. Server inserts the `plan_members` row. Membership is the one write that does not flow through the change log, because it is an access-control fact rather than plan content, and it must be authoritative before any data is readable.
-3. Client creates the local database and pulls from `since_hlc = 0`, paged.
-4. Client applies rows in HLC order, building projections from empty.
+3. Client creates the local database and pulls from `since_server_ts = 0`, paged.
+4. Client applies rows in `server_ts` order, building projections from empty.
 5. Client computes all derived figures locally per section 1.4.
 6. Dashboard renders. B's figures now match A's exactly, because both are projections of the same log.
 
-Bootstrapping a long-lived plan means replaying every field change ever made. For a wedding budget — hundreds of entries, a few thousand log rows — this is fine. If it ever is not, add a periodic server-side snapshot and pull `snapshot + log since snapshot`. **Do not build snapshots for v1.** The seam is the `since_hlc` cursor, which already accommodates them.
+Bootstrapping a long-lived plan means replaying every field change ever made. For a wedding budget — hundreds of entries, a few thousand log rows — this is fine. If it ever is not, add a periodic server-side snapshot and pull `snapshot + log since snapshot`. **Do not build snapshots for v1.** The seam is the `since_server_ts` cursor, which already accommodates them.
 
 ### 2.6 What is deliberately not built
 
@@ -478,27 +482,30 @@ change_log (
   entity_type   text not null,
   entity_id     uuid not null,
   field_name    text not null,
-  old_value     jsonb,
-  new_value     jsonb,
-  hlc_physical  bigint not null,
-  hlc_counter   integer not null,
-  device_id     uuid not null,
-  actor_user_id uuid not null references users,
-  created_at    timestamptz not null
+  old_value       jsonb,
+  new_value       jsonb,
+  server_ts       bigint,          -- assigned by server at sync (D1); null until synced
+  device_monotonic bigint not null, -- per-device increasing counter, tiebreaker
+  device_id       uuid not null,
+  actor_user_id   uuid not null references users,
+  created_at      timestamptz not null
 )
 -- Append-only. No UPDATE, no DELETE, enforced by permission and trigger.
--- Ordering key: (hlc_physical, hlc_counter, device_id).
+-- Ordering key: (server_ts, device_monotonic, device_id) per Decision D1.
+-- server_ts is the authority; device_monotonic/device_id only break ties or
+-- order a device's own not-yet-synced rows locally.
 
 -- Projection index: newest write per field
 create index change_log_field_idx
   on change_log (plan_id, entity_type, entity_id, field_name,
-                 hlc_physical desc, hlc_counter desc, device_id desc);
+                 server_ts desc, device_monotonic desc, device_id desc);
 
 sync_state (                     -- local only, never synced
   device_id       uuid,
   plan_id         uuid,
-  last_pushed_hlc text,
-  last_pulled_hlc text,
+  last_pushed_server_ts  bigint,
+  last_pulled_server_ts  bigint,
+  device_monotonic       bigint not null default 0,
   primary key (device_id, plan_id)
 )
 ```
@@ -655,11 +662,11 @@ Low risk, because offline-first leaves no real alternative. Worth stating explic
 
 Non-negotiable for offline sync. The cost is that every query must filter `deleted_at is null`, and one forgotten filter silently inflates a total. Mitigate with repository-level views rather than relying on discipline at each call site.
 
-### 7.5 Hybrid logical clock instead of wall time
+### 7.5 Server-assigned ordering timestamp instead of device time (D1)
 
-**Cost to reverse: moderate.** Adding HLC later is a migration plus rewriting every comparison, and historical ordering cannot be reconstructed for data already written with wall clocks.
+**Cost to reverse: moderate.** The ordering key `(server_ts, device_monotonic, device_id)` lives in a column on every log row and in every comparison. Changing the authority again means a migration plus rewriting every comparison, and historical ordering cannot be reconstructed for data written under a different scheme.
 
-Cheap now, so do it now.
+Decided (D1): the server is the ordering authority; device wall clocks never decide a conflict. This is stronger than the earlier hybrid-logical-clock design, which still folded the device wall clock into the ordering value. Do it from the first schema so no migration is needed.
 
 ### 7.6 Derived values never persisted
 

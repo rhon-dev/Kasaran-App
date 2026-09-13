@@ -1,6 +1,6 @@
 # Kasaran — Testing Plan
 
-*Test cases carry a TC ID, preconditions, steps, and an expected result verifiable by someone other than the author. This file is created here; it previously did not exist. It focuses first on the plan-lifecycle and shared-editing behaviour affected by Decisions 1 and 2 (ADR-18, ADR-19), then references the security suites those cases depend on. Broader feature coverage (ledger, pledges, allocation, guest math, offline sync) is scaffolded in §4 and expanded as those areas are built.*
+*Test cases carry a TC ID, preconditions, steps, and an expected result verifiable by someone other than the author. Covers the plan-lifecycle, sync, and pledge behaviour affected by Decisions D1–D6 (ADR-21..26 in the decision log), plus the security suites those cases depend on. Broader feature coverage (ledger, allocation, guest math, offline sync) is scaffolded in §4 and expanded as those areas are built. Per Decision D6, shared-record erasure test cases are left un-stubbed and blocked-pending-counsel (§5); no expected value is asserted for them.*
 
 ## 1. Conventions
 
@@ -22,6 +22,17 @@
 | TC-SE-17 | Removal is not a two-party action | A and B paired | A removes B | No `lifecycle_confirmations` row is created for the removal; it is a direct delete. Confirms removal bypasses the two-party path entirely | REQ-SE-6, design.md §4.1 |
 | TC-SE-18 | Plan deletion remains creator-only | A created plan; B paired | B attempts plan deletion | B is not offered the delete action; if the endpoint is invoked directly, it is refused with a creator-only message | REQ-SE-5 (1,2) |
 | TC-SE-19 | Accidental-tap guard on removal | A on SCR-17 | A taps remove but does not complete the typed/deliberate confirmation | No removal occurs; B remains a member | ux-spec SCR-17, REQ-SE-6 (2) |
+| TC-SE-20 | LWW resolves by server-assigned timestamp, not device clock | A and B on same plan; **B's device wall clock is set 10 minutes fast**; both edit the same field | B edits field to X (fast clock), A edits same field to Y afterward in real time; both sync | The write with the later **server-assigned** timestamp wins (A's Y), regardless of B's fast device clock; B's fast clock does not win the conflict | REQ-SE-2 (3,5), ADR-21/D1 |
+| TC-SE-21 | Monotonic-counter tiebreak on equal server timestamp | Two writes to the same field accepted with the same `server_ts` | Force/simulate identical `server_ts` for two field writes | Resolution picks the higher device monotonic counter; if equal, the higher stable device id; both devices converge on the same winner | REQ-SE-2 (4), ADR-21/D1 |
+| TC-SE-22 | Simultaneous mutual removal has a deterministic winner | A and B both offline; A removes B on A's device; B removes A on B's device; both then reconnect (in either order) | Both removals sync | Exactly one partner survives; the winner is the removal with the earlier `server_ts`, tiebroken on stable id (REQ-SE-6 clauses 9–11); result is identical on the server and on both devices regardless of sync order; the plan is never left with zero members; the losing removal is recorded as superseded in the change log | REQ-SE-6 (9,10,11), ADR-24/D4, SEC-07 |
+
+## 2b. Pledge fulfillment math (Decision D2 / ADR-22)
+
+| TC ID | Title | Preconditions | Steps | Expected result | Refs |
+|---|---|---|---|---|---|
+| TC-PL-10 | Promised pledge does not reduce net; shows as expected | Gross ₱350,000; no pledges | Add a `confirmed` pledge of ₱50,000 | Net remains ₱350,000 (unchanged); the expected-pledge figure shows ₱50,000; the two figures are displayed distinctly and never summed | REQ-PL-2 (4), REQ-PL-3 (1,2,4), ADR-22/D2 |
+| TC-PL-11 | Fulfillment reduces net and expected together | State from TC-PL-10 (net ₱350,000, expected ₱50,000) | Change the pledge status `confirmed` → `received` | Net decreases to ₱300,000; expected-pledge figure decreases to ₱0.00; outstanding exposure decreases accordingly; all in the same operation | REQ-PL-2 (3,6), REQ-PL-3 (3), REQ-PL-4 (1), ADR-22/D2 |
+| TC-PL-12 | Tentative behaves as expected, not net | Gross ₱350,000 | Add a `tentative` pledge of ₱20,000 | Net unchanged at ₱350,000; expected-pledge figure includes the ₱20,000; net breakdown (REQ-PL-5) does not list it | REQ-PL-3 (1), REQ-PL-5 (3), ADR-22/D2 |
 
 ## 3. Security suites these depend on
 
@@ -39,10 +50,10 @@ Expanded as each area is implemented; listed so the plan's scope is visible.
 
 - **TC-AE-*** — allocation determinism, regional cost index does not alter shares, buffer drawdown, override preserve/revert.
 - **TC-HF-*** — six fee types with correct per-type input shapes; crew meals excluded from guest scaling.
-- **TC-PL-*** — gross vs net, tentative excluded from net, exposure math.
+- **TC-PL-*** — gross vs net (net reduced only on fulfillment, D2), expected figure shown distinctly, exposure math. TC-PL-10..12 above cover the D2 core.
 - **TC-GM-*** — per-head propagation, crew separation, what-if commit/discard byte-identical state.
-- **TC-OF-*** — full offline CRUD, idempotent replay, queued-write attribution and original HLC.
-- **TC-SYNC-*** — field-level LWW convergence, superseded-write visibility, HLC tiebreaker.
+- **TC-OF-*** — full offline CRUD, idempotent replay, queued-write attribution and preserved device sequence (server assigns `server_ts` on sync, D1).
+- **TC-SYNC-*** — field-level LWW convergence by server timestamp (D1), superseded-write visibility, monotonic-counter tiebreak.
 
 ## 5. Open questions raised by testing
 
