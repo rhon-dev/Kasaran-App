@@ -61,6 +61,7 @@ Short history, for anyone tracing the name's status changes:
 | OQ-07 | **Data residency.** No ADR covers where Philippine personal data is stored. Supabase has no PH region; the deployment plan assumes `ap-southeast-1` (Singapore). DPA 2012 permits cross-border transfer but the controller stays accountable and must disclose the location. | OPEN | deployment-plan §2.2, SEC-30. **Blocks the privacy notice, which blocks store submission** |
 | OQ-08 | **Bundled vs remote allocation ruleset.** ADR-15 bundles the ruleset in the app binary. Flutter has no code OTA, so a wrong baseline or regional modifier requires a full store release (days). Remote-with-bundled-fallback would make it a minutes-scale fix. | OPEN | deployment-plan §3.6, ADR-15, REQ-AE-3, OQ-04. Requires amending ADR-15 |
 | OQ-09 | **Name clearance** (distinct from the name *decision* in ADR-27): App Store name availability, Play title collision, IPOPHIL trademark search, and domain ownership for the support / privacy / deletion URLs. | OPEN | deployment-plan §5.6. Steps 1, 2, 4 are hard submission blockers |
+| OQ-10 | **Payment-rail security has no SEC block.** `security-plan.md` §9 scoped PCI-and-equivalent out of v1 on the assumption payments would arrive inside the AI phase. ADR-28 gives payments its own phase, so a dedicated SEC block (rail auth, tokenisation, reconciliation integrity, PCI applicability, DPA implications of transaction data) must be authored. | OPEN | ADR-28, security-plan §9, development-phases §25. **Blocks phase 25 from starting** |
 
 *Note: OQ-01..05 were previously numbered ADR-O1..O5. They are renamed to the OQ series because they are open questions, not decisions; the mapping is ADR-O1→OQ-01 … ADR-O5→OQ-05. No decision ADR ID is affected. OQ-06 was surfaced by the GIV-07 naming caveat and is now closed by ADR-27.*
 
@@ -99,6 +100,7 @@ Short history, for anyone tracing the name's status changes:
 | ADR-25 (D5) | Retired/merged requirement IDs are recorded in a redirect appendix (requirements §14), never left as hollow live "reserved" clauses. | DECIDED | 2026-09-14 | requirements §14, REQ-SE-5 (cl. 5) |
 | ADR-26 (D6) | Shared-record erasure test cases are left UN-STUBBED and marked blocked-pending-counsel, with no asserted expected value. A guessed expected result is forbidden. | DECIDED (process rule) | 2026-09-14 | testing-plan §5, SEC-33, SEC-38, OQ-01 |
 | ADR-27 | **Final product name is Kasaran.** Confirms and closes the naming question. Adopted as a distinct, ownable mark; cleared for logo/domain. Supersedes ADR-06 (working-name-only) and closes OQ-06; GIV-07 RESOLVED. | DECIDED | 2026-09-14 | GIV-07, OQ-06, ADR-06, problem-brief |
+| ADR-28 | **Payments (REQ-AI-4) is its own post-launch phase, pulled out of the AI tail entirely.** Becomes development phase 25, owned by **Backend Agent** with Security as mandatory reviewer — payments is a financial-rail integration, not inference, and was only ever grouped with AI because both were deferred. The ID `REQ-AI-4` is retained un-renumbered; its `AI-` prefix is now a historical artifact. | DECIDED | 2026-09-14 | REQ-AI-4, development-phases §25, agents.md, OQ-10 |
 
 ---
 

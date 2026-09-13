@@ -257,7 +257,7 @@ Stated so their absence is a decision, not an oversight.
 - **End-to-end encryption of plan content.** Not v1. Data is encrypted in transit (SEC-17) and at rest on device (SEC-12), but the server can read plan content, which is what makes RLS the load-bearing control. E2EE would break server-side validation and is disproportionate for this scope. Reconsider only if the threat model changes.
 - **MFA for end users.** Provider supports it; not required for a wedding-budget account in v1. Owner/admin restore access does require MFA (SEC-27).
 - **Jailbreak/root detection and anti-tampering.** Not v1. The at-rest and backup controls address the realistic threats (T2, T7); device-integrity attestation is disproportionate here.
-- **Payment-rail security (PCI etc.).** Not applicable — v1 records that money moved, never moves it (REQ-LG-4, deferred REQ-AI-4). Revisit only when payments enter the AI phase.
+- **Payment-rail security (PCI etc.).** Not applicable to v1 — v1 records that money moved, never moves it (REQ-LG-4, deferred REQ-AI-4). **Revised per ADR-28:** payments is no longer part of the AI phase; it is its own post-launch phase (development-phases §25). A dedicated SEC block must therefore be authored before that phase starts — covering rail authentication, tokenisation, reconciliation integrity, PCI applicability, and the DPA implications of holding transaction data. Tracked as **OQ-10**, which blocks phase 25. This is a gap, not a completed exclusion.
 
 ## 10. Verification tooling summary
 

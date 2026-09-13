@@ -92,7 +92,7 @@
 
 **Owns / does not own** — Owns business rules wherever they physically run. **Note:** `domain/` ships inside the Flutter app but is owned here, not by Mobile, because it is pure business logic. Does **not** own schema (Data & Sync), RLS (Security), or presentation.
 
-**Inputs** — `requirements.md` (REQ-AE-*, REQ-PL-*, REQ-GM-*, REQ-LG-*), `design.md` §5, `testing-plan.md` §3–4 fixtures.
+**Inputs** — `requirements.md` (REQ-AE-*, REQ-PL-*, REQ-GM-*, REQ-LG-*, and post-launch REQ-AI-4 payments per ADR-28), `design.md` §5, `testing-plan.md` §3–4 fixtures.
 
 **Definition of Done** — All three fixtures match hand-computed values exactly; determinism proven across repeated runs and both devices; no `double` in any money path; zero figures without an explanation payload.
 
@@ -110,8 +110,9 @@
 **Responsibilities**
 - Pre-gate: review `design.md` §6 seams; report gaps as findings, not code.
 - Pre-gate: confirm no v1 artifact contains a model, inference call, or AI dependency.
-- Post-gate: implement REQ-AI-1…5 behind the documented interfaces.
+- Post-gate: implement REQ-AI-1, REQ-AI-2, REQ-AI-3, REQ-AI-5 behind the documented interfaces.
 - Post-gate: own the DPA privacy analysis for plan-snapshot egress.
+- **Does not own REQ-AI-4 (payments)** — reassigned to Backend by ADR-28.
 
 **Deliverables** — `docs/ai-seam-review.md` ⚠ (pre-gate, the only one). Post-gate: `ai/` ⚠
 
@@ -305,7 +306,8 @@ Every file in `docs/` and every top-level source module maps to **exactly one** 
 | `.github/workflows/` | DevOps/Release | |
 | `fastlane/` | DevOps/Release | |
 | `CHANGELOG.md` ⚠ | DevOps/Release | |
-| `ai/` ⚠ | AI/ML | **Must not exist in a v1 build** |
+| `ai/` ⚠ | AI/ML | **Must not exist in a v1 build.** Excludes payments — see below |
+| `payments/` ⚠ | Backend | Post-launch phase 25 (REQ-AI-4, ADR-28). **Security is a mandatory reviewer.** Must not exist in a v1 build |
 
 **Two boundaries worth restating**, because they are the ones most likely to be violated:
 

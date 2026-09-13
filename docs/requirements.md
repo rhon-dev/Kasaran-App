@@ -561,7 +561,7 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 **REQ-AI-1 [AI-phase]** — OCR extraction of ledger entries from photographed contracts and receipts.
 **REQ-AI-2 [AI-phase]** — On-device automatic categorisation of ledger entries.
 **REQ-AI-3 [AI-phase]** — Cloud AI budget advice, risk warnings, forecasting, and natural-language summaries.
-**REQ-AI-4 [AI-phase]** — InstaPay and QR Ph payment initiation and reconciliation.
+**REQ-AI-4 [post-launch — PAYMENTS, not AI-phase]** — InstaPay and QR Ph payment initiation and reconciliation. *(Reclassified per ADR-28: payments is its own post-launch phase (development-phases §25), owned by Backend with Security as mandatory reviewer, and is no longer part of the AI tail. The `REQ-AI-` prefix is retained because IDs are never renumbered — see §14. Still excluded from v1.)*
 **REQ-AI-5 [AI-phase]** — Conversational assistant for natural-language input and queries.
 
 **REQ-EX-1 — Excluded entirely, not deferred.** THE SYSTEM SHALL NOT include a supplier marketplace, vendor directory, supplier reviews, supplier ratings, quote solicitation, or booking, in v1 or in the AI phase.
@@ -665,3 +665,11 @@ Platform, database engine, monetary display, and ruleset management are now all 
 | REQ-SE-5 clause 5 (former text: "Transferring ownership requires affirmative confirmation from both partners") | Merged into REQ-SE-5 clause 4 | REQ-SE-5 clause 4 | D1, D5 | 2026-09-13 |
 
 *No whole REQ IDs have been retired. REQ-SE-5 clause 5 now carries substantive content (a redirect to REQ-SE-6), so it is not a hollow placeholder; this table records the historical merge of its former text.*
+
+### 14.1 Reclassified IDs (prefix no longer describes the classification)
+
+An ID is never renumbered, so a reclassification can leave the prefix misleading. Those cases are recorded here.
+
+| ID | Prefix implies | Actual classification | Decision | Date |
+|---|---|---|---|---|
+| REQ-AI-4 | AI-phase feature | **Post-launch payments phase** (development-phases §25), owned by Backend, not AI/ML. Not an AI capability and not part of the AI tail. | ADR-28 | 2026-09-14 |
