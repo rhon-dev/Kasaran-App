@@ -58,6 +58,9 @@ Short history, for anyone tracing the name's status changes:
 | OQ-04 | Reference cost benchmarks per region tier for budget adequacy. | OPEN | REQ-AE-2 (cl. 2) |
 | OQ-05 | Ownership-transfer confirmation expiry duration. | OPEN | REQ-SE-5 (cl. 7) |
 | OQ-06 | Final product name / brand (whether to keep "Kasaran"). | **CLOSED** → ADR-27 (name is Kasaran, 2026-09-14) | GIV-07, ADR-06, ADR-27 |
+| OQ-07 | **Data residency.** No ADR covers where Philippine personal data is stored. Supabase has no PH region; the deployment plan assumes `ap-southeast-1` (Singapore). DPA 2012 permits cross-border transfer but the controller stays accountable and must disclose the location. | OPEN | deployment-plan §2.2, SEC-30. **Blocks the privacy notice, which blocks store submission** |
+| OQ-08 | **Bundled vs remote allocation ruleset.** ADR-15 bundles the ruleset in the app binary. Flutter has no code OTA, so a wrong baseline or regional modifier requires a full store release (days). Remote-with-bundled-fallback would make it a minutes-scale fix. | OPEN | deployment-plan §3.6, ADR-15, REQ-AE-3, OQ-04. Requires amending ADR-15 |
+| OQ-09 | **Name clearance** (distinct from the name *decision* in ADR-27): App Store name availability, Play title collision, IPOPHIL trademark search, and domain ownership for the support / privacy / deletion URLs. | OPEN | deployment-plan §5.6. Steps 1, 2, 4 are hard submission blockers |
 
 *Note: OQ-01..05 were previously numbered ADR-O1..O5. They are renamed to the OQ series because they are open questions, not decisions; the mapping is ADR-O1→OQ-01 … ADR-O5→OQ-05. No decision ADR ID is affected. OQ-06 was surfaced by the GIV-07 naming caveat and is now closed by ADR-27.*
 
@@ -157,6 +160,7 @@ Short history, for anyone tracing the name's status changes:
 
 - Open-question rows renamed: **ADR-O1 → OQ-01, ADR-O2 → OQ-02, ADR-O3 → OQ-03, ADR-O4 → OQ-04, ADR-O5 → OQ-05.** These were open questions mislabelled with an ADR prefix; the OQ series corrects the tier. No *decision* ADR ID (ADR-01..26) changed.
 - New this restructure: **GIV-01..07** (givens tier), **OQ-06** (final brand name).
+- Added by the deployment plan: **OQ-07** (data residency), **OQ-08** (bundled vs remote ruleset), **OQ-09** (name clearance, distinct from the ADR-27 name decision).
 - **ADR-08** status changed DECIDED → SUPERSEDED-in-part (pointer to ADR-21). Its ID and text are retained.
 - **ADR-06** history: first "brand locked", then reframed to "working name adopted; brand unresolved", now **SUPERSEDED by ADR-27** (name confirmed as Kasaran). ID retained throughout.
 - **ADR-27** added: final product name is Kasaran; closes OQ-06; GIV-07 RESOLVED.
