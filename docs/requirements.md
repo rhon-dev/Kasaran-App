@@ -38,6 +38,49 @@ These terms are used with exactly these meanings throughout. Ambiguity in any re
 | **Flat-rate entry** | A ledger entry whose effective amount is independent of any guest count. |
 | **Ruleset version** | An immutable, identified snapshot of allocation baseline percentages and regional modifiers. |
 | **Region** | The Philippine location classification of the wedding, carrying cost modifiers. |
+| **Allocation category** | One of the six budget categories in the fixed taxonomy below. |
+| **Buffer** | The allocation category reserved to absorb overruns and rounding remainder. |
+| **Regional cost index** | A per-region multiplier expressing absolute cost level relative to NCR. Not a budget-share modifier — see REQ-AE-2. |
+| **Expected total cost** | Sum of reference costs for the plan's size and region, multiplied by the regional cost index. |
+| **RSVP status** | A guest's attendance certainty: confirmed, invited, or tentative. |
+| **Priority tier** | A guest's relationship priority: Tier 1 or Tier 2. Orthogonal to RSVP status. |
+
+### Allocation category taxonomy and NCR baselines
+
+THE SYSTEM SHALL use exactly these six allocation categories, with these NCR baseline percentages.
+
+| Allocation category | NCR baseline |
+|---|---|
+| Catering & Venue | 40% |
+| Photo & Video | 15% |
+| Attire & Styling | 10% |
+| Coordination | 10% |
+| Entourage & Miscellaneous | 5% |
+| Buffer | 20% |
+| **Total** | **100%** |
+
+### Platform and technology constraints
+
+**REQ-PLT-1 [v1]** — THE SYSTEM SHALL be built as a cross-platform Flutter application targeting Android and iOS.
+
+1. A single Flutter codebase serves both platforms.
+2. Web is out of scope for v1; no requirement in this document is satisfied by a web build alone.
+3. Both platforms satisfy every requirement in this document identically.
+
+**REQ-PLT-2 [v1]** — THE SYSTEM SHALL persist all plan data in a local-first embedded database on the device, and SHALL treat the local store as the source of truth for reads.
+
+1. Every read is served from the local store without a network round-trip.
+2. Every write commits to the local store before any sync is attempted.
+3. The embedded database supports integer storage wide enough for REQ-GEN-1 centavo values.
+4. The embedded engine choice between SQLite and Isar is a design-phase decision, recorded before implementation begins.
+
+**REQ-PLT-3 [v1]** — THE SYSTEM SHALL permit exactly one active plan per account.
+
+1. An account with an active plan cannot create a second active plan.
+2. IF a partner attempts to create a second active plan, THEN THE SYSTEM SHALL block creation and name the existing active plan.
+3. Being a second partner on another account's plan does not count against this limit.
+
+---
 
 ### Monetary and rounding rules (apply to every requirement)
 
@@ -86,14 +129,22 @@ IF the wedding date entered is earlier than the device's current date, THEN THE 
 3. Declining returns to the field with the prior value restored.
 4. A past wedding date does not suppress overdue calculation in REQ-LG-5.
 
-**REQ-BS-4 [v1] — Region taxonomy**
-THE SYSTEM SHALL classify wedding location using a fixed, versioned region taxonomy in which each region carries cost modifiers and a destination flag.
+**REQ-BS-4 [v1] — Region taxonomy and cost tiers**
+THE SYSTEM SHALL classify wedding location using a fixed, versioned region taxonomy in which every region maps to exactly one cost tier carrying a regional cost index.
 
-1. The taxonomy contains at minimum: NCR / Metro Manila; Nearby Luzon (Tagaytay, Batangas, Laguna, Cavite, Rizal, Bulacan, Pampanga); Baguio / Northern Luzon; Cebu; Bohol; Boracay / Aklan; Palawan (Puerto Princesa, El Nido, Coron); Siargao; Davao; Other Visayas; Other Mindanao; Other.
-2. Each region record carries a per-category cost modifier set and a boolean destination flag.
-3. Region records are configuration data, versioned with the ruleset, and changeable without a code change.
-4. Regions flagged as destination default the OOT prompt in REQ-HF-3 to an enabled state.
+1. The taxonomy defines exactly three cost tiers with these indices:
+
+   | Cost tier | Regional cost index | Regions |
+   |---|---|---|
+   | Metro | 1.00 | NCR / Metro Manila |
+   | Provincial | 0.85 | Nearby Luzon (Tagaytay, Batangas, Laguna, Cavite, Rizal, Bulacan, Pampanga), Baguio / Northern Luzon, Cebu, Bohol, Davao, Iloilo, Bacolod, Other Visayas, Other Mindanao |
+   | Destination | 1.20 | Boracay / Aklan, Palawan (Puerto Princesa, El Nido, Coron), Siargao |
+
+2. Every region maps to exactly one cost tier; no region is unmapped.
+3. Region records and tier indices are configuration data, versioned with the ruleset, and changeable without a code change.
+4. Regions in the Destination tier default the OOT prompt in REQ-HF-3 to an enabled state.
 5. Selecting a region never itself creates, deletes, or modifies a ledger entry.
+6. The regional cost index is applied only as specified in REQ-AE-2, and SHALL NOT be applied to allocation shares.
 
 **REQ-BS-5 [v1] — Guest cap is a ceiling, not a cost driver**
 THE SYSTEM SHALL treat guest cap as a partner-set ceiling used for warnings only, and SHALL NOT use guest cap as the driving guest count.
@@ -259,13 +310,19 @@ WHEN a partner inspects net out-of-pocket, THE SYSTEM SHALL show which pledges r
 
 ## 5. Guest math
 
-**REQ-GM-1 [v1] — Guest tiers and driving count**
-THE SYSTEM SHALL maintain guest counts in the tiers `confirmed`, `invited`, and `tentative`, and SHALL apply exactly one designated tier as the driving guest count.
+**REQ-GM-1 [v1] — RSVP status and priority tier are separate axes**
+THE SYSTEM SHALL record for every guest both an RSVP status and a priority tier, as two independent fields, and SHALL derive the driving guest count from RSVP status.
 
-1. Each tier stores an independent integer ≥ 0.
-2. The designated driving tier is visible wherever per-head totals are shown.
-3. WHEN a partner changes the designated driving tier, every per-head entry recomputes in the same operation.
-4. Crew headcount is stored separately and is excluded from all three tiers.
+1. RSVP status is exactly one of {confirmed, invited, tentative}.
+2. Priority tier is exactly one of {Tier 1, Tier 2}, where Tier 1 denotes close family and principal sponsors and Tier 2 denotes general or standard guests.
+3. A newly added guest defaults to priority tier Tier 2.
+4. A newly added guest's RSVP status is set explicitly and does not default silently to confirmed.
+5. The two fields are independently editable; changing one never changes the other.
+6. The driving guest count is derived from a designated RSVP status, and the designated status is visible wherever per-head totals are shown.
+7. WHEN a partner changes the designated RSVP status, every per-head entry recomputes in the same operation.
+8. THE SYSTEM SHALL report guest counts broken down by priority tier within the driving RSVP status.
+9. Priority tier SHALL NOT be used as a multiplier in any per-head calculation unless a tier-specific per-head rate is explicitly configured under REQ-GM-2.
+10. Crew headcount is stored separately and is excluded from all guest counts and both axes.
 
 **REQ-GM-2 [v1] — Per-head versus flat-rate classification**
 THE SYSTEM SHALL classify every ledger entry as either per-head or flat-rate, and SHALL require a per-head rate for per-head entries.
@@ -302,29 +359,38 @@ WHEN a partner requests a guest what-if for a hypothetical count, THE SYSTEM SHA
 6. WHEN a partner discards a preview, the plan state is byte-identical to its pre-preview state.
 7. WHEN a partner commits a preview, the driving guest count updates and REQ-GM-3 propagation applies.
 8. A preview is never synced to the other partner's device before commit.
+9. WHERE a partner previews a guest reduction, THE SYSTEM SHALL report how many Tier 2 guests would need removing to reach the target count before any Tier 1 guest is affected.
 
 ---
 
 ## 6. Rule-based allocation engine
 
 **REQ-AE-1 [v1] — Deterministic allocation from configurable baselines**
-WHEN budget setup completes, THE SYSTEM SHALL allocate the total budget across categories using configurable baseline percentages and the selected region's modifiers, from a pinned ruleset version.
+WHEN budget setup completes, THE SYSTEM SHALL allocate the total budget across the six allocation categories using the configured baseline percentages, from a pinned ruleset version.
 
 1. Given identical inputs and an identical ruleset version, the engine returns identical allocations on every invocation and on both devices.
-2. The engine derives allocations only from total budget, guest cap, driving guest count, region, and wedding date.
+2. Default baseline percentages are Catering & Venue 40%, Photo & Video 15%, Attire & Styling 10%, Coordination 10%, Entourage & Miscellaneous 5%, Buffer 20%.
 3. Baseline percentages are stored as configuration data, editable without a code change.
-4. Baseline percentages across all categories sum to exactly 100% before modifiers are applied, and the system rejects a ruleset that does not.
-5. The sum of allocations equals the total budget exactly; any rounding remainder is assigned to a single designated category rather than discarded.
-6. THE SYSTEM SHALL NOT use inference, prediction, learned models, training data, or any generative component in allocation.
+4. Baseline percentages across all six categories sum to exactly 100%, and THE SYSTEM SHALL reject a ruleset whose baselines do not.
+5. The sum of allocations equals the total budget exactly.
+6. WHEN percentage division produces a rounding remainder, THE SYSTEM SHALL assign the entire remainder to the Buffer category.
+7. A ₱350,000 NCR budget allocates ₱140,000.00 to Catering & Venue, ₱52,500.00 to Photo & Video, ₱35,000.00 to Attire & Styling, ₱35,000.00 to Coordination, ₱17,500.00 to Entourage & Miscellaneous, and ₱70,000.00 to Buffer.
+8. THE SYSTEM SHALL NOT use inference, prediction, learned models, training data, or any generative component in allocation.
 
-**REQ-AE-2 [v1] — Regional modifiers**
-WHEN the engine allocates, THE SYSTEM SHALL apply the selected region's per-category modifiers to the baseline percentages before distributing the total budget.
+**REQ-AE-2 [v1] — Regional cost index applies to cost expectation, not to budget share**
+THE SYSTEM SHALL apply the regional cost index to reference cost benchmarks and derived rate suggestions, and SHALL NOT apply it to allocation share percentages.
 
-1. Each region supplies a multiplier per category, defaulting to 1.0 where unspecified.
-2. After modifiers are applied, the system renormalises so allocations still sum exactly to the total budget.
-3. Two plans identical except for region produce different allocations whenever the two regions' modifier sets differ.
-4. Two plans identical except for region produce identical allocations when both regions' modifiers are all 1.0.
-5. Modifier values are configuration data, versioned with the ruleset.
+*Rationale, binding on implementation: a cost index applied uniformly to every baseline percentage and then renormalised returns the original percentages unchanged, because the common factor cancels. A uniform index therefore cannot alter how a fixed budget is sliced. It expresses how much a wedding costs in that region, which is a statement about budget adequacy and about absolute rates, not about proportion.*
+
+1. Allocation share percentages are identical across all three cost tiers for identical inputs.
+2. Expected total cost equals the summed reference cost for the plan's guest count multiplied by the region's cost index.
+3. THE SYSTEM SHALL display a budget adequacy indicator comparing total budget against expected total cost, stating the shortfall or surplus in pesos.
+4. A ₱350,000 budget in a Destination-tier region with an expected total cost of ₱420,000.00 displays a shortfall of ₱70,000.00.
+5. THE SYSTEM SHALL apply the regional cost index to suggested per-head rates and to suggested OOT fee defaults, as suggestions only.
+6. A suggested value produced under clause 5 is never written to a ledger entry without explicit partner action.
+7. WHERE a region additionally defines per-category skew multipliers, THE SYSTEM SHALL apply them to baseline percentages and renormalise so allocations still sum exactly to the total budget.
+8. Per-category skew multipliers default to 1.0 for every category in every region, so that by default no region alters allocation shares.
+9. Cost index and skew values are configuration data, versioned with the ruleset.
 
 **REQ-AE-3 [v1] — Ruleset version pinning**
 WHEN a plan is created, THE SYSTEM SHALL pin the ruleset version then in force, and SHALL NOT retroactively apply a later ruleset to that plan without explicit partner action.
@@ -352,6 +418,17 @@ WHEN a partner overrides a category allocation, THE SYSTEM SHALL store the overr
 5. A partner can revert an override, after which the category returns to the engine value.
 6. Reverting one override does not affect any other override.
 
+**REQ-AE-6 [v1] — Buffer drawdown**
+THE SYSTEM SHALL compute buffer remaining as the Buffer allocation minus the summed overrun of all non-Buffer categories, and SHALL display it on the dashboard.
+
+1. Category overrun equals `max(0, summed_effective_amount − allocated_amount)` for a non-Buffer category.
+2. Buffer remaining equals Buffer allocation minus the sum of all non-Buffer category overruns.
+3. Under-spend in one category does not offset overrun in another for this calculation.
+4. Buffer remaining is displayed as a peso amount and as a percentage of the original Buffer allocation.
+5. IF buffer remaining falls below zero, THEN THE SYSTEM SHALL display a budget breach indicator stating the amount by which the total budget is exceeded.
+6. Rounding remainder assigned under REQ-AE-1 clause 6 increases the Buffer allocation before drawdown is computed.
+7. Buffer remaining recomputes within the same operation as any change to an allocation or an effective amount.
+
 ---
 
 ## 7. Shared editing and sync
@@ -362,8 +439,9 @@ THE SYSTEM SHALL support exactly two partner accounts per plan, with identical r
 1. A plan admits at most two partner accounts in v1.
 2. No budget field is writable by one partner and read-only to the other.
 3. A partner invites the second partner, who joins the plan via that invite.
-4. An unaccepted invite is revocable and expires after a defined period.
-5. WHEN the second partner joins, they see every existing figure identically, including manual overrides.
+4. An unaccepted invite is revocable and expires exactly 7 days after issuance.
+5. IF a partner opens an invite link more than 7 days after issuance, THEN THE SYSTEM SHALL reject it and state that the invite has expired.
+6. WHEN the second partner joins, they see every existing figure identically, including manual overrides.
 
 **REQ-SE-2 [v1] — Field-level last-write-wins**
 WHEN two partners have edited the same plan and their changes reconcile, THE SYSTEM SHALL resolve conflicts at field granularity using last-write-wins by write timestamp.
@@ -390,6 +468,19 @@ THE SYSTEM SHALL record every create, update, and delete with the acting partner
 3. A write that lost a last-write-wins resolution appears in the log with its value preserved and its superseded outcome stated.
 4. Change log entries are immutable; no user interface permits editing or deleting them.
 5. Every log entry attributes exactly one partner identity.
+
+**REQ-SE-5 [v1] — Plan-lifecycle permissions**
+THE SYSTEM SHALL restrict plan deletion to the creating partner, and SHALL require two-party confirmation for partner removal and for ownership transfer.
+
+1. Only the creating partner is offered the delete-plan action.
+2. IF the non-creating partner attempts plan deletion, THEN THE SYSTEM SHALL refuse and state that only the plan creator may delete it.
+3. Plan deletion requires an explicit typed or equivalent confirmation from the creator beyond a single tap.
+4. Removing a linked partner requires affirmative confirmation from both partners before it takes effect.
+5. Transferring ownership requires affirmative confirmation from both partners before it takes effect.
+6. WHILE a two-party confirmation is pending, both partners retain full data access unchanged.
+7. A pending two-party confirmation expires if not completed by both partners, and expiry leaves the plan unchanged.
+8. Every lifecycle action and confirmation is recorded in the change log per REQ-SE-4.
+9. Data-level access remains fully symmetric per REQ-SE-1; this requirement governs lifecycle actions only.
 
 ---
 
@@ -451,33 +542,79 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 
 | Area | Requirements | Source stories |
 |---|---|---|
+| Platform | REQ-PLT-1 … 3 | Cross-cutting |
 | Monetary base | REQ-GEN-1 … 2 | Cross-cutting |
 | Budget setup | REQ-BS-1 … 6 | BS-1, BS-2 |
 | Expense ledger | REQ-LG-1 … 6 | LG-1, LG-2, LG-3 |
 | Hidden fees | REQ-HF-1 … 3 | HF-1, HF-2 |
 | Pledges | REQ-PL-1 … 5 | PL-1, PL-2, PL-3 |
 | Guest math | REQ-GM-1 … 5 | GM-1, GM-2, GM-3 |
-| Allocation engine | REQ-AE-1 … 5 | AE-1, AE-2, AE-3 |
-| Shared editing | REQ-SE-1 … 4 | SE-1, SE-2, SE-3 |
+| Allocation engine | REQ-AE-1 … 6 | AE-1, AE-2, AE-3 |
+| Shared editing | REQ-SE-1 … 5 | SE-1, SE-2, SE-3 |
 | Offline | REQ-OF-1 … 5 | OF-1, OF-2 |
 | AI phase | REQ-AI-1 … 5, REQ-EX-1 | AI-1 … AI-5 |
 
 ---
 
-## 11. Decisions resolved by this document
+## 11. Decisions resolved
 
-Three open items from earlier documents are now closed:
+All previously open items are now closed.
 
-1. **Payment states — resolved.** `paid` / `pending` / `overdue`, derived rather than manually set (REQ-LG-5), with deposits modelled separately (REQ-LG-4). Partial payment is an indicator on `pending`, not a fourth state.
-2. **Offline conflict policy — resolved.** Field-level last-write-wins by write timestamp, plus an immutable visible change log that preserves superseded writes (REQ-SE-2, REQ-SE-4).
-3. **Regional cost variation — resolved as a mechanism.** Region is a first-class setup input with a versioned taxonomy and per-category modifiers (REQ-BS-4, REQ-AE-2).
+| # | Decision | Requirements |
+|---|---|---|
+| 1 | Payment states are `paid` / `pending` / `overdue`, derived not editable, with deposits modelled separately and partial payment as an indicator on `pending`. | REQ-LG-4, REQ-LG-5 |
+| 2 | Sync conflicts resolve by field-level last-write-wins on write timestamp, with an immutable change log preserving superseded writes. | REQ-SE-2, REQ-SE-4 |
+| 3 | Region is a first-class setup input on a versioned taxonomy of three cost tiers: Metro 1.00, Provincial 0.85, Destination 1.20. | REQ-BS-4 |
+| 4 | Baseline allocations are Catering & Venue 40%, Photo & Video 15%, Attire & Styling 10%, Coordination 10%, Entourage & Miscellaneous 5%, Buffer 20%. | REQ-AE-1 |
+| 5 | The regional cost index drives cost expectation, budget adequacy, and rate suggestions — not allocation shares. See section 12. | REQ-AE-2 |
+| 6 | Plan deletion is creator-only; partner removal and ownership transfer require two-party confirmation. Data access stays symmetric. | REQ-SE-5 |
+| 7 | Platform is Flutter on Android and iOS, local-first embedded database, web excluded from v1. | REQ-PLT-1, REQ-PLT-2 |
+| 8 | New guests default to priority tier Tier 2, with Tier 1 reserved for close family and principal sponsors. | REQ-GM-1 |
+| 9 | Partner invites expire 7 days after issuance. | REQ-SE-1 |
+| 10 | Rounding remainder is assigned to the Buffer category. | REQ-AE-1, REQ-AE-6 |
+| 11 | One active plan per account. | REQ-PLT-3 |
 
-## 12. Open items still blocking
+## 12. Two decisions I adjusted, and why
 
-1. **★ Baseline percentages and regional modifier values.** REQ-AE-1 and REQ-AE-2 specify the mechanism, and the engine is now buildable against placeholder configuration. The actual numbers — what share of a ₱300K NCR wedding goes to catering, and how much Palawan multiplies it — remain unsourced. I have not invented them. The engine will produce arithmetically correct nonsense until these are real.
-2. **★ Plan-lifecycle permissions.** REQ-SE-1 covers data symmetry but deliberately does not state who may delete the plan or remove a partner. Recommendation remains two-party confirmation or creator-only.
-3. **★ Platform.** REQ-OF-1 through REQ-OF-5 cannot be estimated or designed without knowing iOS, Android, web, or cross-platform, and whether web is in v1.
-4. **Driving guest tier default.** REQ-GM-1 makes the tier partner-designated. Which tier should a new plan default to?
-5. **Invite expiry period.** REQ-SE-1 requires an expiry but does not fix the duration.
-6. **Rounding remainder category.** REQ-AE-1 assigns the remainder to a designated category. Which one, or should it be partner-selectable?
-7. **Single active plan per account.** Still assumed yes for v1.
+Both were adopted in substance, but neither could be implemented exactly as stated without producing wrong behaviour.
+
+### 12.1 The regional multiplier cannot modify allocation shares
+
+A single multiplier applied uniformly to all six baseline percentages, followed by the renormalisation that REQ-AE-1 clause 5 requires, is arithmetically a no-op. The common factor cancels:
+
+```
+share_i = (baseline_i × m) / Σ(baseline_j × m)
+        = (baseline_i × m) / (m × Σ baseline_j)
+        = baseline_i / Σ baseline_j
+```
+
+Concretely: a ₱350,000 wedding in Palawan at 1.20 and the same wedding in NCR at 1.00 would receive **identical** category allocations — ₱140,000 to Catering & Venue in both cases. The 1.20 would have no observable effect anywhere in the product.
+
+The travel and logistics overhead the index is meant to capture is real, but it is a statement about **absolute cost level**, not about proportion. Palawan does not change what fraction of your budget goes to catering; it changes how much wedding your budget buys. So REQ-AE-2 applies the index where it does real work:
+
+- **Budget adequacy.** Expected total cost for the plan's size and region, compared against the actual budget, surfacing a peso shortfall or surplus. This is where a couple learns that ₱350,000 stretches further in Batangas than in El Nido.
+- **Rate suggestions.** Suggested per-head rates and OOT defaults are scaled by the index, as suggestions the partner must accept.
+- **Optional per-category skew.** REQ-AE-2 clauses 7 and 8 retain a genuine share-modifying mechanism for regions whose cost structure is actually skewed rather than uniformly shifted. It defaults to 1.0 everywhere, so it changes nothing until real per-category data exists.
+
+**Open question for you:** if you did intend Destination weddings to allocate proportionally *differently* — a larger Coordination and Catering & Venue share at the expense of Attire, say — then the per-category skew values in clause 7 are where those numbers go. Uniform indices cannot express it.
+
+### 12.2 Guest tiers describe two different things
+
+The earlier open item asked which of `confirmed` / `invited` / `tentative` should drive per-head costs. Those are **RSVP certainty**. The answer given — Tier 1 for close family and principal sponsors, Tier 2 for general guests, defaulting to Tier 2 — describes **relationship priority**. They are orthogonal: a Tier 1 Ninong can be tentative, and a Tier 2 colleague can be confirmed.
+
+Collapsing them into one field would lose whichever axis it replaced. REQ-GM-1 therefore models both:
+
+- **RSVP status** drives the guest count used for per-head costs, because attendance is what generates cost.
+- **Priority tier** defaults to Tier 2 as specified, and drives the cut-list logic in REQ-GM-5 clause 9: when previewing a headcount reduction, the system reports how many Tier 2 guests absorb the cut before any Tier 1 guest is touched.
+
+This preserves your intent — sponsors and close family are explicitly categorised and protected — without breaking per-head arithmetic.
+
+## 13. Remaining open items
+
+Smaller than before, and none blocking design.
+
+1. **Reference cost benchmarks for budget adequacy.** REQ-AE-2 clause 2 needs a reference cost per guest per region tier to compute expected total cost. The baseline *percentages* are now settled; this is the separate absolute figure — roughly what a Metro-tier wedding costs per head. Without it, the adequacy indicator cannot be built, though every other allocation requirement can.
+2. **Embedded database engine.** REQ-PLT-2 clause 4 defers SQLite versus Isar to design. The relational shape of the change log and the variance queries leans toward SQLite with a typed query layer, but this should be settled deliberately at design time.
+3. **Designated driving RSVP status.** REQ-GM-1 clause 6 makes it designated but does not fix the default. `invited` is the safer planning default, since budgeting for fewer guests than show up is the expensive failure.
+4. **Tier-specific per-head rates.** REQ-GM-1 clause 9 permits them but no requirement sets any. Confirm whether Tier 1 guests should ever carry a different per-head rate, or whether tier is purely a cut-list device.
+5. **Two-party confirmation expiry.** REQ-SE-5 clause 7 requires expiry but does not fix the duration. The 7-day invite window is an obvious candidate for consistency.
