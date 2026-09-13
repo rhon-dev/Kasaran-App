@@ -4,50 +4,42 @@
 
 ---
 
-## 0. Blocking conflict: platform
+## 0. Platform — resolved
 
-**This design specifies React Native. REQ-PLT-1 mandates Flutter.** Both cannot stand.
+**Resolved: Flutter, Android and iOS, SQLite via `drift` (or `sqflite`).** This matches REQ-PLT-1 and REQ-PLT-2 clause 4. The earlier React Native draft of section 1 has been replaced with the Flutter stack below.
 
-| Document | Statement |
-|---|---|
-| REQ-PLT-1 clause 1 | "A single Flutter codebase serves both platforms." |
-| This design, section 1 | React Native + Expo |
+One consequence worth keeping visible: the money-representation caveat that the React Native draft carried in section 1.5 **no longer applies**. Dart's `int` is natively 64-bit, so REQ-GEN-1's signed-64-bit-centavo requirement is satisfied by the language directly, with no `MAX_SAFE_INTEGER` guard and no `BigInt` gymnastics. This was a real point in Flutter's favour and it is now banked. See section 1.5.
 
-One of the two must be amended before implementation starts. I have written section 1 for React Native as instructed, and marked it as the only platform-dependent section. Sections 2 through 6 — sync, backend, data model, allocation engine, AI seams — are platform-agnostic and hold under either choice.
-
-**What changes if the answer is Flutter:** section 1 only. Replace Expo/expo-router with Flutter/go_router, Drizzle with Drift, Zustand with Riverpod, and the money-representation caveat in 1.5 disappears because Dart `int` is natively 64-bit. Everything else is unaffected.
-
-This is the single most expensive decision in the document. See section 7.1.
+Sections 2 through 6 — sync, backend, data model, allocation engine, AI seams — were written platform-agnostic and are unaffected by this resolution.
 
 ---
 
-## 1. Client architecture *(platform-dependent — see section 0)*
+## 1. Client architecture
 
 ### 1.1 Stack
 
 | Concern | Choice | Reason |
 |---|---|---|
-| Runtime | React Native via Expo (managed, with dev builds) | Fastest path to both stores; prebuild escape hatch if a native module is needed later. |
-| Navigation | `expo-router` (file-based) | Typed routes, deep links for invite acceptance, no manual navigator wiring. |
-| Local database | SQLite via `expo-sqlite` | REQ-PLT-2 requires a local-first embedded store. SQLite is the only option once Isar is off the table, since Isar is Dart-only. |
-| Query layer | Drizzle ORM with live queries | Typed SQL, real migrations, reactive reads so the dashboard recomputes without manual invalidation. |
-| UI state | Zustand | Ephemeral only — wizard step, open modal, preview buffer. Never persistent data. |
-| Server state | None | Deliberate. The local DB is the source of truth per REQ-PLT-2 clause 1; there is no cache-of-remote layer to keep coherent. |
+| Framework | Flutter, targeting Android and iOS | REQ-PLT-1. One codebase, both stores. Builds cleanly on the M1 Pro dev machine. |
+| Navigation | `go_router` | Declarative typed routes, deep links for invite acceptance, redirect guards for auth and active-plan state. |
+| Local database | SQLite via `drift` | REQ-PLT-2 clause 4. `drift` gives typed queries, real migrations, and reactive `Stream` results so the dashboard recomputes when a row changes. `sqflite` is the fallback if `drift`'s codegen proves heavy, at the cost of hand-written queries. |
+| App state | Riverpod | Ephemeral and derived-read state only — wizard step, open modal, preview buffer, reactive query providers. Never a second copy of persistent data. |
+| Server-state cache | None | Deliberate. The local DB is the source of truth per REQ-PLT-2 clause 1; there is no remote cache to reconcile, so no equivalent of a fetch-cache layer exists. |
 
-**No TanStack Query, no Redux.** Both exist to reconcile remote state with a client cache. Here reads never touch the network, so that whole layer would be a second source of truth competing with SQLite. Reactive local queries do the job.
+**No remote-state cache layer.** In a networked app a library like this reconciles server responses with a client cache. Here reads never touch the network (REQ-PLT-2 clause 1), so such a layer would be a second source of truth competing with SQLite. Riverpod providers wrapping `drift`'s reactive queries do the job — the UI rebuilds from the database, not from a cache of a server.
 
 ### 1.2 Layering
 
 ```
-ui/                      screens and components, no SQL, no business rules
-  presenters/            formatting only (₱ display per REQ-GEN-2)
-domain/
+ui/                      widgets and screens, no SQL, no business rules
+  presenters/            formatting only (₱ display per REQ-GEN-2, REQ-GEN-2A)
+domain/                  pure Dart, no Flutter or drift imports
   allocation/            pure allocation engine (section 5)
   calculations/          gross, net, exposure, variance, buffer, per-head
   validation/            REQ-BS-2, REQ-LG-1 field rules
 data/
   repositories/          the only code that touches SQL
-  schema/                Drizzle table definitions and migrations
+  db/                    drift table definitions and migrations
   changelog/             append-only writer (section 2)
 sync/
   queue/                 outbound cursor and batching
@@ -57,7 +49,7 @@ platform/
   db/                    SQLite open, migrate, encrypt
 ```
 
-**Rule enforced by review:** `domain/` imports nothing from `data/`, `sync/`, or `ui/`. It is pure functions over plain values. This is what makes the allocation engine swappable in section 5 and independently testable against the acceptance criteria.
+**Rule enforced by review:** the `domain/` layer imports neither Flutter nor `drift` — pure Dart functions over plain value types. This is what makes the allocation engine swappable in section 5 and unit-testable against the acceptance criteria without a widget or a database.
 
 ### 1.3 Navigation
 
@@ -90,15 +82,14 @@ REQ-LG-5 clause 6 forbids persisting payment status. The same reasoning extends 
 
 Cheap because SQLite is local — these are millisecond aggregates over hundreds of rows, not thousands.
 
-### 1.5 Money in JavaScript — a real wrinkle
+### 1.5 Money in Dart — no wrinkle
 
-REQ-GEN-1 requires signed 64-bit integer centavos and forbids floating point. JavaScript has no integer type; `number` is a double that represents integers exactly only to 2^53.
+REQ-GEN-1 requires signed 64-bit integer centavos and forbids floating point. Dart's `int` is natively 64-bit on both mobile targets, so this is satisfied by the language: money is `int` centavos end to end, stored as SQLite `INTEGER`, with no wrapper type and no upper-bound guard needed for any realistic value. This is the caveat that would have existed under React Native and does not exist here.
 
-2^53 centavos is about ₱90 trillion, so no real wedding budget comes close. But the requirement as written is not literally satisfiable with `number`.
+Two rules hold this in place:
 
-**Approach:** store as SQLite `INTEGER` (true 64-bit), carry as `number` in app code, and add a guard in the repository layer that rejects any value exceeding `Number.MAX_SAFE_INTEGER`. Document the bound. Do not use `BigInt` throughout — it does not serialise to JSON cleanly and infects every arithmetic call site for a bound no user will reach.
-
-Worth noting: this caveat is a consequence of choosing React Native. Dart's `int` is 64-bit and satisfies REQ-GEN-1 literally.
+- **No `double` in any monetary path.** Allocation, variance, buffer, and pledge arithmetic operate on `int` centavos. Percentages and multipliers are basis points (`int`), per section 4, so even ratio math stays integer until a final divide.
+- **Formatting is the only place a value becomes a string**, in `ui/presenters/`, applying REQ-GEN-2 (full form) and REQ-GEN-2A (constrained bento form: centavos dropped below ₱1M, `₱1.25M` above, truncated toward zero). The presenter is the single chokepoint, so the constrained form cannot leak into a ledger row, editor, or accessibility label.
 
 ---
 
@@ -224,7 +215,7 @@ Note the tradeoff honestly: it trades a build-it-yourself auth risk for a vendor
 ### Considered and rejected
 
 - **PowerSync or ElectricSQL** — turnkey Postgres-to-SQLite sync. Genuinely capable, but both impose their own conflict semantics, and REQ-SE-2's field-level LWW plus REQ-SE-4's superseded-write visibility are specific enough that fighting the framework is likely. Reconsider if hand-rolled sync stalls.
-- **WatermelonDB** — RN-native offline sync, but row-level LWW by default. Field-level would mean working against the grain.
+- **Isar with built-in sync, or `drift`'s network extensions** — now that the platform is Flutter, these are the on-platform equivalents to consider. Both default to row-level rather than field-level resolution, so field-level LWW plus superseded-write visibility would mean working against the grain either way. `drift` is retained for local persistence per section 1.1; its sync helpers are not used.
 - **Firebase** — Firestore's document model fits the relational shape of variance and change-log queries poorly, and pushes toward denormalisation that conflicts with never storing derived values.
 
 ---
@@ -636,11 +627,11 @@ Not designed here beyond one boundary: v1's `deposit_paid_cents` records that mo
 
 Ordered by cost.
 
-### 7.1 Platform — React Native or Flutter
+### 7.1 Platform — resolved as Flutter
 
 **Cost to reverse: total rewrite of the client.** Everything in section 1, all UI, all local persistence wiring. Sections 2 through 6 survive, which is roughly the sync protocol, schema, and domain logic — real value, but the client is the bulk of the work.
 
-Unresolved, and contradicting REQ-PLT-1. See section 0. **Settle this before writing any code.**
+**Resolved: Flutter + SQLite/`drift` (section 0).** No longer a live decision. Recorded here only so the reversal cost stays on the ledger: switching frameworks after code exists is a client rewrite. The `domain/` purity rule in section 1.2 is the hedge — the allocation engine, calculations, and validation are plain Dart with no Flutter import, so that layer at least would port.
 
 ### 7.2 Change log as the sync unit
 
@@ -686,9 +677,10 @@ Keep application code free of Supabase-specific calls outside `sync/transport/` 
 
 ## 8. Open items carried into implementation
 
-1. **Platform conflict.** Section 0. Blocking.
-2. **Reference cost values.** `reference_costs` exists but is unpopulated, so budget adequacy (REQ-AE-2 clause 3) cannot ship. Every other allocation requirement can.
-3. **Designated driving RSVP status default.** Requirements section 13 item 3 is still open. `invited` remains the safer default.
-4. **Two-party confirmation expiry.** `lifecycle_confirmations.expires_at` needs a duration. Seven days matches the invite window.
-5. **Local database encryption.** Not required by any requirement, but the local store holds names, a wedding date, and financial detail. SQLCipher or platform keystore-backed encryption is worth deciding before launch rather than after.
-6. **RLS policy test suite.** If Supabase is chosen, the plan-isolation policy is the entire security boundary between couples. It needs adversarial tests, not review by inspection.
+1. **Reference cost values.** `reference_costs` exists but is unpopulated, so budget adequacy (REQ-AE-2 clause 3) cannot ship. Every other allocation requirement can. This is now the only item blocking a specific feature.
+2. **Designated driving RSVP status default.** Requirements section 13 item 2 is still open. `invited` remains the safer default.
+3. **Two-party confirmation expiry.** `lifecycle_confirmations.expires_at` needs a duration. Seven days matches the invite window.
+4. **Local database encryption.** Not required by any requirement, but the local store holds names, a wedding date, and financial detail. With Flutter/SQLite this means SQLCipher (via `drift`'s encryption support) or platform keystore-backed encryption, worth deciding before launch rather than after.
+5. **RLS policy test suite.** If Supabase is chosen, the plan-isolation policy is the entire security boundary between couples. It needs adversarial tests, not review by inspection.
+
+*Resolved since first draft: platform (Flutter + SQLite/`drift`, section 0), monetary representation (Dart `int`, section 1.5), and ruleset config management (bundled JSON asset validated at load, per requirements REQ-AE-1).*

@@ -6,10 +6,10 @@
 
 **`docs/decision-log.md` does not exist.** It was listed as an input; the repository contains only `problem-brief.md`, `project-brief.md`, `mvp-user-stories.md`, `requirements.md`, and `design.md`. I have not inferred its contents. Nothing appears lost — decisions are recorded in requirements.md sections 11–13 and design.md sections 7–8 — but if a separate consolidated log is wanted, it needs writing.
 
-**Two upstream conflicts affect this spec directly.** Both are stated where they bite rather than only here.
+**Two items that were open when this spec was first written are now resolved.** Recorded here so the spec reads consistently.
 
-1. **Platform is unresolved.** design.md section 0 specifies React Native; REQ-PLT-1 mandates Flutter. This spec is platform-neutral: no navigator, widget, or gesture primitive is named. Touch-target and dynamic-type rules in section 9 are stated to satisfy both platforms' floors.
-2. **REQ-GEN-2 conflicts with narrow-tile layout.** REQ-GEN-2 clause 1 requires *exactly two decimals* in every monetary display. A bento tile cannot hold `₱1,250,000.00`. See section 8.2 — this requires a requirement amendment, not a silent violation.
+1. **Platform — resolved as Flutter** (Android and iOS, SQLite via `drift`). This spec remains platform-neutral by design — no widget or gesture primitive is named — so nothing here changed, but section 9's touch-target and dynamic-type rules are now known to target Flutter's implementation of both platform floors.
+2. **REQ-GEN-2 constrained-display amendment — adopted** as REQ-GEN-2A. Bento tiles use a constrained monetary form (centavos dropped below ₱1M, `₱1.25M` above, truncated toward zero); the full two-decimal form holds everywhere else and in every screen-reader label. Section 8.2 now describes settled behaviour, not a proposal.
 
 **Budget health thresholds are only partly defined upstream.** See section 4.3. I have specified the card using only conditions that exist in requirements.md and have not invented graded bands.
 
@@ -572,25 +572,23 @@ Per REQ-GEN-2: `₱` prefix, no space, comma thousands separators, exactly two d
 
 Centavos always display in this form. Wedding costs are quoted in whole pesos, so decimals are usually `.00` — but REQ-GEN-2 clause 1 requires them, and a conditional format would make column alignment unstable.
 
-### 8.2 Narrow tiles — a requirement conflict
+### 8.2 Constrained monetary display in bento tiles
 
-`₱1,250,000.00` is fourteen characters. It does not fit a half-width bento tile at a readable size on a small phone. REQ-GEN-2 clause 1 admits no abbreviation.
-
-**Position: this requires amending REQ-GEN-2, not violating it.** Proposed amendment — a *constrained display* form permitted only in bento tiles:
+`₱1,250,000.00` is fourteen characters and does not fit a half-width bento tile at a readable size on a small phone. This is resolved by REQ-GEN-2A, the adopted constrained-display amendment. The constrained form is permitted **only** inside dashboard bento tiles:
 
 | Range | Constrained form | Full form |
 |---|---|---|
 | < ₱1,000,000 | `₱350,000` (centavos dropped) | `₱350,000.00` |
 | ≥ ₱1,000,000 | `₱1.25M` | `₱1,250,000.00` |
 
-Conditions on the amendment:
+Rules, per REQ-GEN-2A:
 
-1. Permitted **only** in dashboard bento tiles. Ledger rows, editors, totals, previews, and the change log keep the full form.
+1. Permitted **only** in dashboard bento tiles. Ledger rows, editors, totals, previews, and the change log keep the full two-decimal form.
 2. The full form is always in the accessibility label, so a screen reader never hears `₱1.25M` (section 9.3).
 3. Tapping any constrained figure reveals the full form.
-4. Abbreviation never rounds in a way that overstates: `₱1.259M` displays as `₱1.25M`, truncated toward zero, so a tile never claims more money than exists.
+4. Truncation is toward zero, so a tile never overstates: `₱1,259,000.00` displays as `₱1.25M`, and `₱350,999.99` displays as `₱350,999`. A tile never claims more money than exists.
 
-Until REQ-GEN-2 is amended, the strictly compliant fallback is section 9.2's shrink-then-wrap behaviour, accepting reduced legibility on small screens. **Flagged for decision — do not resolve in code.**
+Implementation note: this behaviour lives entirely in the `MoneyDisplay` presenter (section 10), which is the single chokepoint between `int` centavos and rendered text. No screen formats money itself, so the constrained form structurally cannot leak outside a tile.
 
 ### 8.3 Negative and over-budget presentation
 
@@ -631,7 +629,7 @@ Justification: the Philippines sees both `MM/DD/YYYY` from US influence and `DD/
 
 ## 9. Accessibility baseline
 
-Stated to satisfy both platform floors, since the platform is unresolved (section 0).
+Stated to satisfy both platform floors. The platform is Flutter (section 0), which implements the accessibility APIs of both underlying systems, so these rules map to Flutter's `Semantics` and text-scaling support.
 
 ### 9.1 Touch targets
 
@@ -646,8 +644,8 @@ Stated to satisfy both platform floors, since the platform is unresolved (sectio
 Text scales with the OS setting on all screens. Overflow in a bento tile follows a fixed escalation:
 
 1. **Shrink** the figure to a floor of 80% of its nominal size. No further.
-2. **Drop centavos**, if the constrained-display amendment in section 8.2 is accepted.
-3. **Abbreviate** to `₱1.25M`, same condition.
+2. **Drop centavos** per the constrained form of REQ-GEN-2A (section 8.2).
+3. **Abbreviate** to `₱1.25M` per REQ-GEN-2A, for values at or above ₱1M.
 4. **Grow the tile vertically.** The bento reflows; the figure never shrinks below the floor and is never clipped.
 5. **At the largest accessibility sizes, the bento collapses to a single-column stack.** Two-column tiles cannot hold a scaled seven-figure number at any legible size.
 
@@ -735,12 +733,11 @@ Names, inputs, and states only.
 
 Ordered by blocking severity.
 
-1. **★ Platform.** design.md 0 versus REQ-PLT-1. This spec is platform-neutral, so it does not block here, but implementation cannot start.
-2. **★ REQ-GEN-2 amendment for constrained displays.** Section 8.2. Without it, seven-figure budgets are illegible in bento tiles on small phones. Needs a requirement change, not a code workaround.
-3. **★ Budget health graded bands — deliberately not invented.** Section 4.3. The card currently states six facts. A graded verdict needs caution thresholds, weighting, and severity ranking defined upstream first.
-4. **Reference cost values.** Budget adequacy renders as unavailable until `reference_costs` is populated. Already tracked as requirements.md 13.1; noted because it is now visible in the UI.
-5. **Two-party confirmation expiry duration.** SCR-17 cannot show a countdown for an undefined window (requirements.md 13.5).
-6. **Notes character-limit feedback.** REQ-LG-1 clause 8 sets a 2,000-character bound without specifying counter or truncation behaviour.
-7. **Removed partner's local data retention.** Section 3.3 keeps it readable. Whether it is eventually purged is a privacy decision.
-8. **Ruleset configuration authoring.** REQ-AE-1 clause 4 requires publish-time validation, but no v1 screen edits rulesets. Confirm config is managed outside the app in v1.
-9. **`decision-log.md`.** Referenced as an input, absent from the repository. Section 0.
+1. **★ Budget health graded bands — deliberately not invented.** Section 4.3. The card currently states six facts. A graded verdict needs caution thresholds, weighting, and severity ranking defined upstream first.
+2. **Reference cost values.** Budget adequacy renders as unavailable until `reference_costs` is populated. Already tracked as requirements.md 13.1; noted because it is now visible in the UI.
+3. **Two-party confirmation expiry duration.** SCR-17 cannot show a countdown for an undefined window (requirements.md 13.4).
+4. **Notes character-limit feedback.** REQ-LG-1 clause 8 sets a 2,000-character bound without specifying counter or truncation behaviour.
+5. **Removed partner's local data retention.** Section 3.3 keeps it readable. Whether it is eventually purged is a privacy decision.
+6. **`decision-log.md`.** Referenced as an input, absent from the repository. Section 0.
+
+*Resolved since first draft: platform (Flutter + SQLite/`drift`), the REQ-GEN-2A constrained-display amendment (section 8.2), and ruleset configuration management (bundled JSON asset validated at app load — REQ-AE-1 clause 4 is now a load-time check, not an authoring screen).*

@@ -72,7 +72,7 @@ THE SYSTEM SHALL use exactly these six allocation categories, with these NCR bas
 1. Every read is served from the local store without a network round-trip.
 2. Every write commits to the local store before any sync is attempted.
 3. The embedded database supports integer storage wide enough for REQ-GEN-1 centavo values.
-4. The embedded engine choice between SQLite and Isar is a design-phase decision, recorded before implementation begins.
+4. The embedded database engine is SQLite, accessed via `drift` or `sqflite`. This is resolved, not deferred.
 
 **REQ-PLT-3 [v1]** — THE SYSTEM SHALL permit exactly one active plan per account.
 
@@ -92,10 +92,22 @@ THE SYSTEM SHALL use exactly these six allocation categories, with these NCR bas
 
 **REQ-GEN-2 [v1]** — WHEN the system converts or displays a monetary value, THE SYSTEM SHALL round half-up to two decimal places and display it as PHP.
 
-1. Display format is a peso sign, thousands separated by commas, exactly two decimals: `₱350,000.00`.
+1. The **full form** is a peso sign, thousands separated by commas, exactly two decimals: `₱350,000.00`.
 2. A half-centavo rounds away from zero (₱0.005 → ₱0.01).
 3. No screen displays a currency symbol other than ₱, and no locale setting changes the currency.
 4. A negative total, where one is arithmetically possible, displays with a leading minus inside the format: `−₱1,200.00`.
+5. The full form is mandatory on full-screen detail cards, modal sheets, ledger rows, tap/expanded states, and every screen-reader accessibility label, without exception.
+
+**REQ-GEN-2A [v1] — Constrained monetary display in bento tiles**
+WHERE a monetary value is rendered inside a dashboard bento grid tile, THE SYSTEM SHALL be permitted to use a constrained form, and SHALL use the full form of REQ-GEN-2 everywhere else.
+
+1. For a value below ₱1,000,000, the constrained form drops centavos: `₱350,000`.
+2. For a value at or above ₱1,000,000, the constrained form uses one-decimal millions shorthand: `₱1.25M`.
+3. Constrained forms SHALL truncate toward zero, so the displayed figure never exceeds the true value: `₱1,259,000.00` renders as `₱1.25M`, and `₱350,999.99` renders as `₱350,999`.
+4. The constrained form is permitted **only** inside dashboard bento tiles. It SHALL NOT appear on detail cards, modal sheets, ledger rows, editors, previews, or the change log.
+5. WHEN a partner taps a constrained figure, THE SYSTEM SHALL reveal the full form of REQ-GEN-2.
+6. Every screen-reader accessibility label for a constrained figure SHALL announce the full form, never the constrained form.
+7. A negative value in constrained form retains the leading minus: `−₱1,200`.
 
 ---
 
@@ -370,8 +382,8 @@ WHEN budget setup completes, THE SYSTEM SHALL allocate the total budget across t
 
 1. Given identical inputs and an identical ruleset version, the engine returns identical allocations on every invocation and on both devices.
 2. Default baseline percentages are Catering & Venue 40%, Photo & Video 15%, Attire & Styling 10%, Coordination 10%, Entourage & Miscellaneous 5%, Buffer 20%.
-3. Baseline percentages are stored as configuration data, editable without a code change.
-4. Baseline percentages across all six categories sum to exactly 100%, and THE SYSTEM SHALL reject a ruleset whose baselines do not.
+3. Baseline percentages are stored as configuration data in a JSON ruleset asset bundled in the app binary for v1, editable without changing engine code. There is no web authoring dashboard in v1.
+4. Baseline percentages across all six categories sum to exactly 100%, and THE SYSTEM SHALL reject a ruleset asset whose baselines do not, at app-load validation time.
 5. The sum of allocations equals the total budget exactly.
 6. WHEN percentage division produces a rounding remainder, THE SYSTEM SHALL assign the entire remainder to the Buffer category.
 7. A ₱350,000 NCR budget allocates ₱140,000.00 to Catering & Venue, ₱52,500.00 to Photo & Video, ₱35,000.00 to Attire & Styling, ₱35,000.00 to Coordination, ₱17,500.00 to Entourage & Miscellaneous, and ₱70,000.00 to Buffer.
@@ -568,11 +580,13 @@ All previously open items are now closed.
 | 4 | Baseline allocations are Catering & Venue 40%, Photo & Video 15%, Attire & Styling 10%, Coordination 10%, Entourage & Miscellaneous 5%, Buffer 20%. | REQ-AE-1 |
 | 5 | The regional cost index drives cost expectation, budget adequacy, and rate suggestions — not allocation shares. See section 12. | REQ-AE-2 |
 | 6 | Plan deletion is creator-only; partner removal and ownership transfer require two-party confirmation. Data access stays symmetric. | REQ-SE-5 |
-| 7 | Platform is Flutter on Android and iOS, local-first embedded database, web excluded from v1. | REQ-PLT-1, REQ-PLT-2 |
+| 7 | Platform is Flutter on Android and iOS, SQLite (`drift` or `sqflite`) for local persistence, web excluded from v1. | REQ-PLT-1, REQ-PLT-2 |
 | 8 | New guests default to priority tier Tier 2, with Tier 1 reserved for close family and principal sponsors. | REQ-GM-1 |
 | 9 | Partner invites expire 7 days after issuance. | REQ-SE-1 |
 | 10 | Rounding remainder is assigned to the Buffer category. | REQ-AE-1, REQ-AE-6 |
 | 11 | One active plan per account. | REQ-PLT-3 |
+| 12 | Bento tiles may use a constrained monetary form (centavos dropped below ₱1M, `₱1.25M` shorthand above, truncated toward zero); full two-decimal form is mandatory everywhere else and in every screen-reader label. | REQ-GEN-2, REQ-GEN-2A |
+| 13 | Ruleset config is a JSON asset bundled in the app binary for v1, validated at app load. No web authoring dashboard. | REQ-AE-1 |
 
 ## 12. Two decisions I adjusted, and why
 
@@ -611,10 +625,9 @@ This preserves your intent — sponsors and close family are explicitly categori
 
 ## 13. Remaining open items
 
-Smaller than before, and none blocking design.
+Platform, database engine, monetary display, and ruleset management are now all resolved (section 11, decisions 7, 12, 13). What remains is smaller, and none of it blocks design or implementation start.
 
-1. **Reference cost benchmarks for budget adequacy.** REQ-AE-2 clause 2 needs a reference cost per guest per region tier to compute expected total cost. The baseline *percentages* are now settled; this is the separate absolute figure — roughly what a Metro-tier wedding costs per head. Without it, the adequacy indicator cannot be built, though every other allocation requirement can.
-2. **Embedded database engine.** REQ-PLT-2 clause 4 defers SQLite versus Isar to design. The relational shape of the change log and the variance queries leans toward SQLite with a typed query layer, but this should be settled deliberately at design time.
-3. **Designated driving RSVP status.** REQ-GM-1 clause 6 makes it designated but does not fix the default. `invited` is the safer planning default, since budgeting for fewer guests than show up is the expensive failure.
-4. **Tier-specific per-head rates.** REQ-GM-1 clause 9 permits them but no requirement sets any. Confirm whether Tier 1 guests should ever carry a different per-head rate, or whether tier is purely a cut-list device.
-5. **Two-party confirmation expiry.** REQ-SE-5 clause 7 requires expiry but does not fix the duration. The 7-day invite window is an obvious candidate for consistency.
+1. **Reference cost benchmarks for budget adequacy.** REQ-AE-2 clause 2 needs a reference cost per guest per region tier to compute expected total cost. The baseline *percentages* are settled; this is the separate absolute figure — roughly what a Metro-tier wedding costs per head. Without it the adequacy indicator cannot be built, though every other allocation requirement can. This is the one genuinely blocking item for a single feature.
+2. **Designated driving RSVP status default.** REQ-GM-1 clause 6 makes it designated but does not fix the default. `invited` is the safer planning default, since budgeting for fewer guests than show up is the expensive failure.
+3. **Tier-specific per-head rates.** REQ-GM-1 clause 9 permits them but no requirement sets any. Confirm whether Tier 1 guests should ever carry a different per-head rate, or whether tier is purely a cut-list device.
+4. **Two-party confirmation expiry.** REQ-SE-5 clause 7 requires expiry but does not fix the duration. The 7-day invite window is an obvious candidate for consistency.
