@@ -32,16 +32,17 @@
 | GIV-04 | Conflict handling is **field-level last-write-wins with an immutable change log — NOT CRDTs**. | FIRM | ADR-08 recorded the mechanism; ADR-21 (D1) later refined the *clock authority* within this given, still LWW, still not CRDT |
 | GIV-05 | **AI features are deferred until after a non-AI launch.** v1 is rule-based only. | FIRM | requirements AI-phase section, REQ-EX-1 |
 | GIV-06 | Domain specifics are fixed: crew meals, OOT fees, church aircon, corkage (plus overtime, venue power); Ninong/Ninang and family pledges; per-head vs flat-rate cost distinction. | FIRM | ADR-04, ADR-05; REQ-HF-*, REQ-PL-*, REQ-GM-* |
-| GIV-07 | **Product name is UNRESOLVED.** "Kasaran" is in use as the working name and appears throughout the docs and repo, but the naming question was flagged as not finally settled (it reads closer to "roughness" than "kasalan"/wedding). | **UNRESOLVED** | See the naming caveat below and ADR-06. Must not be read as a final brand decision. |
+| GIV-07 | **Product name is Kasaran.** Originally stated as a given with the naming question left open; now **resolved** — "Kasaran" is the final name (decision-maker, 2026-09-14). The "roughness" vs "kasalan"/wedding nuance was acknowledged and set aside; the name is adopted as a distinct, ownable mark. | **RESOLVED** → ADR-27; OQ-06 closed | See the naming caveat below and ADR-06/ADR-27. |
 
-### Naming caveat (GIV-07)
+### Naming caveat (GIV-07) — now resolved
 
-There is a real tension on disk that this restructure surfaces rather than hides:
+Short history, for anyone tracing the name's status changes:
 
-- **problem-brief.md** previously stated *"Name locked: Kasaran"* and listed naming as a confirmed decision, and **ADR-06** recorded "Brand name is Kasaran, treated as a distinct mark" as DECIDED. Both traced to an earlier turn where the instruction "its kasaran" was given. As part of this restructure, problem-brief.md now reads "working name; brand unresolved" and ADR-06 is reframed accordingly (below).
-- **The decision-maker has since clarified (this conversation)** that naming belongs in the *givens* tier as an **intentionally unresolved** item, not a settled decision.
+1. An early turn ("its kasaran") locked the name; problem-brief.md said *"Name locked: Kasaran."*
+2. The decision-maker later clarified that naming should sit in the *givens* tier as **intentionally unresolved**, not a settled decision. GIV-07 was set to UNRESOLVED, OQ-06 opened, and problem-brief.md was softened to "working name; provisional."
+3. **The decision-maker has now confirmed (2026-09-14): "Kasaran really is the name."** Naming is **resolved**. GIV-07 is RESOLVED, **OQ-06 is closed**, and this is logged as **ADR-27**. problem-brief.md is re-locked to a final-name statement.
 
-**Resolution taken here (tier/status only, per the structural fix requested):** "Kasaran" remains the **working name** — it is not being reverted, and no downstream doc or ID changes. But its status is recorded as **UNRESOLVED at the brand-decision level**: it may still change before logo/domain commitment. ADR-06 is accordingly reframed below from "DECIDED (brand locked)" to "DECIDED (working name adopted); final brand UNRESOLVED — see GIV-07," so that nothing downstream treats the name as finally locked. This is a status/tier correction, not a re-litigation of the name.
+"Kasaran" is the final product name, adopted as a distinct, ownable mark (the "roughness" vs "kasalan"/wedding nuance was acknowledged and set aside). Downstream docs may treat the name as final and it is cleared for logo/domain.
 
 ---
 
@@ -56,9 +57,9 @@ There is a real tension on disk that this restructure surfaces rather than hides
 | OQ-03 | Force-wipe vs wipe-offer for the removed partner's local copy. Current plan offers, does not force. | OPEN | SEC-08, REQ-SE-6 (cl. 7) |
 | OQ-04 | Reference cost benchmarks per region tier for budget adequacy. | OPEN | REQ-AE-2 (cl. 2) |
 | OQ-05 | Ownership-transfer confirmation expiry duration. | OPEN | REQ-SE-5 (cl. 7) |
-| OQ-06 | Final product name / brand (whether to keep "Kasaran"). | OPEN | GIV-07, ADR-06 |
+| OQ-06 | Final product name / brand (whether to keep "Kasaran"). | **CLOSED** → ADR-27 (name is Kasaran, 2026-09-14) | GIV-07, ADR-06, ADR-27 |
 
-*Note: OQ-01..05 were previously numbered ADR-O1..O5. They are renamed to the OQ series because they are open questions, not decisions; the mapping is ADR-O1→OQ-01 … ADR-O5→OQ-05. No decision ADR ID is affected. OQ-06 is newly surfaced by the GIV-07 naming caveat.*
+*Note: OQ-01..05 were previously numbered ADR-O1..O5. They are renamed to the OQ series because they are open questions, not decisions; the mapping is ADR-O1→OQ-01 … ADR-O5→OQ-05. No decision ADR ID is affected. OQ-06 was surfaced by the GIV-07 naming caveat and is now closed by ADR-27.*
 
 ---
 
@@ -73,7 +74,7 @@ There is a real tension on disk that this restructure surfaces rather than hides
 | ADR-03 | Self-planning couple is the sole primary persona; coordinators deferred. | DECIDED | 2026-09-13 | — |
 | ADR-04 | Six hidden-fee categories first-class: crew meals, OOT, church aircon, corkage, overtime, venue power. | DECIDED | 2026-09-13 | GIV-06, REQ-HF-1, REQ-HF-2 |
 | ADR-05 | Sponsorship: show gross event total and net out-of-pocket; pledge status tentative/confirmed/received. | DECIDED | 2026-09-13 | GIV-06, REQ-PL-2, REQ-PL-3 |
-| ADR-06 | Working name **Kasaran** adopted and used throughout. **Final brand is UNRESOLVED (GIV-07, OQ-06)** — this ADR records adoption of a working name, not a locked brand decision. | DECIDED (working name); brand UNRESOLVED | 2026-09-13 | GIV-07, OQ-06 |
+| ADR-06 | Working name **Kasaran** adopted and used throughout. (Superseded by ADR-27, which confirms Kasaran as the final name.) | SUPERSEDED by ADR-27 | 2026-09-13 | GIV-07, ADR-27 |
 | ADR-07 | Payment states paid/pending/overdue, derived not editable; deposits modelled separately. | DECIDED | 2026-09-13 | REQ-LG-4, REQ-LG-5 |
 | ADR-08 | Sync conflict resolution: field-level last-write-wins with an immutable change log preserving superseded writes. Original clock mechanism was a hybrid logical clock (HLC). | **SUPERSEDED in part** by ADR-21 (D1) | 2026-09-13 | GIV-04, REQ-SE-2, REQ-SE-4. *LWW + change log still stand; the HLC clock authority was replaced by server-assigned timestamps in ADR-21.* |
 | ADR-09 | Region is a first-class input on a versioned three-tier taxonomy: Metro 1.00, Provincial 0.85, Destination 1.20. | DECIDED | 2026-09-13 | REQ-BS-4, REQ-AE-2 |
@@ -94,6 +95,7 @@ There is a real tension on disk that this restructure surfaces rather than hides
 | ADR-24 (D4) | Simultaneous mutual removal has a deterministic winner: order by the D1 server timestamp, tiebreak on stable id. No undefined "whoever syncs first". | DECIDED | 2026-09-14 | ADR-21, REQ-SE-6 (cl. 9–11), SEC-07, TC-SE-22 |
 | ADR-25 (D5) | Retired/merged requirement IDs are recorded in a redirect appendix (requirements §14), never left as hollow live "reserved" clauses. | DECIDED | 2026-09-14 | requirements §14, REQ-SE-5 (cl. 5) |
 | ADR-26 (D6) | Shared-record erasure test cases are left UN-STUBBED and marked blocked-pending-counsel, with no asserted expected value. A guessed expected result is forbidden. | DECIDED (process rule) | 2026-09-14 | testing-plan §5, SEC-33, SEC-38, OQ-01 |
+| ADR-27 | **Final product name is Kasaran.** Confirms and closes the naming question. Adopted as a distinct, ownable mark; cleared for logo/domain. Supersedes ADR-06 (working-name-only) and closes OQ-06; GIV-07 RESOLVED. | DECIDED | 2026-09-14 | GIV-07, OQ-06, ADR-06, problem-brief |
 
 ---
 
@@ -156,4 +158,5 @@ There is a real tension on disk that this restructure surfaces rather than hides
 - Open-question rows renamed: **ADR-O1 → OQ-01, ADR-O2 → OQ-02, ADR-O3 → OQ-03, ADR-O4 → OQ-04, ADR-O5 → OQ-05.** These were open questions mislabelled with an ADR prefix; the OQ series corrects the tier. No *decision* ADR ID (ADR-01..26) changed.
 - New this restructure: **GIV-01..07** (givens tier), **OQ-06** (final brand name).
 - **ADR-08** status changed DECIDED → SUPERSEDED-in-part (pointer to ADR-21). Its ID and text are retained.
-- **ADR-06** reframed from "brand locked" to "working name adopted; brand unresolved." ID retained.
+- **ADR-06** history: first "brand locked", then reframed to "working name adopted; brand unresolved", now **SUPERSEDED by ADR-27** (name confirmed as Kasaran). ID retained throughout.
+- **ADR-27** added: final product name is Kasaran; closes OQ-06; GIV-07 RESOLVED.

@@ -44,9 +44,9 @@ A couple planning their own wedding in the Philippines:
 - Comfortable with phones and spreadsheets, but not with the hidden-fee and sponsorship math that trips them up.
 - Both partners want a shared, single source of truth.
 
-## Naming note (working name; brand unresolved)
+## Naming note (decided)
 
-**Working name: Kasaran.** It is used throughout the docs and repo as the project's working name. For the record, "kasaran" reads closer to "roughness/coarseness" in Filipino while "kasalan" means wedding — this was raised and acknowledged. **The final brand name is not locked** (decision-log GIV-07, OQ-06): "Kasaran" may be adopted as a distinct, ownable mark or may change before any logo/domain commitment. Downstream work should treat the name as provisional and must not assume it is finalized.
+**Name: Kasaran (final).** Confirmed by the decision-maker (decision-log ADR-27, GIV-07 resolved, OQ-06 closed). For the record, "kasaran" reads closer to "roughness/coarseness" in Filipino while "kasalan" means wedding — this was raised, acknowledged, and set aside. The decision is to proceed with **Kasaran** as the brand, treating it as a distinct, ownable mark rather than a literal Tagalog word. Cleared for logo/domain.
 
 ## Confirmed decisions (locked for Prompt 2)
 
@@ -57,6 +57,6 @@ A couple planning their own wedding in the Philippines:
 5. **Hidden-fee launch set:** Confirmed and expanded — crew meals, OOT fees, church aircon premiums, corkage, **plus overtime charges and venue power fees.**
 6. **Sponsorship model:** Confirmed — show gross event total and net couple out-of-pocket, with pledge status (confirmed vs. tentative).
 
-7. **Name:** **Kasaran** adopted as the **working name** only; the final brand is **unresolved** (decision-log GIV-07, OQ-06). The "roughness" vs. "kasalan/wedding" nuance was acknowledged. Not cleared for logo/domain — treat as provisional.
+7. **Name:** **Kasaran** — final (decision-log ADR-27). The "roughness" vs. "kasalan/wedding" nuance was acknowledged and set aside; adopted as a distinct brand mark. Cleared for logo/domain.
 
-*Scoping decisions locked. One item remains open: the final product name (decision-log OQ-06); "Kasaran" is the working name meanwhile.*
+*All scoping decisions locked, including the product name (Kasaran, decision-log ADR-27). No open naming item.*
