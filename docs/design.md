@@ -270,19 +270,23 @@ invites (
   revoked_at      timestamptz
 )
 
-lifecycle_confirmations (          -- REQ-SE-5
+lifecycle_confirmations (          -- REQ-SE-5 (ownership transfer only)
   id           uuid pk,
   plan_id      uuid not null references plans,
-  action       text not null check (action in ('remove_partner','transfer_ownership')),
+  action       text not null check (action = 'transfer_ownership'),
   initiated_by uuid not null references users,
   target_user  uuid references users,
   confirmed_by jsonb not null default '[]',   -- user ids
   expires_at   timestamptz not null,
   completed_at timestamptz
 )
+-- Amended per Decisions 1 & 2: partner removal is NO LONGER a two-party
+-- action, so 'remove_partner' is removed from this table. Defensive
+-- removal (REQ-SE-6) is a direct, immediate delete of the target's
+-- plan_members row plus a change_log entry — it has no pending state.
 ```
 
-`lifecycle_confirmations` exists because REQ-SE-5 clauses 4 through 7 need a pending two-party state that can expire. Without a row to hold it, "pending" has nowhere to live.
+`lifecycle_confirmations` exists because ownership transfer (REQ-SE-5 clauses 4, 6, 7) needs a pending two-party state that can expire. Without a row to hold it, "pending" has nowhere to live. **Defensive partner removal does not use this table:** per REQ-SE-6 it is immediate and one-sided, executed as a direct delete of the removed partner's `plan_members` row (below) with an attributed `change_log` entry — there is no pending confirmation to store.
 
 ### 4.2 Ruleset configuration
 
@@ -679,7 +683,7 @@ Keep application code free of Supabase-specific calls outside `sync/transport/` 
 
 1. **Reference cost values.** `reference_costs` exists but is unpopulated, so budget adequacy (REQ-AE-2 clause 3) cannot ship. Every other allocation requirement can. This is now the only item blocking a specific feature.
 2. **Designated driving RSVP status default.** Requirements section 13 item 2 is still open. `invited` remains the safer default.
-3. **Two-party confirmation expiry.** `lifecycle_confirmations.expires_at` needs a duration. Seven days matches the invite window.
+3. **Ownership-transfer confirmation expiry.** `lifecycle_confirmations.expires_at` needs a duration. Now applies to ownership transfer only (Decisions 1, 2); defensive removal (REQ-SE-6) is immediate and has no expiry. Seven days matches the invite window.
 4. **Local database encryption.** Not required by any requirement, but the local store holds names, a wedding date, and financial detail. With Flutter/SQLite this means SQLCipher (via `drift`'s encryption support) or platform keystore-backed encryption, worth deciding before launch rather than after.
 5. **RLS policy test suite.** If Supabase is chosen, the plan-isolation policy is the entire security boundary between couples. It needs adversarial tests, not review by inspection.
 

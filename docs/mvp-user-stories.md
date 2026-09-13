@@ -44,7 +44,7 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 | **Plan creation & invite** | Whoever creates the plan is the first member and issues the invite. Bootstrap only — it confers no ongoing privilege. | Someone has to create the plan. Once B joins, the roles are indistinguishable. |
 | **Edit attribution** | Every write is stamped with the partner who made it. | Required by the change-history objective. This is identity, not permission — it does not gate any action. |
 
-**One open decision I am flagging rather than assuming (see open items):** fully symmetric rights would let either partner delete the entire plan or remove the other partner. On shared financial data with an offline-capable client, that is an unrecoverable action available to a single tap. My recommendation is that destructive plan-lifecycle actions — delete plan, remove partner — require either two-party confirmation or be restricted to the creator, while everything else stays symmetric. Confirm before design.
+**Plan-lifecycle permissions — DECIDED (Decisions 1 and 2).** Symmetric data rights are qualified by three distinct lifecycle rules: **plan deletion is creator-only** (REQ-SE-5); **ownership transfer requires two-party confirmation** (REQ-SE-5 clause 4); and **defensive partner removal is mutual and one-sided** — either partner may remove the other without consent, effective on the removed partner's next sync, logged and attributed (REQ-SE-6). The removed partner keeps their existing local copy, which is not remotely wiped. Everything else stays symmetric.
 
 ---
 
@@ -299,7 +299,7 @@ Carried forward from the project brief, plus new ones this document surfaced. Th
 1. **★ Payment states (blocks LG-2).** I left the state set deliberately unspecified. My earlier proposal was quoted / committed / partially paid / settled, but local practice is closer to reservation fee → downpayment → balance. Which model do you want?
 2. **★ Offline conflict policy (blocks SE-2 AC-4).** Field-level last-write-wins, per-entry ownership, or surface-to-partner for manual resolution? This drives the data model, so it needs deciding before design.
 3. **★ Allocation rule source data (blocks AE-1).** Still the biggest gap. The engine needs real PH category benchmarks for the ₱30K–₱500K band. I have not invented percentages and will not.
-4. **★ Plan-lifecycle permissions (blocks SE-1).** Can either partner delete the plan or remove the other? My recommendation is two-party confirmation or creator-only for destructive actions, symmetric for everything else.
+4. **Plan-lifecycle permissions — RESOLVED (Decisions 1 and 2).** Plan deletion is creator-only; ownership transfer needs two-party confirmation; defensive partner removal is mutual and one-sided (either partner, no consent, removed partner keeps their local copy). See REQ-SE-5, REQ-SE-6.
 5. **Driving guest tier (affects GM-1 AC-2).** I made this partner-selectable. Simpler alternative is to always drive costs from *confirmed*. Preference?
 6. **Tentative pledges and net (affects PL-2 AC-3).** I ruled that tentative pledges do not reduce net, on conservatism grounds. Confirm you agree — it is a judgement call, not a given.
 7. **Platform.** Still undecided, and OF-1/OF-2 cannot be estimated without it. iOS, Android, web, or cross-platform, and is web in v1 at all?

@@ -482,17 +482,29 @@ THE SYSTEM SHALL record every create, update, and delete with the acting partner
 5. Every log entry attributes exactly one partner identity.
 
 **REQ-SE-5 [v1] — Plan-lifecycle permissions**
-THE SYSTEM SHALL restrict plan deletion to the creating partner, and SHALL require two-party confirmation for partner removal and for ownership transfer.
+THE SYSTEM SHALL restrict plan deletion to the creating partner, SHALL permit either paired partner to defensively remove the other without consent, and SHALL require two-party confirmation for ownership transfer only.
 
 1. Only the creating partner is offered the delete-plan action.
 2. IF the non-creating partner attempts plan deletion, THEN THE SYSTEM SHALL refuse and state that only the plan creator may delete it.
 3. Plan deletion requires an explicit typed or equivalent confirmation from the creator beyond a single tap.
-4. Removing a linked partner requires affirmative confirmation from both partners before it takes effect.
-5. Transferring ownership requires affirmative confirmation from both partners before it takes effect.
-6. WHILE a two-party confirmation is pending, both partners retain full data access unchanged.
-7. A pending two-party confirmation expires if not completed by both partners, and expiry leaves the plan unchanged.
+4. Transferring ownership requires affirmative confirmation from both partners before it takes effect; this is the only lifecycle action that requires two-party confirmation. *(Amended per Decision 1: two-party confirmation is scoped to ownership transfer only. Partner removal is governed by REQ-SE-6.)*
+5. *(Reserved. The former clause 5 — "transferring ownership requires affirmative confirmation from both partners" — is consolidated into clause 4 by Decision 1. Retained as a numbered placeholder so downstream clause references are not renumbered.)*
+6. WHILE an ownership-transfer confirmation is pending, both partners retain full data access unchanged.
+7. A pending ownership-transfer confirmation expires if not completed by both partners, and expiry leaves the plan unchanged.
 8. Every lifecycle action and confirmation is recorded in the change log per REQ-SE-4.
 9. Data-level access remains fully symmetric per REQ-SE-1; this requirement governs lifecycle actions only.
+
+**REQ-SE-6 [v1] — Defensive partner removal**
+THE SYSTEM SHALL permit either paired partner to unilaterally revoke the other partner's access without the removed partner's consent, effective on the removed partner's next sync. *(Added per Decisions 1 and 2. Rationale: a hostile partner would refuse a two-party removal forever, trapping the person the control should protect; and the wedding is symmetric, so the right must belong to either partner, not the creator alone.)*
+
+1. Either paired partner MAY remove the other; the right is mutual and does not depend on who created the plan.
+2. Removal takes effect on the server immediately and requires no affirmative action or consent from the removed partner.
+3. WHEN the removed partner's device next attempts to sync, THE SYSTEM SHALL reject both pull and push for that partner, enforced server-side, not by client checks alone.
+4. The removal is recorded in the change log, attributed to the acting partner per REQ-SE-4, with a timestamp.
+5. A removed partner RETAINS the local copy of data already synced to their device. THE SYSTEM SHALL NOT claim to remotely wipe that copy, because a local-first store on an uncontrolled device cannot be remotely erased.
+6. Following removal, the removed partner's server access stops and no future edits from that partner sync in either direction.
+7. THE SYSTEM MAY offer the removed partner a local wipe on their own device, but SHALL NOT represent it as enforceable against an offline or uncooperative device.
+8. Removal does not delete the plan and does not remove the acting partner; the plan continues under the remaining partner's account.
 
 ---
 
@@ -562,7 +574,7 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 | Pledges | REQ-PL-1 … 5 | PL-1, PL-2, PL-3 |
 | Guest math | REQ-GM-1 … 5 | GM-1, GM-2, GM-3 |
 | Allocation engine | REQ-AE-1 … 6 | AE-1, AE-2, AE-3 |
-| Shared editing | REQ-SE-1 … 5 | SE-1, SE-2, SE-3 |
+| Shared editing | REQ-SE-1 … 6 | SE-1, SE-2, SE-3 |
 | Offline | REQ-OF-1 … 5 | OF-1, OF-2 |
 | AI phase | REQ-AI-1 … 5, REQ-EX-1 | AI-1 … AI-5 |
 
@@ -579,7 +591,7 @@ All previously open items are now closed.
 | 3 | Region is a first-class setup input on a versioned taxonomy of three cost tiers: Metro 1.00, Provincial 0.85, Destination 1.20. | REQ-BS-4 |
 | 4 | Baseline allocations are Catering & Venue 40%, Photo & Video 15%, Attire & Styling 10%, Coordination 10%, Entourage & Miscellaneous 5%, Buffer 20%. | REQ-AE-1 |
 | 5 | The regional cost index drives cost expectation, budget adequacy, and rate suggestions — not allocation shares. See section 12. | REQ-AE-2 |
-| 6 | Plan deletion is creator-only; partner removal and ownership transfer require two-party confirmation. Data access stays symmetric. | REQ-SE-5 |
+| 6 | Plan deletion is creator-only. Two-party confirmation applies to ownership transfer only. Either partner may defensively remove the other without consent (mutual, one-sided); the removed partner keeps their existing local copy, which is not remotely wiped. Data access stays symmetric. | REQ-SE-5, REQ-SE-6 |
 | 7 | Platform is Flutter on Android and iOS, SQLite (`drift` or `sqflite`) for local persistence, web excluded from v1. | REQ-PLT-1, REQ-PLT-2 |
 | 8 | New guests default to priority tier Tier 2, with Tier 1 reserved for close family and principal sponsors. | REQ-GM-1 |
 | 9 | Partner invites expire 7 days after issuance. | REQ-SE-1 |
@@ -630,4 +642,4 @@ Platform, database engine, monetary display, and ruleset management are now all 
 1. **Reference cost benchmarks for budget adequacy.** REQ-AE-2 clause 2 needs a reference cost per guest per region tier to compute expected total cost. The baseline *percentages* are settled; this is the separate absolute figure — roughly what a Metro-tier wedding costs per head. Without it the adequacy indicator cannot be built, though every other allocation requirement can. This is the one genuinely blocking item for a single feature.
 2. **Designated driving RSVP status default.** REQ-GM-1 clause 6 makes it designated but does not fix the default. `invited` is the safer planning default, since budgeting for fewer guests than show up is the expensive failure.
 3. **Tier-specific per-head rates.** REQ-GM-1 clause 9 permits them but no requirement sets any. Confirm whether Tier 1 guests should ever carry a different per-head rate, or whether tier is purely a cut-list device.
-4. **Two-party confirmation expiry.** REQ-SE-5 clause 7 requires expiry but does not fix the duration. The 7-day invite window is an obvious candidate for consistency.
+4. **Ownership-transfer confirmation expiry.** REQ-SE-5 clause 7 requires expiry but does not fix the duration. Now scoped to ownership transfer only (Decision 1); defensive removal under REQ-SE-6 is immediate and has no pending-confirmation window. The 7-day invite window remains an obvious candidate for consistency.

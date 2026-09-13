@@ -35,7 +35,7 @@
 | SCR-14 | Pledges List | Track sponsor pledges and exposure | Pledges tab; dashboard net tile | REQ-PL-1, REQ-PL-3, REQ-PL-4, REQ-PL-5 |
 | SCR-15 | Pledge Editor | Create/edit a pledge; change status | SCR-14 add or row tap | REQ-PL-1, REQ-PL-2, REQ-PL-3 |
 | SCR-16 | Change Log / Activity | Plan-wide and per-entity history with attribution | More tab; per-entity history affordance | REQ-SE-2 (5), REQ-SE-3, REQ-SE-4, REQ-OF-5 (4) |
-| SCR-17 | Shared Access | Partner status, invite, removal, ownership, delete plan | More tab | REQ-SE-1, REQ-SE-5, REQ-PLT-3 |
+| SCR-17 | Shared Access | Partner status, invite, mutual defensive removal, ownership, delete plan | More tab | REQ-SE-1, REQ-SE-5, REQ-SE-6, REQ-PLT-3 |
 | SCR-18 | Plan Settings | Edit setup inputs; driving RSVP status; ruleset opt-in | More tab | REQ-BS-2, REQ-BS-6, REQ-GM-1 (6), REQ-AE-3, REQ-PLT-3 |
 | SCR-19 | Sync Detail | Pending-write queue, last sync, failure detail, retry | Tap sync badge anywhere | REQ-OF-3, REQ-OF-5, REQ-SE-3 |
 
@@ -63,7 +63,7 @@ Separated into requirements that are *correctly* non-UI and requirements that ar
 | REQ-AE-2 (3) | Budget adequacy has a home on SCR-06 but **cannot render in v1**. `reference_costs` is unpopulated (design.md 4.2; requirements.md 13.1). Specified as an explicit unavailable state in section 4.3, not omitted and not shown as healthy. |
 | REQ-AE-1 (4) | Ruleset publish-time validation that baselines sum to 10000 bp. No UI surface — there is no ruleset authoring screen in v1, so this is a build/deploy-time check. Worth confirming that config is edited outside the app in v1. |
 | REQ-LG-1 (8) | The 2,000-character notes limit has no specified counter or truncation behaviour. Assigned to SCR-08 in section 2; flagged because the requirement states the bound without stating the feedback. |
-| REQ-SE-5 (7) | Two-party confirmation expiry duration is undefined upstream (requirements.md 13.5). SCR-17 cannot display a countdown for an undefined window. |
+| REQ-SE-5 (7) | Ownership-transfer confirmation expiry duration is undefined upstream (requirements.md 13.4). SCR-17 cannot display a countdown for an undefined window. Now scoped to ownership transfer only; defensive removal (REQ-SE-6) is immediate and has no pending window. |
 
 ---
 
@@ -177,11 +177,11 @@ Six typed variants sharing one shell. Per-type field differences in section 5.1.
 Specified in section 6.
 
 ### SCR-17 Shared Access
-**Regions:** partner slot with role; invite block; pending-confirmation block; ownership transfer; delete plan (creator only); active-plan note.
-**Fields:** `plan_members.role`, `invites.expires_at`, `lifecycle_confirmations.*`, `plans.is_active`.
-**Actions:** invite → 7-day link (REQ-SE-1 clause 4); revoke. Remove partner and transfer ownership → open two-party confirmation, both partners retain full access while pending (REQ-SE-5 clause 6). Delete plan → creator only; non-creator sees the action absent and, if reached, a refusal naming creator-only (clauses 1, 2); requires typed confirmation (clause 3).
-**Stated on screen:** data access stays fully symmetric; only lifecycle actions are restricted (REQ-SE-5 clause 9). Without this the asymmetry reads as a general permission tier.
-**Nav in:** More tab. **Nav out:** SCR-16 for lifecycle history (clause 8).
+**Regions:** partner slot with role; invite block; remove-partner action; ownership-transfer block (with pending-confirmation sub-state); delete plan (creator only); active-plan note.
+**Fields:** `plan_members.role`, `invites.expires_at`, `lifecycle_confirmations.*` (ownership transfer only), `plans.is_active`.
+**Actions:** invite → 7-day link (REQ-SE-1 clause 4); revoke invite. **Remove partner → mutual and one-sided: either partner may remove the other, no confirmation from the removed party, effective on their next sync (REQ-SE-6). Requires a typed/deliberate confirmation from the acting partner only, to prevent an accidental tap, and is logged and attributed (REQ-SE-4).** Transfer ownership → opens two-party confirmation, both partners retain full access while pending (REQ-SE-5 clauses 4, 6) — this is the only two-party action. Delete plan → creator only; non-creator sees the action absent and, if reached, a refusal naming creator-only (REQ-SE-5 clauses 1, 2); requires typed confirmation (clause 3).
+**Stated on screen:** removing a partner cannot be undone by the removed person and does not delete their existing local copy — server access simply stops (REQ-SE-6 clauses 5, 6). Data access stays fully symmetric; only lifecycle actions are governed here (REQ-SE-5 clause 9). Without this the removal reads as either reversible or a general permission tier.
+**Nav in:** More tab. **Nav out:** SCR-16 for lifecycle history (REQ-SE-5 clause 8, REQ-SE-6 clause 4).
 
 ### SCR-18 Plan Settings
 **Regions:** setup inputs (budget, date, guest cap, region); driving RSVP status picker; ruleset version block; remainder category note.
@@ -227,15 +227,15 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 | SCR-14 | Zero pledges; gross shown, net equals gross, exposure `₱0.00` | Grouped list with all three figures | N/A | Badge | Badge | Banner when a pledge status changed remotely | Read-only | None defined — pledge values cannot be invalid; negative is rejected at entry |
 | SCR-15 | Blank form | Populated | N/A | Badge | Badge | Field stamp | Read-only; save suppressed | Sponsor name empty, negative value, item type without description |
 | SCR-16 | Contains setup entries from the moment a plan exists; never empty | Full feed | Pagination on long histories | Badge; local entries listed as not-yet-synced | Badge | **This is where resolution surfaces** — see 6.4 | Read-only; history retained in full | N/A — log entries are facts, not calculations |
-| SCR-17 | Solo: no partner, invite prompt | Partner present | N/A | Badge; invite generation blocked, stated as requiring connection | Badge | N/A — membership does not flow through the log (design.md 2.5) | Terminal state for the removed partner: explains removal, offers exit | Pending confirmation with no defined expiry — see 1.1 gap |
+| SCR-17 | Solo: no partner, invite prompt | Partner present, with mutual remove action available to either partner | N/A | Badge; invite generation and ownership transfer blocked offline, but a queued removal is permitted and takes effect server-side on reconnect | Badge | N/A — membership does not flow through the log (design.md 2.5) | Terminal state for the removed partner: explains removal, offers exit | Ownership-transfer confirmation with no defined expiry — see 1.1 gap. Defensive removal is immediate, so it has no pending state |
 | SCR-18 | Populated from setup; never empty | Same | N/A | Badge; edits available | Badge | Stamp on remotely changed setup fields | Read-only | Invalid budget, past date |
 | SCR-19 | Zero pending, synced | Queue listed | Sync in progress | Primary purpose: queue depth and age | Primary purpose: failure detail and retry | Lists resolved conflicts with link to SCR-16 | Read-only; sync halted, reason stated | N/A |
 
 ### 3.3 Partner-removed state, stated precisely
 
-REQ-SE-5 governs removal, and the removed partner's experience is not specified upstream. Position taken: **the removed partner retains local data in read-only form and is told plainly.**
+REQ-SE-6 governs defensive removal (mutual and one-sided; either partner may remove the other without consent, per Decisions 1 and 2). The removed partner's experience: **the removed partner retains local data in read-only form and is told plainly.**
 
-Reason: their device holds a legitimate local database. Wiping it silently would look like data loss and would contradict the offline guarantee they have been trained to rely on. Sync stops, writes are refused, and the reason is stated once, clearly, at the top of every screen.
+Reason: their device holds a legitimate local database. Wiping it silently would look like data loss and would contradict the offline guarantee they have been trained to rely on. Sync stops, writes are refused (REQ-SE-6 clauses 3, 6), and the reason is stated once, clearly, at the top of every screen. Because removal is mutual, this same state can be reached by either partner regardless of who created the plan.
 
 Copy: *"You no longer have access to this wedding plan. You can still view your copy, but changes won't be saved or synced."*
 
@@ -449,7 +449,7 @@ What is surfaced instead, in ascending intrusiveness:
 1. **Passive** — attribution stamps on changed fields and rows. No interruption.
 2. **Ambient** — activity indicator on the More tab when unseen log entries exist since last visit to SCR-16.
 3. **Banner** — a dismissible banner on SCR-06, used only when a remote change altered a headline figure (gross, net, buffer remaining, exposure) or when a conflict resolved.
-4. **Blocking** — reserved for lifecycle events only: pending two-party confirmation, partner removed. Never for a data edit.
+4. **Blocking** — reserved for lifecycle events only: pending ownership-transfer confirmation, and being removed from the plan. Never for a data edit. (Defensive removal itself needs no confirmation from the removed party; the blocking surface a removed partner sees is the removed-state notice, not a confirmation prompt.)
 
 ### 6.2 Attribution
 
