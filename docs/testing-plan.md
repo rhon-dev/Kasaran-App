@@ -57,4 +57,4 @@ Expanded as each area is implemented; listed so the plan's scope is visible.
 
 ## 5. Open questions raised by testing
 
-- **Erasure vs mutual removal (ADR-O1, SEC-33/38).** With mutual one-sided removal, each partner independently controls one shared record. A test for "partner A requests erasure" must confirm B's lawful copy survives and that erasure is distinct from removal — but the correct behaviour is counsel-gated and not yet defined, so TC-ERASE-* cannot be authored with a verifiable expected result until ADR-O1 is resolved. Flagged, not stubbed with a guessed outcome.
+- **Erasure vs mutual removal (OQ-01, SEC-33/38).** With mutual one-sided removal, each partner independently controls one shared record. A test for "partner A requests erasure" must confirm B's lawful copy survives and that erasure is distinct from removal — but the correct behaviour is counsel-gated and not yet defined, so TC-ERASE-* cannot be authored with a verifiable expected result until OQ-01 is resolved. Flagged, not stubbed with a guessed outcome.
