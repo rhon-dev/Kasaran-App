@@ -1,0 +1,21 @@
+name: kasaran_lint
+description: >
+  Custom analysis-server plugin for Kasaran.
+  Enforces no-float-money: bans 'double' and 'num' variable/parameter
+  declarations in domain/ and data/ source paths.
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  analysis_server_plugin: ^0.3.0
+  analyzer: ^10.0.0
+
+plugin:
+  platforms:
+    dart:
+      pluginClass: _KasaranPlugin
+      fileName: main.dart
+dev_dependencies:
+  lints: ^6.1.0

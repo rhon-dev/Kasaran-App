@@ -1,0 +1,6 @@
+# analysis_options.yaml for the kasaran_lint plugin package.
+# This package uses the Dart SDK default lints, not the strict
+# application-level rules. It is a separate Dart package and its
+# source quality is validated by `dart analyze lib/` in CI,
+# not by the Flutter project's flutter analyze invocation.
+include: package:lints/recommended.yaml

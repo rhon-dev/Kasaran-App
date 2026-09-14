@@ -1,5 +1,16 @@
 include: package:flutter_lints/flutter.yaml
 
+# ---------------------------------------------------------------------------
+# Custom lint plugin — no_float_money
+# Registered per the Dart 3.10+ analysis_server_plugin system.
+# After editing the plugins section, restart the Dart Analysis Server.
+# ---------------------------------------------------------------------------
+plugins:
+  kasaran_lint:
+    path: tools/lint
+    diagnostics:
+      no_float_money: true
+
 analyzer:
   language:
     strict-casts: true
