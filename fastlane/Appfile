@@ -1,0 +1,16 @@
+# fastlane/Appfile
+# App-level identifiers used by Fastlane lanes.
+# These must match the bundle ID set in the Flutter project.
+#
+# deployment-plan §3.2 — Fastlane is the build tooling choice for Kasaran.
+# deployment-plan §3.4 — iOS uses an App Store Connect API key (not Apple ID);
+#                        the key JSON is supplied via the MATCH_KEYCHAIN_PASSWORD
+#                        and APP_STORE_CONNECT_API_KEY_* CI secrets, never here.
+
+app_identifier 'app.kasaran.kasaran'          # iOS bundle ID / Android application ID
+apple_id        ENV['APPLE_ID']               # injected from CI secret; never hardcoded
+team_id         ENV['APPLE_TEAM_ID']          # injected from CI secret; never hardcoded
+
+# Android — package name mirrors the iOS bundle ID for unambiguous build reports
+# (deployment-plan §3.3).
+package_name 'app.kasaran.kasaran'

@@ -1,26 +1,141 @@
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-Icon?
-._*
+# =============================================================================
+# Kasaran — .gitignore
+# Covers: Flutter/Dart, Android, iOS, Fastlane, secrets, IDEs, macOS, temp.
+# =============================================================================
 
-# Editors / IDEs
-.vscode/*
-!.vscode/extensions.json
+# -----------------------------------------------------------------------------
+# Flutter / Dart build output
+# -----------------------------------------------------------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+*.g.dart              # drift / json_serializable generated files are regenerated in CI
+
+# Flutter-generated IDE files
+*.iml
+*.ipr
+*.iws
 .idea/
-*.swp
-*.swo
+.idea/workspace.xml
 
-# Environment & secrets
+# Dart build runner cache
+.dart_tool/build/
+
+# -----------------------------------------------------------------------------
+# Android
+# -----------------------------------------------------------------------------
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/key.properties          # upload keystore config — NEVER commit
+**/android/**/GeneratedPluginRegistrant.java
+**/android/**/GeneratedPluginRegistrant.kt
+
+# Android keystores — NEVER commit
+*.jks
+*.keystore
+
+# -----------------------------------------------------------------------------
+# iOS
+# -----------------------------------------------------------------------------
+ios/.symlinks/
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/Generated.xcconfig
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.xcframework
+ios/Flutter/flutter_assets/
+ios/Pods/
+ios/.flutter-plugins
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*sync/
+**/ios/**/.sconsign.dblite
+**/ios/**/.tags*
+**/ios/**/*xcuserstate
+**/ios/**/*.xcscmblueprint
+**/ios/**/*.xccheckout
+**/ios/**/DerivedData/
+**/ios/**/Icon?
+**/ios/**/Pods/
+
+# iOS signing — NEVER commit
+*.p12
+*.mobileprovision
+*.cer
+ios/Runner/ExportOptions.plist
+
+# -----------------------------------------------------------------------------
+# Fastlane
+# -----------------------------------------------------------------------------
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+fastlane/.env
+fastlane/.env.*
+
+# -----------------------------------------------------------------------------
+# Secrets & credentials — belt-and-suspenders
+# -----------------------------------------------------------------------------
 .env
 .env.*
 !.env.example
 *.pem
 *.key
+google-services.json          # do not commit; injected by CI secret
+GoogleService-Info.plist      # do not commit; injected by CI secret
+client_secret*.json
+*.p8                          # App Store Connect API key
 
+# -----------------------------------------------------------------------------
+# macOS
+# -----------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+__MACOSX/
+
+# -----------------------------------------------------------------------------
+# IDEs & editors
+# -----------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.fleet/
+
+# -----------------------------------------------------------------------------
 # Logs & temp
+# -----------------------------------------------------------------------------
 *.log
 logs/
 tmp/
 .cache/
+coverage/
+
+# -----------------------------------------------------------------------------
+# Dart pub
+# -----------------------------------------------------------------------------
+# pubspec.lock is committed for application packages (not libraries).
+# Uncomment the following line only if this were a library package:
+# pubspec.lock

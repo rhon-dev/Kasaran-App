@@ -1,0 +1,143 @@
+# fastlane/Fastfile
+# Kasaran — build lanes for Android and iOS.
+#
+# deployment-plan §3.2  — Fastlane chosen over Expo EAS (Flutter project).
+# deployment-plan §3.3  — build numbering: CI run number → --build-number,
+#                         identical for iOS CFBundleVersion and Android versionCode.
+# deployment-plan §3.4  — iOS: Fastlane Match (cert + profile); API key in CI secrets.
+#                         Android: Play App Signing; upload key in CI secrets.
+# deployment-plan §3.2  — Android builds on Linux (cheap); iOS on macOS (RC/nightly only).
+#
+# Certificate generation requires Apple Developer access and is a task-level
+# prerequisite. This file wires the lane; the match repo is initialised separately.
+
+default_platform(:ios)
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+# Build number comes from CI_RUN_NUMBER env var (set by GitHub Actions as
+# github.run_number).  Falls back to 1 for local invocations so the lane
+# still executes without CI context.
+def resolved_build_number
+  (ENV['CI_RUN_NUMBER'] || '1').to_i
+end
+
+# Version name from pubspec.yaml (the +build suffix is stripped by Flutter;
+# we just want the semver part for display in lanes).
+def resolved_version_name
+  pubspec = File.read(File.join(__dir__, '..', 'pubspec.yaml'))
+  match  = pubspec.match(/^version:\s*(\d+\.\d+\.\d+)/)
+  match ? match[1] : '1.0.0'
+end
+
+# ---------------------------------------------------------------------------
+# Android
+# ---------------------------------------------------------------------------
+
+platform :android do
+  # build_android
+  # Builds a release App Bundle (.aab) using the upload keystore from CI secrets.
+  # Accepts an optional `debug` parameter for local testing without signing.
+  #
+  # Usage:
+  #   fastlane android build_android             # release (requires CI secrets)
+  #   fastlane android build_android debug:true  # debug, no signing required
+  desc 'Build a signed Android App Bundle'
+  lane :build_android do |options|
+    build_number = resolved_build_number
+    version_name = resolved_version_name
+    is_debug     = options[:debug] || false
+
+    UI.message "Building Android — version #{version_name}+#{build_number} (debug=#{is_debug})"
+
+    if is_debug
+      sh(
+        'flutter', 'build', 'appbundle',
+        '--debug',
+        '--build-number', build_number.to_s,
+        '--build-name',   version_name,
+        chdir: File.join(__dir__, '..')
+      )
+    else
+      # Ensure the upload keystore properties file is present (injected by CI).
+      keystore_props = File.join(__dir__, '..', 'android', 'key.properties')
+      UI.user_error!('android/key.properties missing — inject from CI secret') unless File.exist?(keystore_props)
+
+      sh(
+        'flutter', 'build', 'appbundle',
+        '--release',
+        '--build-number', build_number.to_s,
+        '--build-name',   version_name,
+        chdir: File.join(__dir__, '..')
+      )
+    end
+
+    aab_path = File.join(
+      __dir__, '..', 'build', 'app', 'outputs', 'bundle',
+      is_debug ? 'debug' : 'release',
+      is_debug ? 'app-debug.aab' : 'app-release.aab'
+    )
+    UI.success "App Bundle produced: #{aab_path}"
+  end
+end
+
+# ---------------------------------------------------------------------------
+# iOS
+# ---------------------------------------------------------------------------
+
+platform :ios do
+  # build_ios
+  # Builds a signed iOS archive (.ipa) using Fastlane Match for certificates.
+  # Requires:
+  #   MATCH_GIT_URL               — private Match repo URL (CI secret)
+  #   MATCH_PASSWORD              — Match repo passphrase (CI secret)
+  #   APP_STORE_CONNECT_API_KEY_ID / ISSUER_ID / KEY_CONTENT — API key (CI secrets)
+  #
+  # Per deployment-plan §3.2, iOS builds run only on tagged release candidates
+  # and nightly CI — not per PR — to contain macOS runner costs.
+  #
+  # Usage:
+  #   fastlane ios build_ios
+  desc 'Build a signed iOS archive using Fastlane Match'
+  lane :build_ios do
+    build_number = resolved_build_number
+    version_name = resolved_version_name
+
+    UI.message "Building iOS — version #{version_name}+#{build_number}"
+
+    # Load App Store Connect API key (avoids 2FA prompt in CI).
+    app_store_connect_api_key(
+      key_id:        ENV.fetch('APP_STORE_CONNECT_API_KEY_ID'),
+      issuer_id:     ENV.fetch('APP_STORE_CONNECT_API_KEY_ISSUER_ID'),
+      key_content:   ENV.fetch('APP_STORE_CONNECT_API_KEY_CONTENT'),
+      is_key_content_base64: true,
+      in_house: false
+    )
+
+    # Sync certificates and provisioning profiles from the Match repo.
+    # match repo reference: the URL is in CI secrets (MATCH_GIT_URL).
+    # Certificate generation is a task-level prerequisite; this lane consumes
+    # existing certs/profiles — it does not generate them.
+    match(
+      type:           'appstore',
+      app_identifier: 'app.kasaran.kasaran',
+      git_url:        ENV.fetch('MATCH_GIT_URL'),
+      readonly:       true   # CI never regenerates; use `match nuke` + re-run locally
+    )
+
+    # Build the Flutter archive.
+    sh(
+      'flutter', 'build', 'ipa',
+      '--release',
+      '--build-number', build_number.to_s,
+      '--build-name',   version_name,
+      '--export-options-plist', 'ios/ExportOptions.plist',
+      chdir: File.join(__dir__, '..')
+    )
+
+    ipa_path = File.join(__dir__, '..', 'build', 'ios', 'ipa', 'kasaran.ipa')
+    UI.success "IPA produced: #{ipa_path}"
+  end
+end
