@@ -66,5 +66,21 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Deep-link URL scheme: kasaran://accept/<token>  (invite acceptance, SCR-02) -->
+	<!-- ux-spec §1.3 (invite) group; deployment-plan §3.2                          -->
+	<!-- Phase 06 adds the associated-domains entitlement for Universal Links.      -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>app.kasaran.kasaran</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kasaran</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
