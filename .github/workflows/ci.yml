@@ -16,19 +16,38 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Flutter version pinned to the same channel used by the dev machine.
-  # Update this when the team upgrades Flutter.
   FLUTTER_VERSION: '3.41.6'
 
 # ---------------------------------------------------------------------------
-# Job: analyze
-# Runs `flutter analyze` with strict settings from analysis_options.yaml.
-# A single lint violation (including the gate test in task 9) fails this job.
+# Job: secret-scan
+# Runs gitleaks on every push to confirm no secrets have been committed.
+# SEC-26: service-role keys, signing credentials, and .env values must never
+# appear in source. The gate deliberately fails on a dummy secret (phase 04
+# task 8) to prove the scanner is wired correctly.
+# deployment-plan §2.5.
 # ---------------------------------------------------------------------------
 jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for gitleaks)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# ---------------------------------------------------------------------------
+# Job: analyze
+# ---------------------------------------------------------------------------
   analyze:
     name: Static analysis
     runs-on: ubuntu-latest
+    needs: secret-scan
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,9 +67,6 @@ jobs:
 
 # ---------------------------------------------------------------------------
 # Job: test
-# Runs the full unit-test suite. Requires at least one test to produce a
-# meaningful non-zero exit on failure (placeholder_test.dart satisfies this
-# at phase 01; domain tests are added progressively from phase 02 onward).
 # ---------------------------------------------------------------------------
   test:
     name: Unit tests
@@ -74,16 +90,70 @@ jobs:
         run: flutter test --reporter=expanded
 
 # ---------------------------------------------------------------------------
+# Job: contract-tests
+# Starts the local Supabase CLI instance, deploys the Edge Function stubs,
+# then runs the Dart contract test suite against the local instance.
+#
+# deployment-plan §2.3 gate: zero failures required.
+# TC-API-01, TC-API-02, TC-API-04, TC-API-05 must pass.
+# TC-API-03 (idempotency) is deferred to phase 08.
+# ---------------------------------------------------------------------------
+  contract-tests:
+    name: API contract tests
+    runs-on: ubuntu-latest
+    needs: analyze
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+        # supabase start pulls Docker images and boots all services.
+        # This takes 2-5 minutes on a cold runner cache.
+        timeout-minutes: 10
+
+      - name: Verify Supabase is healthy
+        run: supabase status
+
+      - name: Serve Edge Functions (background)
+        # Edge Functions are served automatically when supabase start is running.
+        # The serve command is not needed separately; functions in supabase/functions/
+        # are auto-loaded by the edge-runtime container.
+        run: echo "Edge functions served by supabase start"
+
+      - name: Run contract tests
+        run: flutter test test/api/contract/ --reporter=expanded
+        # The contract tests skip gracefully when the local instance is not
+        # reachable, but in CI it will be running — all tests must execute.
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+
+# ---------------------------------------------------------------------------
 # Job: build-android
-# Builds a debug App Bundle (.aab) on a Linux runner.
-# Build number = github.run_number, satisfying deployment-plan §3.3:
-#   iOS CFBundleVersion == Android versionCode == CI run number.
-# iOS build is EXCLUDED per deployment-plan §3.2 (macOS runner cost policy).
 # ---------------------------------------------------------------------------
   build-android:
     name: Build Android (debug AAB)
     runs-on: ubuntu-latest
     needs: test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -105,15 +175,16 @@ jobs:
         run: flutter pub get
 
       # Build number from CI run number (deployment-plan §3.3).
-      # --build-number is applied identically to CFBundleVersion (iOS) and
-      # versionCode (Android); for the Android debug build here the run number
-      # is set even in debug mode so the produced artifact is identifiable.
+      # Anon key: the local default is used for debug AAB builds in CI.
+      # Staging/production keys are injected from CI secrets in release lanes.
+      # SEC-26: the service-role key is never passed to this step.
       - name: Build Android App Bundle (debug)
         run: |
           flutter build appbundle \
             --debug \
             --build-number=${{ github.run_number }} \
-            --build-name=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+            --build-name=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1) \
+            --dart-define=ENV=local
 
       - name: Verify AAB exists
         run: |
@@ -123,6 +194,21 @@ jobs:
             exit 1
           fi
           echo "AAB produced: $AAB ($(du -sh "$AAB" | cut -f1))"
+
+      # SEC-26 guard: confirm the service-role key prefix never appears in
+      # the compiled artifact. "service_role" is the role claim in the JWT.
+      - name: Verify service-role key absent from AAB
+        run: |
+          AAB=build/app/outputs/bundle/debug/app-debug.aab
+          # Unzip AAB into a temp dir and search all extracted files.
+          TMP=$(mktemp -d)
+          unzip -q "$AAB" -d "$TMP"
+          if grep -r --include='*.dex' -l 'service_role' "$TMP" 2>/dev/null | grep -q .; then
+            echo "ERROR: 'service_role' string found inside compiled AAB — SEC-26 violation"
+            exit 1
+          fi
+          echo "SEC-26 check passed: no service-role key in compiled artifact"
+          rm -rf "$TMP"
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4

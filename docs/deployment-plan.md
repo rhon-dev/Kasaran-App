@@ -35,15 +35,17 @@ Your §8 says "a native iOS fix can take days, which is why the OTA policy in se
 
 | | **Local dev** | **Staging** | **Production** |
 |---|---|---|---|
-| Backend URL | `http://localhost:54321` (Supabase CLI) | `https://kasaran-staging.supabase.co` | `https://kasaran-prod.supabase.co` |
+| Backend URL | `http://localhost:54321` (Supabase CLI) | `https://kasaran-staging.supabase.co` *(project ref TBD — created in phase 04)* | **DEFERRED — OQ-07 OPEN** |
 | API path | `/v1/sync/*` | `/v1/sync/*` | `/v1/sync/*` |
-| Database instance | Local Postgres in Docker, ephemeral | Dedicated Supabase project, separate from prod | Dedicated Supabase project, PITR enabled |
-| Auth tenant | Local Supabase Auth, throwaway users | Staging Auth project — **separate user pool**, no prod identities | Production Auth project |
+| Database instance | Local Postgres in Docker, ephemeral | Dedicated Supabase project `ap-southeast-1`, separate from prod | **DEFERRED — OQ-07 OPEN.** Production region = residency decision, irreversible post-creation. |
+| Auth tenant | Local Supabase Auth, throwaway users | Staging Auth project — **separate user pool**, no prod identities | **DEFERRED** |
 | Seeded data policy | Fixtures FIX-A / FIX-B / FIX-C (testing-plan §3) loaded on `db reset` | **Synthetic only** — generated from the same three fixtures plus a generator for volume | **None.** Real user data only |
 | Migrations applied | Automatically on reset | Automatically on merge to `main` | Manually gated (§2.3) |
 | Who can access | The maintainer, locally only | Maintainer + any future collaborator; credentials in CI secrets | **Maintainer only.** MFA required (SEC-27) |
 | Client build pointed at it | Debug build, `--dart-define=ENV=local` | Internal TestFlight / Play internal track | App Store / Play production |
 | Crash reporting | Disabled | Sentry, `environment=staging` | Sentry, `environment=production` |
+
+> **Phase 04 descope note (OQ-07):** Staging project creation in `ap-southeast-1` was authorised as a staging-only descope. The production project is **deferred** until OQ-07 (data residency) is resolved. See §2.2 and `decision-log.md`. This blocks the privacy notice (SEC-30) and ultimately phase 23 (store submission).
 
 ### 1.1 Production data is never copied to staging
 

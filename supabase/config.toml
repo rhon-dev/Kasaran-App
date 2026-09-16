@@ -1,0 +1,200 @@
+# supabase/config.toml — Kasaran declarative Supabase configuration.
+#
+# STAGING ONLY — production project deferred pending OQ-07 (data residency).
+# See docs/deployment-plan.md §2.2 and §1 environments table.
+# OQ-07 must be resolved before creating the production project; the region
+# decision is irreversible after creation.
+#
+# Local dev: supabase start  →  http://127.0.0.1:54321
+# Staging:   ap-southeast-1 (Singapore) per deployment-plan §2.2.
+# Production: DEFERRED — OQ-07 OPEN.
+#
+# Reference: https://supabase.com/docs/guides/local-development/cli/config
+
+project_id = "kasaran"
+
+# ---------------------------------------------------------------------------
+# API
+# ---------------------------------------------------------------------------
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+# Cap rows to prevent accidental or malicious large responses.
+max_rows = 1000
+
+[api.tls]
+enabled = false
+
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+[db]
+port = 54322
+shadow_port = 54320
+health_timeout = "2m"
+# Keep in sync with remote Supabase project (Postgres 17 on ap-southeast-1).
+major_version = 17
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = true
+# Seed file is added in phase 07 alongside the first real migration.
+# Until then, the file may not exist; Supabase CLI skips absent seed files.
+sql_paths = ["./seed.sql"]
+
+# ---------------------------------------------------------------------------
+# Auth — SEC-03, SEC-04, SEC-05, security-plan §1
+# ---------------------------------------------------------------------------
+[auth]
+enabled = true
+# Mobile deep-link: kasaran:// scheme (deployment-plan §3.2, phase 03).
+# Phase 06 adds PKCE + the real production site_url.
+site_url = "kasaran://auth"
+additional_redirect_urls = [
+  "kasaran://auth/callback",
+  "http://127.0.0.1:3000"
+]
+
+# SEC-03: access-token TTL ≤ 1 hour.
+jwt_expiry = 3600
+
+# SEC-03: refresh token rotates on every use.
+enable_refresh_token_rotation = true
+
+# Allow a 10-second window for clock skew on rotation, but not longer.
+# A wider window would allow token replay in a network attack.
+refresh_token_reuse_interval = 10
+
+# Email/password only in v1. OAuth and anonymous sign-ins are out of scope.
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+
+# REQ-SE-1 (pairing via invite); passwords must be ≥ 12 chars per
+# security-plan §1 ("12-72 chars"). Supabase minimum is 6; we set 12.
+minimum_password_length = 12
+
+# Require mixed-case letters + digits. Symbols are encouraged but not
+# required to avoid locking out users on restricted keyboards.
+password_requirements = "lower_upper_letters_digits"
+
+[auth.rate_limit]
+# Conservative rate limits — this is a low-volume personal-finance app, not
+# a high-traffic service. Tighter limits reduce credential-stuffing exposure.
+email_sent = 2        # per hour
+sms_sent = 0          # SMS auth not used in v1
+anonymous_users = 0   # disabled above
+token_refresh = 30    # per 5-minute window per IP
+sign_in_sign_ups = 10 # per 5-minute window per IP
+token_verifications = 10
+web3 = 0
+
+[auth.email]
+enable_signup = true
+# Require confirmation on both old and new address for email changes.
+double_confirm_changes = true
+# Email verification required before any plan action — enforced by RLS
+# (phase 06 SEC-02). Disabled here so local dev can skip the email step;
+# CI contract tests override via service-role key.
+enable_confirmations = false
+secure_password_change = true
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 300  # 5-minute OTP expiry (patient portal OTP, phase N)
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+template = "Your code is {{ `{{ .Code }}` }}"
+max_frequency = "5s"
+
+# MFA disabled in v1; all roles are staff using email + password.
+[auth.mfa]
+max_enrolled_factors = 0
+
+[auth.mfa.totp]
+enroll_enabled = false
+verify_enabled = false
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
+otp_length = 6
+template = "Your code is {{ `{{ .Code }}` }}"
+max_frequency = "5s"
+
+# External OAuth — not used in v1.
+[auth.external.apple]
+enabled = false
+client_id = ""
+secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
+redirect_uri = ""
+url = ""
+skip_nonce_check = false
+email_optional = false
+
+# ---------------------------------------------------------------------------
+# Edge Runtime (Deno 2) — sync_push and sync_pull functions (task 3)
+# ---------------------------------------------------------------------------
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+inspector_port = 8083
+deno_version = 2
+
+# ---------------------------------------------------------------------------
+# Realtime — used later for presence; harmless to enable now
+# ---------------------------------------------------------------------------
+[realtime]
+enabled = true
+
+# ---------------------------------------------------------------------------
+# Studio — local developer UI
+# ---------------------------------------------------------------------------
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+# IMPORTANT: openai_api_key intentionally unset. Supabase AI features are
+# never enabled for Kasaran (no AI code, no AI dependencies — phase charter).
+# openai_api_key = ""
+
+# ---------------------------------------------------------------------------
+# Storage — not used in v1 but enabled by default; keep off to reduce surface
+# ---------------------------------------------------------------------------
+[storage]
+enabled = false
+file_size_limit = "50MiB"
+
+# ---------------------------------------------------------------------------
+# Local SMTP (email testing UI)
+# ---------------------------------------------------------------------------
+[local_smtp]
+enabled = true
+port = 54324
+
+# ---------------------------------------------------------------------------
+# Analytics
+# ---------------------------------------------------------------------------
+[analytics]
+enabled = true
+port = 54327
+backend = "postgres"
+
+# ---------------------------------------------------------------------------
+# Experimental
+# ---------------------------------------------------------------------------
+[experimental.pgdelta]
+enabled = true
