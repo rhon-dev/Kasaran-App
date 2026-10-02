@@ -33,7 +33,7 @@ Neither triggers the stop condition, but both change what this plan can promise.
 | API path | `/v1/sync/*` | `/v1/sync/*` | `/v1/sync/*` |
 | Database instance | Local Postgres in Docker, ephemeral | Dedicated Supabase project `ap-southeast-1`, separate from prod | **DEFERRED — OQ-07 OPEN.** Production region = residency decision, irreversible post-creation. |
 | Auth tenant | Local Supabase Auth, throwaway users | Staging Auth project — **separate user pool**, no prod identities | **DEFERRED** |
-| Seeded data policy | Fixtures FIX-A / FIX-B / FIX-C (testing-plan §3) loaded on `db reset` | **Synthetic only** — generated from the same three fixtures plus a generator for volume | **None.** Real user data only |
+| Seeded data policy | Synthetic inputs for FIX-A…D (testing-plan §3), once implemented as version-controlled test data, loaded on `db reset` | **Synthetic only** — generated from the same four specified fixtures plus a generator for volume | **None.** Real user data only |
 | Migrations applied | Automatically on reset | Automatically on merge to `main` | Manually gated (§2.3) |
 | Who can access | The maintainer, locally only | Maintainer + any future collaborator; credentials in CI secrets | **Maintainer only.** MFA required (SEC-27) |
 | Client build pointed at it | Debug build, `--dart-define=ENV=local` | Internal TestFlight / Play internal track | App Store / Play production |
@@ -47,7 +47,7 @@ Neither triggers the stop condition, but both change what this plan can promise.
 
 **What staging uses instead:**
 
-1. **The three committed fixtures** (FIX-A NCR, FIX-B Boracay, FIX-C Iloilo) as the canonical realistic plans. They already have hand-verified expected values, so staging doubles as a place to confirm the numbers match production behaviour.
+1. **The four specified fixtures** (FIX-A NCR, FIX-B Boracay, FIX-C Iloilo and FIX-D money flows), once implemented as version-controlled inputs, as the canonical synthetic plans. Their expected values are hand-computed in testing-plan §3; staging must assert against that spec, not generated output. Explicitly applied FIX-C rebalance and FIX-A affordable-guest cases are additional expected results; baseline FIX-A/B/C fixture values do not change (ADR-53/54).
 2. **A synthetic volume generator** for load-shaped data: N plans × M ledger entries × K change-log rows, with names drawn from a fixed fake-name list, amounts from plausible ranges, and Ninong/Ninang roles distributed realistically. Deterministic from a seed so bugs reproduce.
 3. **Synthetic pairing sets** — pre-paired two-account plans for testing shared editing and removal, including the demo pair used for store review (§5.4).
 
@@ -87,7 +87,7 @@ The backend surface is deliberately thin (design.md §2.4): two idempotent endpo
 ```
 ① PR opened
    ├─ dart analyze + money-path lint          gate: zero violations (TC-GEN-01)
-   ├─ domain unit tests incl. all 3 fixtures  gate: 8/8 fixture TCs green
+   ├─ domain unit tests incl. FIX-A…D plus explicit rebalance/guest previews
    ├─ widget tests + golden verify            gate: no unreviewed golden diff
    ├─ integration_test (Android emulator)     gate: green
    ├─ TENANT ISOLATION SUITE                  gate: TC-SEC-01 green — BLOCKING
@@ -462,7 +462,7 @@ Example: *"Fixed: the buffer total could show as under-spent when one category w
 | # | Requirement | Source | Pass condition | Status |
 |---|---|---|---|---|
 | 1 | Tenant isolation suite green in CI | TC-SEC-01, SEC-24 | Cross-tenant read/write/delete and forged-`plan_id` pull all denied; suite blocks the pipeline | NOT MET |
-| 2 | All fixture calculations exact | TC-FIX-A1/A2/B1/B2/C1/C2, TC-PL-19, TC-AE-05 | 8/8 green; FIX-C net = ₱335,750.00 | NOT MET |
+| 2 | All fixture calculations exact | testing-plan §3, §4 (FIX-A…D; TC-PL-19, TC-AE-05 and new rebalance/guest cases) | All specified assertions green; pre-action FIX-C net remains ₱335,750.00; only explicit Apply changes allocations, not net or the pinned baseline | NOT MET |
 | 3 | Full MVP E2E on both platforms | TC-E2E-01 | 20/20 steps + offline gate, iOS and Android | NOT MET |
 | 4 | Sync conflict matrix green both platforms | testing-plan §5 (10 rows) | 10/10, incl. clock-skew TC-SE-20 and the LWW/removal asymmetry | NOT MET |
 | 5 | Offline matrix green | TC-OF-01…17 | 8 entity rows + 9 durability rows; TC-OF-10 string scan finds zero prohibited words | NOT MET |
@@ -480,6 +480,10 @@ Example: *"Fixed: the buffer total could show as under-spent when one category w
 | 17 | Account deletion path live | SEC-34, SEC-40 | In-app deletion works end-to-end; public URL live | NOT MET |
 | 18 | Privacy notice published | SEC-30 | Live URL naming data location — **blocked on OQ-07** | NOT MET |
 | 19 | Name clearance | §5.6, OQ-09 | Store name availability confirmed on both platforms; domain owned | NOT MET |
+| 20 | Verified checklist preset content | OQ-11, ADR-56, REQ-CK-1 | Before publishing any v1 legal/church applicability or date-offset preset, verify each item with the relevant authority and record its source; otherwise show only user-managed NEEDS VERIFICATION prompts without a claimed preset date. **OQ-11 remains open; preset release is blocked.** | NOT MET |
+| 21 | Private offline export/share | ADR-57, SEC-32/42, REQ-EX-2, testing-plan export cases | PDF/CSV and the separate full local-data copy work offline; privacy preview, single-sponsor scoping and spreadsheet-formula neutralization pass on both platforms; DPO has reviewed server-only access-data coverage before SEC-32 passes | NOT MET |
+
+**v1.1 is not part of this v1 gate.** A later attachment release separately requires SEC-43/44 Storage RLS, size/MIME, encrypted offline staging and Photos-label PASS before store submission; localization needs ARB fallback and pseudo-localization tile-overflow tests (ADR-58/59). A backlog stub is not a green release gate.
 
 ### 7.1 Named alerts and thresholds
 

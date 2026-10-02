@@ -39,19 +39,24 @@ Target market: 2026 Philippines, PHP budgets, couples self-planning without a fu
 
 ### v1 scope
 
-Each is specified in `docs/requirements.md` and `docs/mvp-user-stories.md`:
+Prospective features specified in `docs/requirements.md` (with earlier user stories in `docs/mvp-user-stories.md`), not a statement of implemented behavior:
 
-- **Budget setup** `v1` — guided intake: total budget, wedding date, guest cap, region.
+- **Budget setup and starter templates** `v1` — guided intake: total budget, wedding date, guest cap, region and optional wedding-type context; civil, church + hotel, church + garden, beach/destination and intimate (≤50 guests) unticked expense suggestions with no preset amounts or automatic ledger rows.
 - **Expense ledger** `v1` — line items with estimated vs actual amounts, deposits, and derived paid/pending/overdue status.
 - **Hidden-fee line items** `v1` — crew meals, OOT, church aircon, corkage (plus overtime, venue power) as first-class, prompted entries.
 - **Pledges** `v1` — sponsor pledges with fulfillment state; net out-of-pocket reduced only on fulfillment, shown distinctly from gross and from expected support.
-- **Guest math** `v1` — RSVP and priority-tier tracking, per-head vs flat-rate cost scaling, and "what if we add N guests" previews.
-- **Rule-based allocation engine** `v1` — deterministic, explainable budget allocation with regional cost modifiers and manual overrides. No AI.
+- **Guest math** `v1` — RSVP and priority-tier tracking, per-head vs flat-rate cost scaling, "what if we add N guests" previews, and an affordable-guest ceiling using the couple's budget, flat costs, per-head rates and buffer to keep (not expected pledges).
+- **Rule-based allocation engine** `v1` — deterministic, explainable default allocation with regional cost modifiers and manual overrides; separate explicit before/after rebalance against committed amounts, preserving override locks and showing any remaining shortfall. No AI or change to baseline fixtures without an apply.
+- **Requirements checklist** `v1` — couple-managed state and optional manually entered fee-to-ledger for PSA and church/civil paperwork; preset applicability and due-date offsets are **NEEDS VERIFICATION / blocked on OQ-11**, not universal legal or church advice.
+- **Offline export and share** `v1` — on-device PDF budget summary and single-sponsor statement, separate ledger/payment/pledge/guest CSVs, guest/sponsor-name privacy toggles for shared PDF, CSV formula neutralization, and OS share sheet. A separate full machine-readable local personal-data copy includes history and labels missing server-only fields; SEC-32 completion needs DPO review. No live links; recipients' copies cannot be recalled.
 - **Shared editing + offline sync** `v1` — two partners on one plan, full offline use, field-level last-write-wins with a visible, immutable change log.
 
 ### Deferred — not in v1
 
-Deliberately excluded until after the non-AI production launch (`docs/project-brief.md`, `docs/development-phases.md`):
+Planned scope only; the current repository is still a foundation scaffold, not an implementation of the feature list above (`docs/project-brief.md`, `docs/development-phases.md`):
+
+- **Taglish/Filipino UI** `v1.1 backlog` — ARB resources with English fallback; en_PH money/date formats and pseudo-localisation overflow checks for bento tiles.
+- **Receipt/contract photo attachments** `v1.1 backlog stub` — no current upload; later design requires private plan-scoped Storage, encrypted offline staging, approved limits and Photos privacy-label review. No OCR.
 
 - **AI categorization** (on-device) — deferred.
 - **OCR contract parsing and cloud AI reasoning** — deferred.
