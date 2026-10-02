@@ -188,7 +188,7 @@ THE SYSTEM SHALL provide each ledger entry with a category, supplier name, estim
 
 1. Category is selected from the fixed taxonomy; free-text category values are rejected.
 2. Supplier name accepts any non-empty string up to 200 characters.
-3. Estimated amount is mandatory and ≥ 0.
+3. A flat-rate entry SHALL store a mandatory estimated amount ≥ 0. A per-head entry SHALL store its nonnegative rate and derive its displayed estimate on read from that rate and the driving count; its `estimated_cents` column SHALL be null, never a synced or written-back derived estimate (REQ-GM-2, REQ-OF-2 cl. 4, ADR-46).
 4. Actual amount is optional and, when set, is ≥ 0.
 5. Deposit paid SHALL NOT be stored on an entry; it is derived from the separate payment and refund records per REQ-LG-4.
 6. Due date SHALL NOT be stored on an entry; dated obligations belong to REQ-LG-7 schedule items, and entries without a schedule have a virtual undated balance.
@@ -498,6 +498,7 @@ WHEN a partner overrides a category allocation, THE SYSTEM SHALL store the overr
 4. IF the sum of overrides exceeds the total budget, THEN THE SYSTEM SHALL display an over-allocation warning naming the excess amount, and SHALL NOT reduce any override to fit.
 5. A partner can revert an override, after which the category returns to the engine value.
 6. Reverting one override does not affect any other override.
+7. `engine_cents` and its rule explanation SHALL be computed on read from synced inputs and the pinned ruleset, not synced or stored as authoritative values; only `override_cents`, the source inputs, and the ruleset identifier sync (REQ-OF-2 cl. 4, ADR-46).
 
 **REQ-AE-6 [v1] — Buffer drawdown**
 THE SYSTEM SHALL compute buffer remaining as the Buffer allocation minus the summed overrun of all non-Buffer categories, and SHALL display it on the dashboard.
@@ -523,6 +524,8 @@ THE SYSTEM SHALL support exactly two partner accounts per plan, with identical r
 4. An unaccepted invite is revocable and expires exactly 7 days after issuance.
 5. IF a partner opens an invite link more than 7 days after issuance, THEN THE SYSTEM SHALL reject it and state that the invite has expired.
 6. WHEN the second partner joins, they see every existing figure identically, including manual overrides.
+7. WHEN a signed-in account has no active plan, THE SYSTEM SHALL offer “Start our plan” and “Join my partner's plan” before creating any plan; choosing Join SHALL NOT create a separate plan (ADR-52).
+8. WHEN a partner pastes an invite link instead of tapping it, THE SYSTEM SHALL send its token through the same acceptance, revocation, membership and seven-day expiry checks as the deep link; the token SHALL have at least 128 bits of CSPRNG entropy, be stored server-side only as a hash, and never appear in logs (SEC-05, ADR-52).
 
 **REQ-SE-2 [v1] — Field-level last-write-wins**
 WHEN two partners have edited the same plan and their changes reconcile, THE SYSTEM SHALL resolve conflicts at field granularity using last-write-wins ordered by a **server-assigned timestamp applied at sync time**, with a device-side monotonic counter used only as a deterministic tiebreaker. *(Amended per Decision D1: device wall-clocks are never authoritative for ordering.)*
@@ -534,6 +537,10 @@ WHEN two partners have edited the same plan and their changes reconcile, THE SYS
 5. The server-assigned timestamp is applied when the write is accepted at sync; a write that has not yet synced carries no authoritative order and SHALL NOT win a conflict against an already-synced write purely by an earlier device clock reading.
 6. Resolution never discards an accepted local write without recording it in the change log per REQ-SE-4.
 7. THE SYSTEM SHALL NOT use inference, heuristics, or any AI component in conflict resolution.
+8. WHEN a synced change-log row's typed `old_value` (including null) differs from the effective value it actually replaces immediately before that row in server order, THE SYSTEM SHALL derive a conflict on read, not persist a conflict flag; the later accepted write remains the winner even when it was made offline days earlier. A derived payment `status` or other recomputed value SHALL NOT be compared as a synced field (ADR-43).
+9. WHEN a conflict is derived, THE SYSTEM SHALL show both partners a dismissible conflict banner and a “Conflicts” filter on SCR-16 naming the winning and superseded values and attribution; dismissing the banner SHALL NOT erase the log or conflict history (ADR-43).
+10. WHERE `pricing_mode` and `per_head_rate_cents` change, or a fee component's `quantity`, `unit_rate_cents`, and `amount_cents` change, THE SYSTEM SHALL write the entire respective group as one validated snapshot under one `change_group_id`, resolve all fields from the group with the highest `(server_ts, device_monotonic, device_id)`, and never partially project an incomplete group. All other independent fields keep clauses 1–5 field LWW; the losing group's rows remain in the immutable log (ADR-44).
+11. WHEN one account edits a plan on two devices, THE SYSTEM SHALL treat their queued changes as distinct device writes under clauses 3–5; where applicable conflict copy SHALL say “You changed this on another device,” not imply a different person (ADR-50).
 
 **REQ-SE-3 [v1] — Convergence**
 WHEN all queued writes from both devices have been applied, THE SYSTEM SHALL present identical values on both devices.
@@ -541,6 +548,9 @@ WHEN all queued writes from both devices have been applied, THE SYSTEM SHALL pre
 1. Given the same set of writes, convergence is independent of arrival order.
 2. After sync completes, gross, net, outstanding exposure, and every category variance match exactly across devices.
 3. Re-running sync with no new writes changes nothing on either device.
+4. WHEN replay or concurrent edits violate a cross-field constraint, THE SYSTEM SHALL preserve all accepted rows and winners, revalidate on read, exclude only invalid dependent financial contributions from live aggregates, and show the raw values and a “needs attention” flag on SCR-19 (state 5); it SHALL NOT issue automatic corrective writes. Independent valid records remain visible and counted (ADR-45).
+5. The read-time validation in clause 4 SHALL cover the six-category taxonomy, nonblank supplier, nonnegative flat estimate and actual, 2,000-character notes limit, valid per-head mode/rate and `manually_valued` actual precedence (REQ-LG-1, REQ-GM-2 cl. 4–5); fixed hidden-fee subtype/category, required component shapes, complete quantity/rate pair **or** flat amount and subtype-specific component sums (REQ-HF-2); plan budget > 0, cap/crew headcount ≥ 0, region and pinned ruleset validity, guest RSVP/tier axes (REQ-BS-2/4/5, REQ-GM-1/4, REQ-AE-1/3); schedule sum ≤ effective amount, positive dated payments/refunds, parent entry and matching payment/schedule links (REQ-LG-7/8); valid sponsor role/sub-role, positive receipts, receipt-backed/withdrawn pledge lifecycle, in-kind shared cap and live linked entry, plus reciprocal unique equal-value supplier-paid receipt/payment pair in the same plan (REQ-PL-1/6/7); positive gifts with allowed source (REQ-GF-1); nonnegative allocation overrides with valid category (REQ-AE-5); and six hidden-fee decisions before setup completion (REQ-HF-1). Over-allocation, overpayment and zero eligible support remain **warnings/derived values**, not invalidity; invalid dependent values SHALL NOT be silently clamped, repaired, or counted (ADR-45).
+6. WHEN the same complete committed log and pinned ruleset are available on two devices, their read-time validation, excluded contributions, needs-attention flags, and money totals SHALL converge; a device without the pinned version SHALL retain its log and show an update/needs-attention state rather than fabricate allocations (ADR-45/46).
 
 **REQ-SE-4 [v1] — Visible change log**
 THE SYSTEM SHALL record every create, update, and delete with the acting partner, a timestamp, the field changed, the previous value, and the new value.
@@ -549,7 +559,12 @@ THE SYSTEM SHALL record every create, update, and delete with the acting partner
 2. Monetary changes record both previous and new value.
 3. A write that lost a last-write-wins resolution appears in the log with its value preserved and its superseded outcome stated.
 4. Change log entries are immutable; no user interface permits editing or deleting them.
-5. Every log entry attributes exactly one partner identity.
+5. Every log entry attributes exactly one stable per-plan `plan_member_id` alias and its originating `device_id`, not an immutable foreign key to `users`; an account-to-alias mapping is removable without rewriting log rows. After that mapping is removed, the unchanged history renders the actor as “Former member” (ADR-50/51). The outcome of shared-record erasure remains **BLOCKED on OQ-01/SEC-33/38**; this clause does not authorize retention or erasure of the shared plan.
+6. WHEN a row is created, THE SYSTEM SHALL emit one `create` change-log row containing its complete validated initial snapshot; a peer SHALL materialize the entity only from that complete event, and a child SHALL remain unprojected until its parent create arrives, including across pull pages (ADR-47).
+7. WHEN an entity is soft-deleted, THE SYSTEM SHALL preserve its tombstone and history and exclude it and dependent children from **all** live totals (gross, net, expected/exposure, deposits, balances, category variance, buffer, gifts, net after gifts, and reconciliation); later ordinary edits SHALL remain in Activity as suppressed/superseded while deleted, trigger the conflict banner, and SHALL NOT resurrect it or cascade writes. A linked pledge retains its recorded value, shows “linked entry deleted,” and its linked support is excluded from live net pending reconciliation (ADR-47, REQ-PL-7).
+8. WHEN a partner explicitly selects Restore on a deleted entity in SCR-16, THE SYSTEM SHALL issue a normal ordered LWW `deleted_at = null` write, then revalidate the entity's last effective pre-delete field values and eligible children per REQ-SE-3 before returning valid contributions to live totals. Edits accepted while deleted remain suppressed in history and SHALL NOT silently become effective after Restore. Restore is distinct from a one-tap revert of a superseded field value, which remains unavailable (ADR-47).
+9. WHEN a user signs out on SCR-18 or revokes one listed device's session, THE SYSTEM SHALL revoke that device's server refresh session, stop its future sync, and offer a local wipe; other devices' sessions remain usable. THE SYSTEM SHALL NOT claim to force-wipe an offline or uncooperative device (ADR-50, SEC-04).
+10. WHERE a user requests account deletion on SCR-18, THE SYSTEM SHALL expose an in-app request path and explain that shared-plan record treatment awaits OQ-01/SEC-33/38 counsel review; the alias-to-user mapping can be removed without changing log attribution, but no shared-record retention/deletion outcome or passing erasure acceptance test is specified until that decision (ADR-51, SEC-34).
 
 **REQ-SE-5 [v1] — Plan-lifecycle permissions**
 THE SYSTEM SHALL restrict plan deletion to the creating partner, SHALL permit either paired partner to defensively remove the other without consent, and SHALL require two-party confirmation for ownership transfer only.
@@ -597,6 +612,8 @@ WHILE the device has no network connectivity, THE SYSTEM SHALL compute the alloc
 1. Allocation runs offline and returns figures identical to those the same inputs produce online.
 2. A guest what-if preview runs fully offline.
 3. No dashboard figure renders as unavailable, stale, or placeholder due to absent connectivity.
+4. THE SYSTEM SHALL derive per-head effective amounts from the synced rate and driving guest count on each read and SHALL NOT sync or write back a recomputed `estimated_cents`; it SHALL derive the allocation `engine_cents` result and explanation locally from synced inputs and the pinned bundled ruleset, syncing only manual override cents and source inputs/ruleset version, not engine outputs (ADR-46).
+5. IF the pinned ruleset version is absent locally, THEN THE SYSTEM SHALL retain the log, identify the missing version and show needs attention/update for the affected allocation view, without inventing an engine amount; clause 3's offline parity applies where the pinned ruleset is installed (ADR-46).
 
 **REQ-OF-3 [v1] — Offline state visibility**
 WHILE the device has unsynced local changes, THE SYSTEM SHALL display the offline state and the count of pending changes.
@@ -620,6 +637,10 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 3. WHEN queued writes replay, THE SYSTEM SHALL preserve each write's original `device_monotonic` order and `device_id`; the server SHALL assign `server_ts` when it accepts each new row, not when the offline edit was made. A duplicate replay SHALL retain the row's originally assigned `server_ts` and SHALL NOT create a second row (REQ-SE-2, ADR-21).
 4. IF a queued write cannot be applied, THEN THE SYSTEM SHALL retain the write with its data intact, surface it to the partner, and SHALL NOT discard it.
 5. Sync progress and completion are visible to the partner.
+6. WHEN the server accepts a plan's writes, THE SYSTEM SHALL serialize `server_ts` assignment and insertion under a per-plan transactional lock held through commit; pull pages SHALL use a committed high-water mark and advance the per-plan cursor only through returned committed rows. A rollback may leave a gap, but a later-committed lower sequence SHALL NOT be skipped, including when push transactions race (ADR-48).
+7. THE SYSTEM SHALL include `protocol_version` in push and pull envelopes and `schema_version` on immutable change-log rows. IF a request uses an unsupported major protocol version, THEN THE SERVER SHALL reject it with a structured `min_supported_build` response and leave local queued rows intact; no incompatible row is silently projected (ADR-49).
+8. WHEN a compatible old client receives an unknown additive `entity_type` or `field_name`, THE SYSTEM SHALL persist its complete row and ordering metadata in the local log without projecting that unknown value; after upgrading it SHALL transactionally migrate the local drift schema, retain queued and unknown rows unchanged, and rebuild projections from the entire retained log. IF a required dependent input is unknown, THEN THE SYSTEM SHALL gate its financial projection with needs attention rather than silently compute an incorrect total (ADR-49).
+9. IF local drift migration or projection rebuild fails, THEN THE SYSTEM SHALL roll back the migration transaction, preserve the old schema, queued writes, cursor, and retained log, and surface an update/retry state instead of partially applying a newer projection (ADR-49).
 
 ---
 
@@ -648,8 +669,8 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 | Day-of gifts and reconciliation | REQ-GF-1 … 2 | Prompt 2 day-of gifts |
 | Guest math | REQ-GM-1 … 5 | GM-1, GM-2, GM-3 |
 | Allocation engine | REQ-AE-1 … 6 | AE-1, AE-2, AE-3 |
-| Shared editing | REQ-SE-1 … 6 | SE-1, SE-2, SE-3 |
-| Offline | REQ-OF-1 … 5 | OF-1, OF-2 |
+| Shared editing, conflicts, onboarding, attribution and restore | REQ-SE-1 … 6 (ADR-43–45, 47, 50–52) | SE-1, SE-2, SE-3; Prompt 3 sync integrity |
+| Offline computation, committed cursors and compatibility | REQ-OF-1 … 5 (ADR-46, 48–49) | OF-1, OF-2; Prompt 3 sync integrity |
 | AI phase | REQ-AI-1 … 5, REQ-EX-1 | AI-1 … AI-5 |
 
 ---
@@ -661,7 +682,7 @@ The decisions in this section are resolved. Remaining open questions and formerl
 | # | Decision | Requirements |
 |---|---|---|
 | 1 | Payment states are derived `paid` / `pending` / `due soon` / `overdue`; deposits derive from insert-only payments less refunds, with partial payment indicated independently of status (ADR-36). | REQ-LG-4, REQ-LG-5, REQ-LG-7 … 9 |
-| 2 | Sync conflicts resolve by field-level last-write-wins ordered by a **server-assigned timestamp** applied at sync time (device wall-clocks never authoritative), with a device monotonic counter + stable device id as tiebreaker, and an immutable change log preserving superseded writes. *(D1)* | REQ-SE-2, REQ-SE-4 |
+| 2 | Sync conflicts resolve by field-level last-write-wins ordered by a **server-assigned timestamp** applied at sync time (device wall-clocks never authoritative), with a device monotonic counter + stable device id as tiebreaker, and an immutable change log preserving superseded writes. Atomic compound field groups, typed stale-value conflict disclosure, read-time invariant gates, create/tombstone handling, and committed per-plan cursors refine—not replace—this ordering (ADR-43–49). *(D1)* | REQ-SE-2 … 4, REQ-OF-2/5 |
 | 3 | Region is a first-class setup input on three cost tiers: Metro 1.00, Provincial 0.85, Destination 1.20. Destination flags control OOT independently; Bohol is Provincial at 0.85 and destination-flagged (ADR-29). | REQ-BS-4, REQ-HF-3 |
 | 4 | Baseline allocations are Catering & Venue 40%, Photo & Video 15%, Attire & Styling 10%, Coordination 10%, Entourage & Miscellaneous 5%, Buffer 20%. | REQ-AE-1 |
 | 5 | The regional cost index drives cost expectation, budget adequacy, and rate suggestions — not allocation shares. See section 12. | REQ-AE-2 |

@@ -130,7 +130,7 @@ Nothing auto-deploys to production. For a solo maintainer the risk is not slow r
 - Adding `NOT NULL` without a default to a table clients insert into.
 - Narrowing a type (`bigint` → `int`), or tightening a `CHECK` to reject a value old clients still send.
 - Removing a value from an enum-like `CHECK` constraint (e.g. deleting a pledge status).
-- Any change to `change_log`'s shape. This one is the most dangerous in the whole schema: it is the sync unit (design.md §2.1), so a client that cannot write a valid `change_log` row cannot sync **at all** — it does not degrade, it stops.
+- Any **breaking** change to `change_log`'s shape. Additive, versioned nullable fields (`change_group_id`, `schema_version` in ADR-44/49) follow expand/migrate/contract and require an N−1 compatibility probe; changing an existing field so an older client cannot write or retain an unknown field stops sync entirely. An older client must preserve additive unknown events in its log even when it cannot project them.
 
 **Sync-specific hazard.** `server_ts` is assigned server-side (ADR-21/D1) and is the ordering authority. A migration that rewrites, re-bases, or re-assigns `server_ts` on existing rows **silently changes past conflict outcomes** — a field that resolved to partner A's value could flip to B's. Treat `server_ts` as immutable once assigned. If a migration must touch it, that is a data-integrity change requiring its own review and a documented recomputation of affected projections.
 
@@ -315,6 +315,8 @@ Build (CI, tagged RC) → INTERNAL TESTING (maintainer, immediate)
 | < `min_supported_build` | **Blocking update-required screen.** Sync is disabled. **Local data remains readable** — the app does not hold a user's own budget hostage; it degrades to read-only rather than dark. Copy follows ux-spec §7.3 rules: never implies data loss |
 | Cannot reach `app_config` (offline) | Uses last-known value; if never fetched, treats itself as supported. Fails open (§3.6) |
 
+**Versioned sync envelopes (ADR-49).** Push/pull include `protocol_version`; each immutable log row carries `schema_version`. The server rejects an unsupported major version before accepting a batch, with a structured incompatible-protocol response that contains `min_supported_build`. The client retains every queued write, displays the existing update-required/read-only state (without implying loss), and retries only after an update. A supported older minor client persists unknown additive events unchanged and omits them only from projections; after updating, a transactional drift migration rebuilds those projections from the retained log. Raising `min_supported_build` does not rewrite `server_ts` or bypass the two-minor-release/90-day deprecation policy below. Test the N−1 request set for both read and write, unknown-event preservation, and incompatible-major refusal before contracting a protocol shape.
+
 **When the floor is raised:** only when an old client would be *unsafe to sync* — it writes a `change_log` shape the backend no longer accepts, mishandles `server_ts` ordering, or misses a security fix. Not for feature parity. Raising the floor is a production change requiring §2.3 gating, and the deprecation window is **two minor releases or 90 days, whichever is longer**, tracked by client-version telemetry before any contract-phase migration (§2.4).
 
 ---
@@ -354,7 +356,7 @@ Transcribed from security-plan.md §6.2 and §6.3; must match the §6.1 data inv
 
 **Google Play Data Safety:** collects Personal (name, email), Financial, and other user content. **No third-party sharing** in the Play sense (Supabase is a processor). Encrypted in transit (SEC-17) ✅. Encrypted at rest on device (SEC-12) ✅. Users can request deletion in-app (SEC-34) ✅. Not used for tracking ✅.
 
-**Account deletion path (both stores require it):** in-app deletion under Shared Access / account settings (SEC-34), plus a publicly reachable deletion-instructions URL for Apple (SEC-40). Deletion behaviour follows SEC-33 — **and note the open dependency:** the shared-record erasure model is still counsel-gated (OQ-01), so the deletion flow's exact behaviour on a two-partner plan is not finalised. This is a genuine submission risk, not a formality: both stores check that the deletion path works.
+**Account deletion path:** SCR-18 account settings offers an in-app deletion request and confirmation (SEC-34), plus a publicly reachable deletion-instructions URL is planned (SEC-40). The alias-based log attribution can render “Former member” without mutating history (ADR-51), but this does **not** decide how a shared plan or historical personal content is erased. The shared-record completion outcome remains counsel-gated on OQ-01/SEC-33/38; no production deletion-flow pass may be claimed before a reviewed, working path exists. This is a release blocker, not a resolved store-submission item.
 
 ### 5.4 Review risk: reviewers cannot pair two accounts — pre-paired demo required
 
