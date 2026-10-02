@@ -78,7 +78,9 @@ The setup wizard is a distinct stack rather than tabs because REQ-HF-1 clause 6 
 
 REQ-LG-5 clause 6 forbids persisting payment status. The same reasoning extends to every computed figure: two devices that disagree would generate a sync conflict on a value that is not actually user input.
 
-**Computed on read, never in a table:** entry effective amount (including actual-price discounts and per-head rules); per-entry deposit/net paid (`Σ active payment rows − Σ active refund rows`), plan deposits/net payments, per-entry balance due (`max(0, effective − net paid)`), plan balance due, and overpayment; schedule-item allocated paid and residual, item states (`paid`, `partially paid`, `due soon`, `overdue`, otherwise pending), entry payment status (`paid`, `pending`, `due soon`, `overdue`) and separately indicated partial coverage; gross event total, net received pledge support (including receipt-derived `received` status), expected remaining pledge support, outstanding confirmed pledge exposure, net out-of-pocket (gross minus received support), gifts total, net after gifts (net out-of-pocket minus gifts total), post-wedding reconciliation of gifts against remaining balances and any orphan support; buffer remaining, category variance, per-head derived amounts, and budget adequacy. Do not persist a running payment, receipt, or gift total. Negative net and net-after-gifts values remain negative, not floored (ADR-37/40). Details and attribution rules are in §4.4–4.5.
+**Computed on read, never synced or persisted as plan data:** entry effective amount (including actual-price discounts and per-head rules); per-entry deposit/net paid (`Σ active payment rows − Σ active refund rows`), plan deposits/net payments, per-entry balance due (`max(0, effective − net paid)`), plan balance due, and overpayment; schedule-item allocated paid and residual, item states (`paid`, `partially paid`, `due soon`, `overdue`, otherwise pending), entry payment status (`paid`, `pending`, `due soon`, `overdue`) and separately indicated partial coverage; gross event total, net received pledge support (including receipt-derived `received` status), expected remaining pledge support, outstanding confirmed pledge exposure, net out-of-pocket (gross minus received support), gifts total, net after gifts (net out-of-pocket minus gifts total), post-wedding reconciliation of gifts against remaining balances and any orphan support; buffer remaining, category variance, per-head derived amounts, and budget adequacy. Do not persist a running payment, receipt, or gift total. Negative net and net-after-gifts values remain negative, not floored (ADR-37/40). Details and attribution rules are in §4.4–4.5.
+
+Per-head `estimated_cents` is a **flat-mode input only**; for an unvalued per-head entry derive `driving_guest_count × per_head_rate_cents` on every read, including after guest-count sync. Never write a recomputed estimate. The pinned immutable bundled ruleset and synced plan inputs likewise produce engine allocations and traceable explanations locally; only manual `override_cents` syncs (§4.3, §5.3, ADR-46). Missing pinned ruleset assets block the dependent derived view with needs-attention/update copy rather than fabricating an amount. A what-if preview never persists derived changes.
 
 For an entry without explicit schedule items, render **one virtual undated balance** for its effective amount; it has no row, no date, no reminder, and cannot become overdue. When an explicit schedule exists, allocate its dated items first, then render a virtual undated residual only for any remaining effective amount not covered by the items (ADR-36). All payment allocations, item states and reminders derive locally on read from the active rows and the device's calendar date; they are not synced as status writes (REQ-OF-4). A refund can reopen a paid item or entry.
 
@@ -102,7 +104,8 @@ Two rules hold this in place:
 The pivotal decision in this design. REQ-SE-2 requires field-level last-write-wins, and REQ-SE-4 requires an immutable log with previous and new values including writes that lost. One structure satisfies both: **an append-only log of field-level changes is the thing that syncs, and row state is a materialised projection of it.**
 
 ```
-write path:   user edit → one change_log row per changed field
+write path:   user edit → one change_log row per changed ordinary field,
+                        or one atomic full-snapshot group/create event
                         → apply to projection table
                         → enqueue log row for push
 
@@ -114,13 +117,15 @@ sync:         push local log rows, pull remote log rows,
 
 Consequences that fall out for free:
 
-- **REQ-SE-2 clause 1 and 2** — different fields and different entries never collide, because log rows are keyed by `(entity_type, entity_id, field_name)`.
+- **REQ-SE-2 clause 1 and 2** — different ordinary fields and different entries never collide, because log rows are keyed by `(entity_type, entity_id, field_name)`; the two explicitly grouped fields sets resolve atomically (§2.2).
 - **REQ-SE-2 clause 6** — a losing write is never discarded; it is already in the log and reads as superseded.
 - **REQ-SE-4 clause 3** — superseded writes are visible with their values intact.
 - **REQ-SE-3 clause 1** — convergence is order-independent, because applying a set of log rows sorted by clock yields the same projection regardless of arrival order.
 - **REQ-OF-5 clause 2** — idempotency is a primary-key conflict on the log row's client-generated ID.
 
 The alternative — sync whole rows and keep the log as a side audit table — cannot satisfy field-level LWW without a second mechanism, and lets the log drift out of agreement with state.
+
+**Stale-write visibility (ADR-43).** For each accepted *update* write, compare its typed `old_value` (null included) against the effective value it *actually replaces* immediately before applying it in authoritative server order; a create event initializes state and is not compared against a prior field. A mismatch is a derived conflict, not a stored flag; an old offline write can win while still conflicting. Replay all rows and groups to derive conflict records on **both** devices; show winning and superseded values in SCR-16's Conflicts filter and a dismissible banner to both users. A superseded row alone is not proof of a stale write: the mismatch test is decisive. Neither detection nor notification changes ADR-21 ordering.
 
 ### 2.2 Clocks: server-assigned ordering (D1)
 
@@ -138,13 +143,15 @@ Each log row carries an ordering key `(server_ts, device_monotonic, device_id)`,
 
 **Consequence for offline writes.** A write made offline has no `server_ts` until it syncs (REQ-SE-2 clause 5). Locally its provisional value is visible immediately, with the device's own unsynced writes sequenced by `device_monotonic`; on sync the server assigns `server_ts` and settles the authoritative order. **The same-field write that syncs last wins, even if it was made offline days earlier.** If A's same-field write synced first and B's older offline edit syncs later, B wins because B receives the later server timestamp. The age of the offline edit and either device's wall clock do not determine the winner. Both writes remain in the immutable log; A's becomes superseded.
 
+**Two compound LWW groups (ADR-44).** `(ledger_entries.pricing_mode, per_head_rate_cents)` and `(fee_components.quantity, unit_rate_cents, amount_cents)` are indivisible. Each edit emits one row with a fresh `change_group_id`, `field_name` naming the group and `old_value`/`new_value` containing the **complete typed snapshot**, including explicit nulls and unchanged members. Choose the highest `(server_ts, device_monotonic, device_id)` group event and apply its entire snapshot atomically; do not merge constituent fields or accept an incomplete group. Conflict comparison uses the prior full-group snapshot. Other fields retain field LWW, and losing group events remain in the immutable log. This is LWW over a larger validation unit, not a CRDT.
+
 **Expensive to reverse.** The ordering key lives in a column on every log row and in every comparison. This is a change from the earlier HLC design; the schema (§4.6) reflects `server_ts` + `device_monotonic` rather than `hlc_physical` + `hlc_counter`.
 
 ### 2.3 Identifiers and tombstones
 
 **Client-generated UUIDv7 primary keys, everywhere.** Offline creation is required by REQ-OF-1, so the client must mint IDs without asking the server. Server-side autoincrement makes offline creates impossible. UUIDv7 sorts by creation time, which keeps index locality reasonable.
 
-**Soft deletes via `deleted_at`.** A hard delete cannot propagate — the row simply vanishes locally, and the next pull from a peer that has not yet seen the delete resurrects it. Deletion is a field change like any other, so it flows through the log and resolves under the same LWW rule. Schedule items, payments, receipts and gifts have independent UUID rows and tombstones: two partners recording different events offline insert different IDs instead of overwriting one cumulative field. Monetary event corrections tombstone the old row and insert a new UUID event, rather than overwrite its amount. Other changed fields on an existing row still follow ADR-21 server-timestamp LWW, with the immutable log retaining losing writes; dates such as `paid_on` and `received_on` are domain dates, never ordering clocks.
+**Full-snapshot creation and parent-gated soft deletes (ADR-47).** Each entity is introduced by **one** `create` log event containing the complete validated initial snapshot (including parent ID and nullable fields). Replay materialises it atomically, never a partly created row across pull pages; a child waits for its parent's create, and an incomplete/unknown snapshot is retained but not projected. A later `deleted_at` tombstone gates visibility over ordinary edits regardless of their later ordering keys: edits accepted while deleted are retained as suppressed/superseded history, trigger the conflict banner, and **do not update effective fields**. Only an explicit later LWW write `deleted_at = null` (Restore) reopens the **last effective pre-delete field values**, revalidating them and eligible children; suppressed edits do not silently become effective. Restore is distinct from reverting a value. A concurrent delete wins over an ordinary edit even if the edit is accepted later. Children (fee components, schedule items, payments, receipts as applicable) remain logged but do not contribute to live totals while a parent is deleted; no cascade writes. A pledge linked to a deleted entry retains its value and link, visibly says “linked entry deleted”, and its orphan in-kind support remains excluded from live net. Schedule items, payments, receipts and gifts have independent UUID rows and tombstones; corrections tombstone the old monetary event and insert a new UUID event. Domain dates such as `paid_on` and `received_on` never order sync.
 
 Both are expensive to reverse. See sections 7.3 and 7.4.
 
@@ -153,31 +160,35 @@ Both are expensive to reverse. See sections 7.3 and 7.4.
 Two operations, both idempotent:
 
 ```
-POST /sync/push   { plan_id, rows: ChangeLogRow[] }   -- rows carry device_monotonic, not server_ts
-                  → { accepted: [{id, server_ts}], server_ts_high }
+POST /sync/push   { protocol_version, plan_id, rows: ChangeLogRow[] }  -- no client server_ts
+                  → { protocol_version, accepted: [{id, server_ts}], server_ts_high }
                   insert-ignore on primary key; server assigns server_ts on accept (D1)
 
-GET  /sync/pull   ?plan_id&since_server_ts&limit
-                  → { rows: ChangeLogRow[], next_cursor, has_more }
+POST /sync/pull   { protocol_version, plan_id, cursor, limit }
+                  → { protocol_version, rows: ChangeLogRow[], next_cursor, has_more }
 ```
 
-- Pull is cursor-paged on `server_ts` so a long offline period syncs incrementally rather than in one oversized response.
-- Push batches with a cap; partial success is fine because retry is idempotent.
+- Pull is cursor-paged on a **per-plan commit-ordered** `server_ts`, not a wall-clock timestamp. Server sequence assignment and log insertion hold a transactional per-plan lock **through commit**; another transaction cannot commit a higher key ahead of a still-uncommitted lower key. Return only committed rows up to the committed high-water mark, in order; advance `next_cursor` only past returned committed rows. Rollback gaps are harmless. A client advances its durable cursor only after transactional local persistence of the whole page (including unknown rows), so restart/retry cannot skip or half-apply a page (ADR-48).
+- Push batches with a cap; partial success across **independent** events is fine because retry is idempotent. A sponsor-direct payment and its paired receipt are an indivisible accept/reject unit even if the surrounding batch is interrupted (§4.5); group and create snapshots are single indivisible events.
 - **The server assigns `server_ts` on acceptance (D1); the device never sends an authoritative ordering timestamp.** The device sends `device_monotonic` and `device_id`, which the server preserves for tiebreaking. This differs from a preserved-client-timestamp scheme: the ordering authority is the server, per Decision D1, so REQ-OF-5 clause 3's "preserve original ordering" means preserving the device sequence, with `server_ts` settled at first acceptance and never rewritten thereafter. A later-accepted offline edit wins a same-field conflict over an earlier-accepted online edit.
-- `sync_state` holds `last_pushed_server_ts`, `last_pulled_server_ts`, and the device's `device_monotonic` per device per plan.
+- `sync_state` holds `last_pushed_server_ts`, `last_pulled_server_ts` (the per-plan committed cursor), and the device's `device_monotonic` per device per plan.
+
+**Mixed versions and local migrations (ADR-49).** Every push/pull request and response carries `protocol_version` (major/minor), and every immutable event carries `schema_version`. The server refuses unsupported majors with a structured `min_supported_build` response; pending local rows stay queued and the client shows update-required, never silently drops them. Compatible additive unknown `entity_type`/`field_name` rows are stored intact in the local log but omitted from projections; if a known calculation depends on unknown data, suppress its derived view and flag needs attention instead of showing a misleading total. On upgrade, migrate drift schema transactionally before sync, retain the entire log and queue/cursors, rebuild projections in ordering-key order from log (including formerly unknown rows), validate invariants, and only then swap to new projections and resume; rollback leaves the old schema/data usable. Migrations are versioned and idempotent, not destructive resets.
+
+**Multiple devices and sessions (ADR-50).** A member may have multiple device IDs, device-local counters, cursors and queues; attribution distinguishes another device of the same member from the partner. Each device has an independently revocable refresh session. Sign-out revokes that device's session on the server and stops its sync; offer a confirmed local SQLCipher/key wipe, never silently remove unsynced work. Revoke another device from SCR-18 without terminating the current/other sessions. An offline or uncooperative device cannot be remotely force-wiped; on reconnect reject its revoked session before accepting pushes. Local copies remain until voluntarily wiped; do not promise erasure elsewhere.
 
 ### 2.5 First login on a second device
 
 REQ-SE-1 clause 5 requires the joining partner to see every existing figure identically, including overrides. With log-based sync this is a full replay:
 
-1. Partner B accepts the invite deep link. Server validates the token against `invites` — unexpired per REQ-SE-1 clause 4, not revoked, not already accepted.
-2. Server inserts the `plan_members` row. Membership is the one write that does not flow through the change log, because it is an access-control fact rather than plan content, and it must be authoritative before any data is readable.
-3. Client creates the local database and pulls from `since_server_ts = 0`, paged.
+1. After sign-up with no plan, show “Start our plan” or “Join my partner's plan” (ADR-52); joining opens SCR-02 by tapped deep link **or pasted invite URL**. Both parse the same token and server validation path (≥128-bit CSPRNG token, hash-only storage per SEC-05): unexpired per REQ-SE-1 clause 4, not revoked, not already accepted. Never implicitly create a second plan.
+2. Server atomically inserts the stable `plan_member_aliases` row and live `plan_members` row. Membership is the one write that does not flow through the change log, because it is an access-control fact rather than plan content, and it must be authoritative before any data is readable.
+3. Client creates the local database and pulls from per-plan `cursor = 0`, paged.
 4. Client applies rows in `server_ts` order, building projections from empty.
 5. Client computes all derived figures locally per section 1.4.
 6. Dashboard renders. B's figures now match A's exactly, because both are projections of the same log.
 
-Bootstrapping a long-lived plan means replaying every field change ever made. For a wedding budget — hundreds of entries, a few thousand log rows — this is fine. If it ever is not, add a periodic server-side snapshot and pull `snapshot + log since snapshot`. **Do not build snapshots for v1.** The seam is the `since_server_ts` cursor, which already accommodates them.
+Bootstrapping a long-lived plan means replaying every field change ever made. For a wedding budget — hundreds of entries, a few thousand log rows — this is fine. If it ever is not, add a periodic server-side snapshot and pull `snapshot + log since snapshot`. **Do not build server projection snapshots for v1.** A per-entity `$create` event's full initial snapshot (§2.3) is different from a periodic server checkpoint. The seam is the per-plan committed cursor.
 
 ### 2.6 What is deliberately not built
 
@@ -268,14 +279,21 @@ plans (
 -- the six mandatory hidden-fee prompts (REQ-BS-1, REQ-HF-1, ADR-42).
 -- Reminder preferences sync per plan; delivered notifications stay device-local.
 
-plan_members (
-  plan_id   uuid references plans,
-  user_id   uuid references users,
-  role      text not null check (role in ('creator','partner')),
-  joined_at timestamptz not null,
+plan_member_aliases (
+  plan_member_id uuid pk,        -- stable attribution alias, never reused
+  plan_id   uuid not null references plans,
+  user_id   uuid references users, -- removable alias-to-account mapping
+  unique (plan_id, plan_member_id)
+)
+plan_members (                  -- only LIVE memberships grant plan access
+  plan_id        uuid references plans,
+  user_id        uuid references users,
+  plan_member_id uuid not null references plan_member_aliases(plan_member_id),
+  role           text not null check (role in ('creator','partner')),
+  joined_at      timestamptz not null,
   primary key (plan_id, user_id)
 )
--- REQ-SE-1 clause 1: at most two rows per plan, enforced by trigger.
+-- REQ-SE-1 clause 1: at most two active plan_members rows per plan, enforced by trigger.
 -- REQ-PLT-3: at most one plan per user where is_active and role = 'creator'.
 
 invites (
@@ -303,6 +321,8 @@ lifecycle_confirmations (          -- REQ-SE-5 (ownership transfer only)
 -- removal (REQ-SE-6) is a direct, immediate delete of the target's
 -- plan_members row plus a change_log entry — it has no pending state.
 ```
+
+**Attribution and account deletion (ADR-51).** The immutable log references `plan_member_aliases.plan_member_id`, not `users`. Keep the stable alias when an account is deleted, sever its removable `user_id` mapping and remove the separate live membership; history then renders “Former member” without editing a log row. RLS requires a live `plan_members` row and matching authenticated user; aliases alone grant no access and do not count toward the two-person active-member cap. Defensive removal deletes the target's live membership without erasing its attribution alias. Validate alias plan/user correspondence on every accepted write. `plans.creator_user_id`, `invites.inviter_user_id`, `lifecycle_confirmations.initiated_by/target_user/confirmed_by`, `hidden_fee_prompts.dismissed_by` and any other user FKs require an explicit delete-safe retention/de-identification migration before account deletion; do **not** rely on an implicit cascade, dangling FK, or immutable-log rewrite. SCR-18 exposes the technically required account deletion request/confirmation path (SEC-33/34), but execution on a shared plan and the fate of identifiable shared records remain **blocked pending counsel under OQ-01/ADR-26**. No claimed legal erasure outcome or invented automatic resolution.
 
 `lifecycle_confirmations` exists because ownership transfer (REQ-SE-5 clauses 4, 6, 7) needs a pending two-party state that can expire. Without a row to hold it, "pending" has nowhere to live. **Defensive partner removal does not use this table:** per REQ-SE-6 it is immediate and one-sided, executed as a direct delete of the removed partner's `plan_members` row (below) with an attributed `change_log` entry — there is no pending confirmation to store.
 
@@ -375,19 +395,14 @@ The bundled taxonomy maps Bohol to **Provincial (0.85 / 8500 bp)** with `is_dest
 plan_allocations (
   plan_id           uuid references plans,
   category_code     text references allocation_categories,
-  engine_cents      bigint not null,     -- what the engine produced
   override_cents    bigint,              -- null unless overridden, REQ-AE-5
-  allocator_kind    text not null,       -- 'rule_based' | future
-  allocator_version text not null,
-  explanation       jsonb not null,      -- REQ-AE-4, opaque
-  computed_at       timestamptz not null,
   primary key (plan_id, category_code)
 )
 ```
 
-Keeping `engine_cents` alongside `override_cents` satisfies REQ-AE-5 clause 2 — both values displayed — and makes clause 5 revert a null-out rather than a recomputation.
+Only `override_cents` is user input and flows through the log. `engine_cents`, `allocator_kind`, `allocator_version` and `explanation` are a **local, read-time** `BudgetAllocator` result from the pinned bundled ruleset plus synced inputs, never columns, log rows, or server values. Display engine and override together (REQ-AE-5 clause 2); revert writes null override and immediately reveals the recomputed engine amount (clause 5). Any optional device-local cache must be disposable, invalidated by input/ruleset changes and never synced.
 
-`allocator_kind`, `allocator_version`, and an opaque `explanation` are the AI seam. See section 5.3.
+The result still includes allocator kind/version and a traceable explanation; see §5.3.
 
 ### 4.4 Ledger
 
@@ -398,7 +413,7 @@ ledger_entries (
   category_code      text not null references allocation_categories,
   entry_type         text not null,     -- 'standard' or a hidden-fee subtype
   supplier_name      text not null,
-  estimated_cents    bigint not null check (estimated_cents >= 0),
+  estimated_cents    bigint check (estimated_cents >= 0), -- flat input; null for derived per-head
   actual_cents       bigint check (actual_cents >= 0),      -- nullable
   pricing_mode       text not null check (pricing_mode in ('per_head','flat')),
   per_head_rate_cents bigint,           -- required when per_head
@@ -471,7 +486,9 @@ One generic `fee_components` table covers all six hidden-fee shapes from REQ-HF-
 | Overtime | one row per supplier; `quantity` = projected hours, `unit_rate_cents` = hourly rate |
 | Venue power | three rows: `generator`, `surcharge`, `electrical` |
 
-Component total is `quantity × unit_rate_cents` when both are present, otherwise `amount_cents`. Entry total is the sum. This trades some compile-time type safety for schema stability, and it is cheap to reverse in either direction because the change is additive.
+Component total is `quantity × unit_rate_cents` when both are present, otherwise `amount_cents`. Entry total is the sum. These three component values travel as a full-snapshot LWW group (§2.2); one row cannot combine quantity from one editor and rate from another. This trades some compile-time type safety for schema stability, and it is cheap to reverse in either direction because the change is additive.
+
+**Post-merge invariant gate (ADR-45).** Validate on every replay/read, including restored entities; do not emit automatic repair writes. The gate covers: REQ-LG-1 (category in the six-category taxonomy, nonblank supplier, nonnegative flat estimate/actual, 2,000-character notes limit and valid mode/rate); REQ-GM-2 clause 4–5 (per-head effective amount equals driving count × rate unless explicitly `manually_valued` by actual, with no synced derived estimate); REQ-HF-2 (required subtype-specific component shapes, complete quantity/rate pairs **or** flat amounts, nonnegative components, subtype-specific sums and fixed subtype→category mapping); plan budget > 0, cap/crew headcount ≥ 0, valid region/pinned ruleset and RSVP/tier axes, plus all six hidden-fee decisions before setup completion; scheduled sum ≤ live effective entry amount with valid same-entry schedule/payment attribution and positive dated monetary events; valid sponsor role/sub-role, positive receipt, receipt-backed pledge status, withdrawn precedence, in-kind shared cap and live linked entry; direct supplier payment↔receipt pair present, unique, same pledge/plan and equal positive amount; gifts positive with allowed source; and per-plan overrides ≥ 0 with valid category. **Over-allocation, overpayment and zero eligible support are warnings/derived values, not invalidity** (ADR-36–42). Parent tombstones exclude dependent rows from all live totals (gross/net, expected/exposure, deposits/balances, variance/buffer, gifts/net-after-gifts and reconciliation) regardless of child validity. Invalid dependent contributions are excluded deterministically from live financial aggregates and their raw preserved fields remain inspectable; valid independent rows stay visible. SCR-19 state 5 names entity/constraint and links to deliberate user correction; both devices derive the same interpretation from the same log. Do not clamp, clear, invent a missing pair, or silently count an invalid amount. Device-local date affects only due-status/reminder presentation (REQ-OF-4), not this gate.
 
 ```sql
 hidden_fee_prompts (                       -- REQ-HF-1
@@ -565,13 +582,15 @@ change_log (
   plan_id       uuid not null references plans,
   entity_type   text not null,
   entity_id     uuid not null,
-  field_name    text not null,
+  field_name    text not null,    -- ordinary field, group name, or '$create'
+  change_group_id uuid,          -- required for compound full-snapshot events
+  schema_version integer not null,
   old_value       jsonb,
   new_value       jsonb,
   server_ts       bigint,          -- assigned by server at sync (D1); null until synced
   device_monotonic bigint not null, -- per-device increasing counter, tiebreaker
   device_id       uuid not null,
-  actor_user_id   uuid not null references users,
+  plan_member_id  uuid not null references plan_member_aliases(plan_member_id),
   created_at      timestamptz not null
 )
 -- Append-only. No UPDATE, no DELETE, enforced by permission and trigger.
@@ -594,7 +613,7 @@ sync_state (                     -- local only, never synced
 )
 ```
 
-`superseded` is deliberately not a column. It is derivable — a row is superseded when a higher-ordered row exists for the same `(entity, field)` — and storing it would mean rewriting log rows, which contradicts append-only and REQ-SE-4 clause 4. REQ-SE-4 clause 3 is satisfied by computing it at read time.
+`superseded` and `conflict` are deliberately not columns. A row is superseded when a higher-ordered accepted ordinary field/group write controls its value, or a tombstone suppresses its visibility; a stale-write conflict is detected by comparing typed `old_value` with the effective pre-write field/group snapshot in server order (§2.1). Compute both at read time without rewriting immutable rows. `new_value` on `$create` is the full validated initial snapshot; group events contain all group members and one `change_group_id`, not separate independently winning field rows. `schema_version` identifies the event shape independently of envelope `protocol_version`; unknown additive events survive local storage and later projection rebuild.
 
 ---
 
@@ -604,7 +623,7 @@ sync_state (                     -- local only, never synced
 
 ```dart
 abstract interface class BudgetAllocator {
-  String get kind;             // persisted to plan_allocations.allocator_kind
+  String get kind;             // returned with local explanation; never synced
   String get version;
 
   AllocationResult allocate(AllocationInput input, Ruleset ruleset);
@@ -655,13 +674,13 @@ Steps 3 and 4 are where REQ-AE-2's correction lives. With every `skew_bp` at its
 
 ### 5.3 The swap seam
 
-An AI-driven allocator replaces the rule-based one with **no schema change**, because:
+The interface permits a future allocator implementation without changing the **override schema**; v1 does not silently make nondeterministic AI output shared authoritative state:
 
 1. **The interface is the boundary.** A future `AiAssistedAllocator` implements the same `BudgetAllocator`. Callers are unaffected.
-2. **Only the output is persisted.** `plan_allocations` stores amounts, not how they were derived. Engine internals never reach the schema.
-3. **`explanation` is opaque JSONB.** A rule-based allocator writes rule ids and basis points; an AI one writes model id, features, confidence. Neither the column type nor the reader changes — the UI renders whatever the explanation contains.
-4. **`allocator_kind` and `allocator_version` already exist.** Every allocation records what produced it, so mixed-provenance data is legible and a rollback is a re-run, not a migration.
-5. **`ruleset_version` stays pinned.** Even an AI allocator records the configuration in force, so REQ-AE-3 clause 2 continues to hold.
+2. **Only manual overrides persist and sync.** `plan_allocations` stores `override_cents` alone; engine amounts and explanations are locally recomputed from pinned inputs and ruleset, never emitted as log rows. A future nondeterministic allocator would need a separate explicit decision and provenance protocol, not a silent v1 schema swap.
+3. **`explanation` is a local result payload.** A rule-based allocator returns rule ids and basis points; the UI renders that trace alongside the amount without a synced JSONB column.
+4. **`allocator_kind` and `allocator_version` travel with the local result.** Both identify the producing implementation for explanation, not persisted shared state; rollback reruns the pinned rule-based implementation.
+5. **`ruleset_version` stays pinned.** The rule-based v1 allocator always uses the pinned configuration, so REQ-AE-3 clause 2 holds. Any future AI allocator must establish a separate deterministic shared-output/provenance policy before replacing this contract.
 
 The constraint an AI allocator must respect is REQ-AE-4 clause 4: no figure may display without a traceable explanation. That is a contract on the `Explanation` payload, not on the schema. Both types of allocator must fill it.
 
@@ -736,7 +755,7 @@ Ordered by cost.
 
 **Cost to reverse: high.** Moving to row-based sync or CRDTs means a new schema, a new protocol, and a migration of existing log data into whatever replaces it.
 
-Confidence is high that this is right, because REQ-SE-2 and REQ-SE-4 together essentially describe it. The reversal path, if per-field LWW proves too lossy in practice, is a CRDT per field — which would still be log-shaped, limiting the damage.
+Confidence is high that this is right, because REQ-SE-2 and REQ-SE-4 together essentially describe it. ADR-43–45 add read-time stale-write disclosure, two atomic full-snapshot LWW groups and a non-writing invariant gate within GIV-04. A hypothetical move to CRDTs is outside v1 and would require a new decision, schema and protocol.
 
 ### 7.3 Client-generated UUIDv7 keys
 
@@ -746,7 +765,7 @@ Low risk, because offline-first leaves no real alternative. Worth stating explic
 
 ### 7.4 Soft deletes everywhere
 
-**Cost to reverse: high.** Retrofitting tombstones after shipping hard deletes means every already-deleted row is unrecoverable and every peer may hold resurrected copies. Retrofitting requires reconciling divergent devices with no record of what was removed.
+**Cost to reverse: high.** Retrofitting tombstones after shipping hard deletes means every already-deleted row is unrecoverable and every peer may hold resurrected copies. Retrofitting requires reconciling divergent devices with no record of what was removed. ADR-47 adds full-snapshot creates and tombstone precedence over later ordinary edits; only explicit Restore clears the gate.
 
 Non-negotiable for offline sync. The cost is that every query must filter `deleted_at is null`, and one forgotten filter silently inflates a total. Mitigate with repository-level views rather than relying on discipline at each call site.
 
@@ -760,7 +779,7 @@ Decided (D1): the server is the ordering authority; device wall clocks never dec
 
 **Cost to reverse: moderate, and asymmetric.** Adding a persisted cache later is straightforward. Removing one after shipping means finding every consumer that trusted it and every sync conflict it caused.
 
-Start strict. REQ-LG-5 clause 6 requires it for payment status regardless.
+Start strict. REQ-LG-5 clause 6 requires it for payment status regardless. ADR-46 extends this to per-head estimates and engine allocations/explanations: only source inputs and overrides sync.
 
 ### 7.7 Supabase as the backend
 

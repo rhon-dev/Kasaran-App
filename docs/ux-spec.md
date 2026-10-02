@@ -19,8 +19,8 @@
 
 | Screen ID | Name | Purpose | Entry points | REQ IDs satisfied |
 |---|---|---|---|---|
-| SCR-01 | Sign In / Sign Up | Authenticate; create account | Cold start, unauthenticated | REQ-SE-1 |
-| SCR-02 | Invite Acceptance | Partner B joins a plan via deep link | Invite deep link | REQ-SE-1 (3,4,5,6) |
+| SCR-01 | Sign In / Sign Up | Authenticate; first-run Start our plan / Join my partner's plan choice | Cold start, unauthenticated | REQ-SE-1, ADR-52 |
+| SCR-02 | Invite Acceptance | Join via deep link or pasted invite URL | Invite deep link; SCR-01 join choice | REQ-SE-1 (3,4,5,6), SEC-05, ADR-52 |
 | SCR-03 | Setup: Budget & Date | Capture total budget, wedding date | After sign-up; SCR-18 | REQ-BS-1, REQ-BS-2, REQ-BS-3, REQ-GEN-2 |
 | SCR-04 | Setup: Guest Cap, Region & Types | Capture required cap/region and optional ceremony/venue hints | SCR-03 next | REQ-BS-1, REQ-BS-4, REQ-BS-5, REQ-HF-1 |
 | SCR-05 | Setup: Hidden-Fee Prompts | Force a decision on all six fees; gate completion | SCR-04 next | REQ-HF-1, REQ-HF-2, REQ-HF-3 |
@@ -34,10 +34,10 @@
 | SCR-13 | Guest What-If | Model a headcount change before committing | SCR-12 action; dashboard guest tile | REQ-GM-2, REQ-GM-3, REQ-GM-5, REQ-BS-5 (2) |
 | SCR-14 | Pledges List | Track remaining sponsor support, partial receipts, withdrawn history | Pledges tab; dashboard net tile | REQ-PL-1…7 |
 | SCR-15 | Pledge Editor | Create/edit pledge; record receipts and direct supplier payments; withdraw | SCR-14 add or row tap | REQ-PL-1…7, REQ-LG-8 |
-| SCR-16 | Change Log / Activity | Plan-wide and per-entity history with attribution | More tab; per-entity history affordance | REQ-SE-2 (5), REQ-SE-3, REQ-SE-4, REQ-OF-5 (4) |
+| SCR-16 | Change Log / Activity | Plan-wide/per-entity history, Conflicts filter, tombstone Restore | More tab; per-entity history affordance; conflict banner | REQ-SE-2, REQ-SE-3, REQ-SE-4, REQ-OF-5 (4), ADR-43/47 |
 | SCR-17 | Shared Access | Partner status, invite, mutual defensive removal, ownership, delete plan | More tab | REQ-SE-1, REQ-SE-5, REQ-SE-6, REQ-PLT-3 |
-| SCR-18 | Plan Settings | Edit setup inputs, RSVP, ruleset and local due-date reminders | More tab | REQ-BS-1, REQ-BS-2, REQ-BS-6, REQ-GM-1 (6), REQ-AE-3, REQ-LG-9, REQ-PLT-3 |
-| SCR-19 | Sync Detail | Pending-write queue, last sync, failure detail, retry | Tap sync badge anywhere | REQ-OF-3, REQ-OF-5, REQ-SE-3 |
+| SCR-18 | Plan Settings | Edit plan/reminders; device sessions, sign-out/wipe, account deletion request | More tab | REQ-BS-1, REQ-BS-2, REQ-BS-6, REQ-GM-1 (6), REQ-AE-3, REQ-LG-9, REQ-PLT-3, SEC-33/34, ADR-50/51 |
+| SCR-19 | Sync Detail | Queue, last sync, retry, invalid-projection needs-attention and version state | Tap sync badge anywhere | REQ-OF-3, REQ-OF-5, REQ-SE-3, ADR-45/49 |
 | SCR-20 | Post-Wedding Reconciliation | Record cash gifts and compare gifts to remaining supplier balances | More tab; dashboard gifts action; Pledges tab | REQ-GF-1, REQ-GF-2, REQ-LG-4, REQ-PL-7 |
 
 ### 1.1 Requirements no screen satisfies
@@ -72,18 +72,18 @@ Ruleset asset validation (REQ-AE-1 clause 4) is correctly non-UI: baselines sum 
 Field sources cite entities and derived calculations from design.md sections 1.4 and 4. **Derived** means computed on read and never stored, per design.md 1.4.
 
 ### SCR-01 Sign In / Sign Up
-**Regions:** brand block; form; primary action; alternate-mode link; error slot.
+**Regions:** brand block; form; primary action; alternate-mode link; error slot; after authentication with no plan, explicit first-run choice.
 **Fields:** email, password, display name (sign-up only) → `users`.
-**Actions:** submit → authenticate, then route to SCR-03 if no active plan, SCR-06 if one exists (REQ-PLT-3). Toggle sign-in/sign-up.
-**Nav in:** cold start unauthenticated. **Nav out:** SCR-03, SCR-06, or SCR-02 when a pending invite token exists.
+**Actions:** submit → authenticate; an existing active plan routes to SCR-06, a pending invite to SCR-02; otherwise offer **“Start our plan”** → SCR-03 or **“Join my partner's plan”** → SCR-02 with paste field. Toggle sign-in/sign-up. Signing up before receiving an invite never creates an implicit plan (ADR-52).
+**Nav in:** cold start unauthenticated. **Nav out:** SCR-03, SCR-06, SCR-02.
 
 ### SCR-02 Invite Acceptance
-**Regions:** inviter identity; plan summary; accept/decline; expiry/error slot.
-**Fields:** inviter display name → `users` via `invites.inviter_user_id`; wedding date → `plans`; expiry → `invites.expires_at`.
-**Actions:** Accept → write `plan_members`, then full replay pull from `since_server_ts = 0` (design.md 2.5) → SCR-06. Decline → SCR-01.
+**Regions:** invite URL paste field when entered via SCR-01; inviter identity; plan summary; accept/decline; expiry/error slot.
+**Fields:** inviter display name → `users` via `invites.inviter_user_id` while available; wedding date → `plans`; expiry → `invites.expires_at`.
+**Actions:** paste link or receive a tapped deep link → parse the same ≥128-bit CSPRNG token; server validates its hash, single use, 7-day expiry and revocation (SEC-05). Invalid/unparseable link stays editable with a reason, never creates a plan. Accept → atomically establish stable member alias and live `plan_members` membership, then full replay pull from per-plan `cursor = 0` (design.md 2.5) → SCR-06. Decline → SCR-01's start/join choice.
 **States of note:** expired, revoked, already accepted — each names the reason (REQ-SE-1 clause 5).
 **Expiry copy:** the invite expires exactly 7 days after issuance; the expired state says so and does not offer acceptance (REQ-SE-1 clauses 4, 5).
-**Nav in:** deep link. **Nav out:** SCR-06, SCR-01.
+**Nav in:** deep link or SCR-01 paste. **Nav out:** SCR-06, SCR-01.
 
 ### SCR-03 Setup: Budget & Date
 **Regions:** step indicator (1 of 3); total budget field; wedding date field; validation slot; next.
@@ -132,7 +132,7 @@ Six typed variants sharing one shell. Per-type field differences in section 5.1.
 
 ### SCR-10 Allocations & Overrides
 **Regions:** total budget header; six category rows; buffer drawdown block; over-allocation slot.
-**Fields per row:** `plan_allocations.engine_cents`, `override_cents`, overridden badge, summed effective for the category, variance in pesos and percent (REQ-LG-6 clauses 1, 2).
+**Fields per row:** locally recomputed engine amount/explanation from pinned ruleset and inputs; synced `plan_allocations.override_cents`, overridden badge, summed effective for the category, variance in pesos and percent (REQ-LG-6 clauses 1, 2; ADR-46).
 **Buffer block:** buffer allocation, summed non-buffer overrun, **buffer remaining** (derived per REQ-AE-6 clauses 1, 2) in pesos and as percent of original (clause 4).
 **Actions:** override → accepts any value ≥ 0; both values remain visible (REQ-AE-5 clause 2). Revert → nulls `override_cents`, affects no other category (clauses 5, 6). Explain → SCR-11.
 **Over-allocation:** when overrides sum above total budget, names the excess and reduces nothing (REQ-AE-5 clause 4).
@@ -140,7 +140,7 @@ Six typed variants sharing one shell. Per-type field differences in section 5.1.
 
 ### SCR-11 Explain Figure
 **Regions:** figure restated; plain-language rule; input list; modifier line; ruleset version.
-**Fields:** `plan_allocations.explanation` (opaque JSONB), `allocator_kind`, `allocator_version`, `plans.ruleset_version`.
+**Fields:** locally recomputed explanation, allocator kind/version and `plans.ruleset_version`; explanation is not synced (ADR-46).
 **Content:** baseline basis points, skew multiplier, resulting share, amount — in prose, not a formula (REQ-AE-4 clauses 2, 3).
 **Rule enforced:** a figure with no explanation payload is not rendered at all anywhere in the app (REQ-AE-4 clause 4). This screen is the reason that rule is enforceable.
 **Nav in:** tap any engine figure. **Nav out:** dismiss.
@@ -175,7 +175,10 @@ Six typed variants sharing one shell. Per-type field differences in section 5.1.
 **Nav in:** SCR-14. **Nav out:** SCR-14.
 
 ### SCR-16 Change Log / Activity
-Specified in section 6.
+**Regions:** reverse-chronological immutable feed; partner/entity/date filters and **Conflicts** filter; per-entity history; deleted-item history with explicit Restore action (section 6).
+**Fields:** `change_log` old/new typed values, group snapshot, `plan_member_id`, ordering key and derived superseded/conflict labels; “Former member” for a severed alias mapping.
+**Actions:** filter to stale writes where recorded old value differs from the immediately replaced value; inspect winning and superseded values side by side. For a tombstoned entity, **Restore entry** confirms and writes a new LWW `deleted_at = null` event, subject to post-merge validation; no edit or delete of log history. This is not a one-tap restore of a disagreeing *value* (§6.5). Suppressed concurrent edits remain inspectable.
+**Nav in:** More, per-entity history, either member's conflict banner. **Nav out:** prior screen or the affected editor.
 
 ### SCR-17 Shared Access
 **Regions:** partner slot with role; invite block; remove-partner action; ownership-transfer block (with pending-confirmation sub-state); delete plan (creator only); active-plan note.
@@ -185,15 +188,15 @@ Specified in section 6.
 **Nav in:** More tab. **Nav out:** SCR-16 for lifecycle history (REQ-SE-5 clause 8, REQ-SE-6 clause 4).
 
 ### SCR-18 Plan Settings
-**Regions:** setup inputs (budget, date, guest cap, region, optional ceremony/venue types); driving RSVP status picker (default `invited`); ruleset version block; **Due-date reminders** section with on/off, independent Due soon window (default 7 days), notification before-due offsets (defaults 7 and 1 days), overdue toggle and OS notification-permission explanation.
-**Actions:** any setup edit → preview before applying when more than one category shifts (REQ-BS-6 clause 3); cancel persists nothing (clause 4); applied edits log (clause 5). Ruleset opt-in → before/after preview, overrides preserved (REQ-AE-3 clauses 3, 4). Reminder edits sync plan-level preferences, reschedule this device's live unpaid dated items immediately even offline; permission denial and off switch leave financial records untouched and no reminder delivered. **Off does not hide Due soon** (the configured window still drives it). Do not include names or amounts in lock-screen text; “A supplier payment is due in 7 days” is the default. No partner-edit push.
+**Regions:** setup inputs (budget, date, guest cap, region, optional ceremony/venue types); driving RSVP status picker (default `invited`); ruleset version block; **Due-date reminders** section with on/off, independent Due soon window (default 7 days), notification before-due offsets (defaults 7 and 1 days), overdue toggle and OS notification-permission explanation; **Devices & account** list naming this and other sessions, per-device sign-out, local-wipe choice and account-deletion request.
+**Actions:** any setup edit → preview before applying when more than one category shifts (REQ-BS-6 clause 3); cancel persists nothing (clause 4); applied edits log (clause 5). Ruleset opt-in → before/after preview, overrides preserved (REQ-AE-3 clauses 3, 4). Reminder edits sync plan-level preferences, reschedule this device's live unpaid dated items immediately even offline; permission denial and off switch leave financial records untouched and no reminder delivered. **Off does not hide Due soon** (the configured window still drives it). Do not include names or amounts in lock-screen text; “A supplier payment is due in 7 days” is the default. No partner-edit push. Sign out this device → warn about pending writes, revoke its server refresh session, stop sync, then offer **confirmed local wipe** of encrypted data/key; do not silently wipe. Sign out a selected other device → revoke only that session, with no claim of remotely wiping its offline copy. Other sessions remain active (ADR-50). Account deletion → show deliberate request/confirmation path (SEC-33/34), but for a shared plan label completion **blocked pending counsel (OQ-01/ADR-26)**; never promise an erasure outcome or imply that deleting a local copy deletes the account. Attribution after permitted deletion reads “Former member”; other user FKs must be resolved in the eventual policy.
 **Stated on screen:** editing setup destroys no entries, pledges, guests, or overrides (REQ-BS-6 clauses 1, 2). Users expect budget changes to wipe work; saying otherwise prevents avoidable fear.
 **Nav in:** More tab. **Nav out:** SCR-03/04 field editors, SCR-10.
 
 ### SCR-19 Sync Detail
-**Regions:** connection state; pending-write count and list; last successful sync; failure detail; manual retry.
+**Regions:** connection state; pending-write count and list; last successful sync; failure detail; manual retry; **needs-attention** list of invalid dependent projections with entity, failed invariant, preserved raw values and editor link; update-required version state.
 **Fields:** `sync_state.last_pushed_server_ts`, `last_pulled_server_ts`; local queue depth.
-**Actions:** retry. Replay is automatic and requires no action here (REQ-OF-5 clauses 1, 2) — the button exists for reassurance, and the screen says so.
+**Actions:** retry; open an invalid entity to make a deliberate corrective write. Replay is automatic and requires no action here (REQ-OF-5 clauses 1, 2) — the button exists for reassurance, and the screen says so. No automatic repair write; unknown additive events remain stored for post-upgrade rebuild, unsupported protocol major prompts minimum supported build without dropping queued writes (ADR-45/49).
 **Nav in:** sync badge, any screen. **Nav out:** dismiss.
 
 ### SCR-20 Post-Wedding Reconciliation
@@ -210,7 +213,7 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 
 ### 3.1 Two states behave unusually in this app, by design
 
-**Loading is nearly absent.** REQ-PLT-2 clause 1 requires every read served from the local store with no network round-trip. There is no remote fetch to wait on, so no screen shows a spinner for data. Loading appears in exactly three places: database open and migration on cold start, the SCR-02 first-replay, and never elsewhere. Any spinner beyond those three is a defect — it means something reached for the network on a read path.
+**Loading is nearly absent for plan reads.** REQ-PLT-2 clause 1 requires plan data from the local store with no network round-trip. Progress is appropriate for database open/migration and post-upgrade projection rebuild, SCR-02 first replay, authentication and session revocation, and SCR-19 sync transport. SCR-16 long local-history pagination may show local progress. No plan-data read may wait for a network spinner.
 
 **Sync-error is not a data-integrity state.** A failed push means writes are still queued locally and intact (REQ-OF-5 clause 4). Copy must never imply loss. See section 7.
 
@@ -218,8 +221,8 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 
 | Screen | First-run empty | Populated | Loading | Offline + pending | Sync error | Conflict just resolved | Partner removed | Calculation invalid |
 |---|---|---|---|---|---|---|---|---|
-| SCR-01 | Default state | N/A — no plan data | Auth request in flight | Sign-in blocked; message states connection needed and no data is at risk | Auth failure, distinct from sync | N/A — pre-plan | N/A | N/A |
-| SCR-02 | Default state | N/A | Replay progress with row count | Accept blocked; invite requires connection; token retained | Replay interrupted; resumes from cursor, partial data retained | N/A — no local writes yet | Invite already revoked; names reason | Expired invite (REQ-SE-1 clause 5) |
+| SCR-01 | Post-auth Start our plan / Join my partner's plan; no implicit plan | Existing plan → SCR-06 | Auth request in flight | Sign-in blocked; message states connection needed and no data is at risk | Auth failure, distinct from sync | N/A — pre-plan | N/A | N/A |
+| SCR-02 | Paste invite URL or accept deep link; no plan created yet | Valid invite summary | Replay progress with row count | Accept blocked; invite requires connection; token retained | Replay interrupted; resumes from committed cursor, local rows retained (ADR-48) | N/A — no local writes yet | Invite revoked; names reason | Invalid/expired/used token names reason and cannot accept |
 | SCR-03 | Default state | Pre-filled when reached from SCR-18 | N/A — local only | Badge only; setup fully available (REQ-OF-1) | Badge only; no blocking | N/A — single-partner phase | N/A | Invalid budget per REQ-BS-2; past date per REQ-BS-3 |
 | SCR-04 | Default cap/region; both optional types “Not sure yet” | Pre-filled from SCR-18 | N/A | Badge only; hints local | Badge only | Changed type attributed | N/A | Invalid required cap/region; optional unset never blocks |
 | SCR-05 | All six `prompted_unfilled`; contextual hints only | Mixed filled/dismissed; hints may change | N/A | Badge only | Badge only | Hint/type edits do not change fee states | N/A | Finish blocked while any untouched regardless of type (REQ-HF-1 clause 6) |
@@ -233,10 +236,10 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 | SCR-13 | N/A — requires a plan; runs with zero guests and reports zero deltas | Before/after comparison | N/A | Badge; computes fully offline (REQ-OF-2 clause 2) | Badge; preview unaffected as it is local-only | **N/A — a preview is never synced (REQ-GM-5 clause 8), so no remote write can touch it** | Read-only; commit suppressed, preview still viewable | Over-cap with full calculation still returned (REQ-GM-5 clause 4) |
 | SCR-14 | Zero pledges; gross = net, expected/exposure `₱0.00` | Partial/received/withdrawn groups with remaining exposure | N/A | Badge; receipts visible immediately | Badge | Receipt row additions both retained; status field winner attributed | Read-only | Orphan item support surfaced; negative net legitimate |
 | SCR-15 | Blank form, zero receipts | Pledge plus receipt and direct-payment links | N/A | Badge; atomic direct-payment + receipt available | Badge; paired rows retained for retry | Separate receipt rows preserved; same-field status LWW attributed | Read-only | Missing sponsor/item detail, nonpositive receipt, invalid direct-payment link or unequal payment/receipt blocked |
-| SCR-16 | Contains setup entries from the moment a plan exists; never empty | Full feed | Pagination on long histories | Badge; local entries listed as not-yet-synced | Badge | **This is where resolution surfaces** — see 6.4 | Read-only; history retained in full | N/A — log entries are facts, not calculations |
+| SCR-16 | Contains setup create events from plan creation; Conflicts filter may be empty | Full feed; Conflicts filter shows both values, deleted history offers Restore | Local-history pagination only (not a network read) | Badge; local entries listed as not-yet-synced | Badge | Both users see winning/superseded values, including same-user second device and tombstone suppression | Read-only; history retained, Restore disabled | Invalid projection raw values inspectable; log facts unchanged |
 | SCR-17 | Solo: no partner, invite prompt | Partner present, with mutual remove action available to either partner | N/A | Badge; invite generation and ownership transfer blocked offline, but a queued removal is permitted and takes effect server-side on reconnect | Badge | N/A — membership does not flow through the log (design.md 2.5) | Terminal state for the removed partner: explains removal, offers local wipe and exit | Ownership-transfer confirmation expires after 7 days; defensive removal is immediate with no pending state |
-| SCR-18 | Setup populated; reminder defaults on, 7-day Due soon, 7/1 delivery plus overdue | Edited preferences; permission status explained | N/A | Badge; reminders rescheduled locally | Badge; local schedule remains | Preference fields attributed; reschedule after sync | Read-only; no scheduling writes | Invalid budget, past date, invalid reminder offset/window; permission denied explained |
-| SCR-19 | Zero pending, synced | Queue listed | Sync in progress | Primary purpose: queue depth and age | Primary purpose: failure detail and retry | Lists resolved conflicts with link to SCR-16 | Read-only; sync halted, reason stated | N/A |
+| SCR-18 | Setup populated; reminder defaults on, 7-day Due soon, 7/1 delivery plus overdue; current device listed | Preferences and per-device sessions; sign-out/wipe and deletion request | N/A — plan reads local; session revoke in progress indicated | Badge; remote revoke/deletion request waits for connection, no fake completion | Revocation failure preserves session/data; retry | Same-user edits say “You changed this on another device” | Read-only plan; local wipe/sign-out still offered | Invalid inputs refused; shared-plan account deletion blocked pending OQ-01 |
+| SCR-19 | Zero pending, synced | Queue and needs-attention list | Sync in progress or local migration/rebuild | Queue depth and age | Failure detail/retry; unsupported major → min-supported-build update (ADR-49) | Conflict list links to SCR-16 for **both** members | Read-only; sync halted, reason stated | State 5 shows invalid dependency/invariant, excludes affected contribution, preserves raw values; never auto-repairs |
 | SCR-20 | No gifts: `₱0.00` gifts, actual supplier balances still shown; no net-after-gifts tile; invitation to add | Gifts, signed comparison, balances and orphan list | N/A — local read | Badge; add gift and reconcile offline | Badge; all local totals still visible | Both new UUID gift rows retained, attributed | Read-only history, no add/edit | Negative difference/net valid; orphan item support flagged, never silently counted |
 
 ### 3.3 Partner-removed state, stated precisely
@@ -390,7 +393,7 @@ All six use the same SCR-09 shell, with subtype-specific inputs and a read-only 
 2. Enter supplier name, crew headcount, per-meal rate. Row total computes live as `headcount × rate`.
 3. Add rows for remaining suppliers. Running total updates per row.
 4. Note is persistently visible: crew meals do not change when guest count changes.
-5. Save. `hidden_fee_prompts.state` → `filled`. One `change_log` row per changed field.
+5. Save. `hidden_fee_prompts.state` → `filled`. Initial entities each emit one complete create snapshot; later component quantity/rate/amount edits emit one full-group snapshot, and independent fields retain one event per changed field (ADR-44/47).
 6. **End state:** entry appears in SCR-07 as its own attributable line; gross on SCR-06 increases by the entry total; the crew-meals chip disappears from tile H; a guest what-if leaves this total unchanged.
 
 **Flow — OOT fees** · REQ-HF-1, REQ-HF-2 (2, 7), REQ-HF-3
@@ -447,7 +450,7 @@ All six use the same SCR-09 shell, with subtype-specific inputs and a read-only 
 7. On a reduction, the tier cut-list states how many Tier 2 guests absorb the cut before any Tier 1 guest is affected.
 8. Partner B's device shows pre-preview values throughout; nothing syncs.
 9. **Discard → end state:** plan byte-identical to pre-preview. No `change_log` rows. Nothing on B's device changed at any point.
-10. **Commit → end state:** driving count updated; every non-excluded per-head entry recomputed; gross, net, all category variance, and buffer remaining updated in the same operation; `change_log` rows written; B's device matches after next sync.
+10. **Commit → end state:** only user-input guest/plan changes create `change_log` rows. Each device recomputes unvalued per-head effective amounts from the new driving count and saved rate **on read**; no recomputed `estimated_cents`, gross, net, allocation or explanation writes occur. Gross, net, category variance and buffer remaining update locally from the resulting inputs; B's device derives the same figures after next sync (ADR-46).
 
 ### 5.4 A sync conflict resolving and surfacing · REQ-SE-2, REQ-SE-3, REQ-SE-4, REQ-OF-5
 
@@ -456,10 +459,10 @@ All six use the same SCR-09 shell, with subtype-specific inputs and a read-only 
 3. B reconnects. The queued row pushes and the **server assigns its `server_ts` on acceptance** (Decision D1); B's device sequence (`device_monotonic`) is preserved but is not the ordering authority. Because A's write was accepted earlier, A's write carries the earlier `server_ts`.
 4. Both devices order the two log rows by `(server_ts, device_monotonic, device_id)` and independently select the same winner. Under D1 **B's ₱62,000 wins**, because B's queued write was accepted later and has the later server timestamp, despite having been edited offline earlier (REQ-SE-2 clauses 3–5). Device time does not decide this.
 5. Projections converge. Both devices show the same value, ₱62,000 (REQ-SE-3 clause 2).
-6. **Neither write is discarded.** Both remain in `change_log`; the loser is superseded, computed at read time (design.md 4.6).
-7. **A's device** shows a banner naming the field and B's winning value when it next syncs, linking to SCR-16. B's device does not show a losing-write banner.
-8. SCR-16 shows both rows in clock order, the winner marked current and the loser marked superseded with its value intact and its author attributed.
-9. **End state:** one visible current value on both devices; both attempts permanently recoverable in the change log; each attributed; the couple can see a disagreement happened and what the other person intended.
+6. **Neither write is discarded.** Both remain in `change_log`; A's value is superseded. B's row recorded an `old_value` different from the value it actually replaced immediately before application, so this is a derived stale-write conflict, not a stored flag (ADR-43).
+7. **Both A's and B's devices** show one dismissible conflict banner on next replay, naming the field and linking to SCR-16; even the winning device sees that its offline edit displaced A's online value. If both devices belong to the same user, say “You changed this on another device,” never “your partner.”
+8. SCR-16's **Conflicts** filter shows B's winning ₱62,000.00 and A's superseded ₱58,000.00 side by side, plus recorded old and immediately replaced values and attribution. Group edits show the full winning/losing snapshots, never a synthetic mixture.
+9. **End state:** one visible current value on both devices, with both attempts retained and attributed; deletion conflicts instead show the tombstone and suppressed edits, and Restore is available for the deleted entity (§6.5).
 
 ### 5.5 Scheduling a balance, refund and reminder · REQ-LG-4/5/7/8/9
 
@@ -493,7 +496,7 @@ What is surfaced instead, in ascending intrusiveness:
 
 1. **Passive** — attribution stamps on changed fields and rows. No interruption.
 2. **Ambient** — activity indicator on the More tab when unseen log entries exist since last visit to SCR-16.
-3. **Banner** — a dismissible banner on SCR-06, used only when a remote change altered a headline figure (gross, net, buffer remaining, exposure) or when a conflict resolved.
+3. **Banner** — a dismissible banner on SCR-06, used when a remote change altered a headline figure (gross, net, buffer remaining, exposure), or on **both users' devices** when a stale-write/deletion conflict is discovered; link SCR-16.
 4. **Blocking** — reserved for lifecycle events only: pending ownership-transfer confirmation, and being removed from the plan. Never for a data edit. (Defensive removal itself needs no confirmation from the removed party; the blocking surface a removed partner sees is the removed-state notice, not a confirmation prompt.)
 
 ### 6.2 Attribution
@@ -501,8 +504,8 @@ What is surfaced instead, in ascending intrusiveness:
 Displayed as **display name + relative timestamp**. No avatar in v1: with exactly two members, an avatar carries no information a name does not, and it consumes width that money figures need.
 
 - Relative time under 7 days: "2 hours ago". Beyond that, absolute date per section 8.5.
-- Attribution is always the acting partner from `change_log.actor_user_id` (REQ-SE-4 clause 5).
-- Stamps read "You" for the current user rather than their own name.
+- Attribution comes from stable `change_log.plan_member_id` and its live alias mapping; after account deletion, show “Former member” without rewriting history (ADR-51). An unmapped alias never grants access.
+- Stamps read “You” for the current user, including another of their devices; device-specific conflict copy reads “You changed this on another device.”
 
 ### 6.3 Field-level attribution placement
 
@@ -525,37 +528,37 @@ Rules:
 - Monetary changes show both old and new values (REQ-SE-4 clause 2).
 - Superseded entries carry a marker and their value stays legible (clause 3).
 - Entries are immutable — no edit or delete affordance exists anywhere (clause 4).
-- Filterable by partner, entity type, and date. Not searchable in v1.
+- Filterable by member, entity type, date, and **Conflicts** (typed recorded-old vs immediately replaced value mismatch). Show current winning and superseded values together, including full compound snapshots and tombstone-suppressed edits. Not searchable in v1.
 - Per-entity history is the same component filtered to one `entity_id`.
 - Lifecycle actions and their confirmations appear here (REQ-SE-5 clause 8).
 - Locally queued, not-yet-pushed entries appear with a pending marker so a partner sees their own offline work in context.
 
 ### 6.5 Is an overwritten value recoverable in the UI?
 
-**Yes — visible and readable, but not restorable with one tap.**
+**Value disagreement: visible and readable, but not restorable with one tap. Deleted entity: explicit Restore action.**
 
 The value is never lost; design.md 4.6 makes the log append-only and REQ-SE-2 clause 6 forbids discarding an accepted write. SCR-16 shows the superseded value, its author, and its timestamp.
 
-What is deliberately **not** provided is a one-tap Restore. Reason: restoring is just another write, and a Restore button invites a tap-war where each partner reverts the other, generating log noise and no agreement. The couple should read what happened and decide, then type the value they agree on. The value is one screen away and fully legible — that satisfies recoverability without automating a disagreement.
+What is deliberately **not** provided is a one-tap **value** revert. Reverting a contested amount is another write and invites a tap-war; the couple reads what happened and deliberately enters the agreed value. Separately, SCR-16 offers **Restore entry** on a deleted entity, after confirmation: a new LWW `deleted_at = null` write reopens its validated projection and children; it never rewrites history or silently selects a disputed financial value (ADR-47).
 
 ### 6.6 Is a same-field loss shown or silent?
 
-**Shown. Explicitly, and only to the partner whose write lost.**
+**Shown explicitly to both members, including the writer whose value currently wins.**
 
 Silence here would undermine confidence in shared editing. A partner who sees their entered amount replaced by another number with no explanation may conclude the app lost their work. REQ-SE-2 clause 6 requires the losing write to be preserved — so the information exists and withholding it is a choice. In §5.4 it is **A's online write** that loses after B's offline edit syncs; the banner must not imply that A was offline.
 
-Shown on the losing device, once, dismissible:
+Shown on **both** devices after replay, once per discovered conflict batch, dismissible:
 
-> **"Your partner also changed this"**
-> *"[B's name] changed the actual amount on [entry] to ₱62,000.00. That amount is now being used. Your ₱58,000.00 is saved in the activity log."*
+> **“Two changes to this entry”**
+> *“[B's name]'s ₱62,000.00 actual amount is now used for [entry]. [A's name]'s ₱58,000.00 is saved in Activity. Review both changes.”*
 
 Rules:
 
-- Shown **only** to the losing partner. The winner has no action to take and no confusion to resolve.
-- Names the field, the winning value, the losing value, and where the losing value lives.
+- Shown to **both** members, even if neither device originated the losing write. For one member editing on two devices, replace partner-name framing with “You changed this on another device.”
+- Names the field, the winning and superseded values, and where both are visible. A tombstone instead reads “<name> deleted this entry; your change is saved in Activity” (or neutral attribution on the other device) with a link to its deleted history and explicit Restore.
 - Never uses "overwritten", "lost", "discarded", or "failed". The write is preserved and the copy must say where.
 - One banner per sync cycle regardless of conflict count, linking to SCR-16 for the full list. Twelve banners is not disclosure, it is noise.
-- Non-conflicting remote changes get no banner. Only genuine same-field losses.
+- Non-conflicting remote changes get no conflict banner. Derive a stale-write conflict from `old_value` mismatch, not from the mere presence of a superseded row; a deleted parent suppressing a concurrent ordinary edit also triggers disclosure (ADR-43/47).
 
 ---
 
@@ -590,9 +593,9 @@ Badge: `Sync problem · 12 pending`
 On SCR-19: *"We can't reach the server right now. Your 12 changes are safe on this device and we'll keep trying. Nothing has been lost."*
 With retry, last-attempt time, and last successful sync time.
 
-**State 5 — A write cannot be applied** (REQ-OF-5 clause 4).
+**State 5 — A queued write cannot be applied, or a merged projection fails an invariant** (REQ-OF-5 clause 4, ADR-45).
 Badge: `1 change needs attention`
-On SCR-19: *"One change couldn't be saved to the shared plan. It's still here and hasn't been deleted. Open it to see the details."*
+On SCR-19 for a rejected queued write: *“One change needs attention before it can join the shared plan. It is still saved on this device. Open it for details.”* For a post-merge invariant: *“This entry needs attention: [constraint]. Its changes are saved in Activity; its affected amount is not included in totals until corrected.”* Give the raw values and correction link; no automatic write. Unknown dependency/version likewise blocks the affected figure and requests an update, not a guessed total.
 
 ### 7.3 Copy rules
 
@@ -773,8 +776,8 @@ Names, inputs, and states only.
 | `ExplainSheet` | explanation payload, allocatorKind, rulesetVersion | rule-based, unavailable | SCR-11 |
 | `OverrideRow` | engineCents, overrideCents, categoryCode | engine-value, overridden, over-allocated, read-only | SCR-10 |
 | `BufferGauge` | allocation, overrun, remaining | healthy, breached, full | SCR-06 tile D, SCR-10 |
-| `ChangeLogEntry` | actor, action, entity, field, oldValue, newValue, serverTs, deviceMonotonic, superseded, pendingPush | applied, superseded, pending-push, lifecycle | SCR-16, per-entity history |
-| `ConflictBanner` | field, winningValue, losingValue, actor | single-conflict, multiple-conflicts, dismissed | SCR-06, SCR-19 |
+| `ChangeLogEntry` | planMemberId, action, entity, field/group, oldValue, newValue, serverTs, deviceMonotonic, superseded, staleConflict, pendingPush | applied, superseded, stale-conflict, deleted/suppressed, former-member, pending-push, lifecycle | SCR-16, per-entity history |
+| `ConflictBanner` | field/group, winningValue, supersededValue, actor/member/device relation, deletion flag | single-conflict, multiple-conflicts, deleted-entry, same-user-other-device, dismissed | SCR-06, SCR-19 |
 | `ReadOnlyNotice` | reason | partner-removed, plan-deleted | All SCR-06–20 |
 | `StepIndicator` | current, total, blockedReason | in-progress, blocked, complete | SCR-03, 04, 05 |
 | `DateField` | value, allowPast | empty, valid, past-confirmed, invalid | SCR-03, 08, 09, 15, 20 |

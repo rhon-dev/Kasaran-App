@@ -73,7 +73,7 @@ Every REQ ID in `requirements.md` (61 total) appears. Levels: **U** unit, **I** 
 | REQ-BS-4 | TC-BS-04, TC-BS-09 | U + I |
 | REQ-BS-5 | TC-BS-05, TC-GM-06 | U |
 | REQ-BS-6 | TC-BS-06 | I |
-| REQ-LG-1 | TC-LG-01, TC-LG-02, TC-LG-14, TC-LG-15 | U + I + widget |
+| REQ-LG-1 | TC-LG-01, TC-LG-02, TC-LG-14, TC-LG-15, TC-LG-41 | U + I + widget |
 | REQ-LG-2 | TC-LG-03, TC-LG-04 | I |
 | REQ-LG-3 | TC-LG-05 | U |
 | REQ-LG-4 | TC-LG-06, TC-LG-07, TC-LG-16 … TC-LG-20 | U + I |
@@ -103,19 +103,19 @@ Every REQ ID in `requirements.md` (61 total) appears. Levels: **U** unit, **I** 
 | REQ-AE-2 | TC-AE-05, TC-AE-06, **TC-AE-07 (BLOCKED)** | U |
 | REQ-AE-3 | TC-AE-08 | U |
 | REQ-AE-4 | TC-AE-09, TC-AE-14 | U + widget |
-| REQ-AE-5 | TC-AE-10, TC-AE-11 | U |
+| REQ-AE-5 | TC-AE-10, TC-AE-11, TC-AE-15 | U + I |
 | REQ-AE-6 | TC-AE-12 | U |
-| REQ-SE-1 | TC-SE-23 | I |
-| REQ-SE-2 | TC-SE-20, TC-SE-21, TC-SE-24 | U + I |
-| REQ-SE-3 | TC-SE-25 | I |
-| REQ-SE-4 | TC-SE-15, TC-SE-26 | I |
+| REQ-SE-1 | TC-SE-23, TC-SE-42 | I + E |
+| REQ-SE-2 | TC-SE-20, TC-SE-21, TC-SE-24, TC-SE-27 … TC-SE-28, TC-SE-33 … TC-SE-35, TC-SE-39 | U + I |
+| REQ-SE-3 | TC-SE-25, TC-SE-36, TC-SE-39 | U + I |
+| REQ-SE-4 | TC-SE-15, TC-SE-26, TC-SE-28, TC-SE-37 … TC-SE-41 | U + I + E |
 | REQ-SE-5 | TC-SE-16, TC-SE-18, TC-SE-31 | I |
 | REQ-SE-6 | TC-SE-10, TC-SE-11, TC-SE-12, TC-SE-13, TC-SE-14, TC-SE-17, TC-SE-19, TC-SE-22, TC-SE-32 | I + E |
 | REQ-OF-1 | TC-OF-01 … TC-OF-08, TC-OF-19 … TC-OF-21 | I |
-| REQ-OF-2 | TC-OF-09 | I |
+| REQ-OF-2 | TC-OF-09, TC-OF-22, TC-OF-26 | U + I |
 | REQ-OF-3 | TC-OF-10 | I |
 | REQ-OF-4 | TC-OF-11 | U + I |
-| REQ-OF-5 | TC-OF-12, TC-OF-15, TC-OF-18, TC-SE-13 | I |
+| REQ-OF-5 | TC-OF-12, TC-OF-15, TC-OF-18, TC-OF-23 … TC-OF-25, TC-SE-13, TC-SE-43 … TC-SE-44, TC-API-06 … TC-API-09, TC-MIG-04 … TC-MIG-05 | I |
 | REQ-AI-1 | — | Out of v1 scope (AI phase) |
 | REQ-AI-2 | — | Out of v1 scope (AI phase) |
 | REQ-AI-3 | — | Out of v1 scope (AI phase) |
@@ -596,6 +596,7 @@ All run as pure Dart in `domain/` — no widget tree, no database, no network.
 | TC-AE-10 | Override preserved across recompute; revert restores engine value; reverting one does not affect another |
 | TC-AE-11 | **Overrides not summing to 100%:** if Σ overrides > budget → over-allocation warning naming the excess, **and no override is silently clamped or scaled** (REQ-AE-5 cl. 4). If Σ overrides < budget, non-overridden categories absorb the remainder; if *all* six are overridden and sum < budget, the shortfall is surfaced, not silently added to Buffer |
 | TC-AE-12 | Buffer drawdown incl. the FIX-C negative case; under-spend does not offset overrun |
+| TC-AE-15 | With identical synced inputs, override cents and pinned bundled ruleset, two devices derive identical `engine_cents` and explanations on read; inspect log/server schema to verify neither engine output nor explanation is authoritative or synced. Reverting writes only a null override (REQ-AE-5 cl. 7, ADR-46). |
 
 ### 4.3 Per-head vs flat-rate, crew rollups
 
@@ -688,6 +689,7 @@ Each newly introduced or materially changed numbered clause below has its own st
 | TC-LG-38 | LG-9.2 | Per-plan window/timing edit reschedules both devices locally; off cancels notices even offline. |
 | TC-LG-39 | LG-9.3 | Lock-screen and accessibility string scan finds no supplier name or amount in generic default notification. |
 | TC-LG-40 | LG-9.4 | Due soon lists on SCR-06/07 link to entries within window even if notifications disabled. |
+| TC-LG-41 | LG-1.3 | Flat entry persists mandatory nonnegative estimate; per-head entry persists nonnegative rate and null `estimated_cents`, displays derived rate × driving count (or actual when set) without syncing/writing back recomputed estimate (ADR-46). |
 | TC-PL-21 | PL-1.2 | secondary_sponsor requires candle/veil/cord; other roles reject sub-role. |
 | TC-PL-22 | PL-1.6,8 | Zero-valued pledge without receipts stays tentative/confirmed; received is not editable; withdrawn displays despite prior full receipt and keeps its support; both links prioritize entry; deleted entry excludes support and flags orphan. |
 | TC-PL-23 | PL-2.2–3 | No receipt yields net=gross; ₱25k partial on ₱50k pledge and ₱350k gross yields ₱325k net; second ₱25k yields ₱300k and derived received. |
@@ -728,24 +730,39 @@ Each newly introduced or materially changed numbered clause below has its own st
 
 ## 5. Sync & conflict tests
 
-**Clock ADR status: DECIDED, not open.** ADR-21 (D1) fixes the ordering authority as a **server-assigned timestamp** applied at sync, with device monotonic counter then stable device id as tiebreakers; device wall-clocks are never authoritative. These tests are therefore **finalizable now** and are not blocked. (The instruction's "if that ADR is still OPEN" branch does not apply.)
+**Clock ADR status: DECIDED, not open.** ADR-21 (D1) fixes the ordering authority as a **server-assigned timestamp** applied at sync, with device monotonic counter then stable device id as tiebreakers; device wall-clocks are never authoritative. ADR-43–52 refine visibility, atomic field groups, read-time validation, durable order, and compatibility without replacing this authority. These are specified expected results, not executed test outcomes. Shared-record erasure alone remains blocked on OQ-01.
 
 **One deliberate asymmetry that must be tested explicitly.** General field LWW resolves to the **later** server timestamp (REQ-SE-2 cl. 3). Simultaneous mutual *removal* resolves to the **earlier** server timestamp (REQ-SE-6 cl. 9) — first defensive action wins. Same clock, opposite direction. This is intentional but is a likely implementation bug, so TC-SE-24 and TC-SE-22 assert opposite directions on purpose.
 
 | TC ID | Scenario | Device A | Device B | Offline duration | Expected winner / end state | Expected change-log entry |
 |---|---|---|---|---|---|---|
-| TC-SE-24 | Same field, both offline | edits `ledger[x].actual` → ₱58,000, syncs first | edits `ledger[x].actual` → ₱62,000, syncs second | A 10 min, B 2 h | **B's ₱62,000 wins** (later server_ts, REQ-SE-2 cl. 3) | Both rows retained; A's marked superseded, value ₱58,000 intact, actor A |
+| TC-SE-24 | Same field, both offline | edits `ledger[x].actual` → ₱58,000, syncs first | edits `ledger[x].actual` → ₱62,000, syncs second | A 10 min, B 2 h | **B's ₱62,000 wins** (later server_ts, REQ-SE-2 cl. 3) | Both rows retained; A's marked superseded, value ₱58,000 intact, actor A; typed old-value mismatch (if present) is a separately derived conflict, not a stored status |
 | TC-SE-20 | Clock skew | clock correct, edits → ₱58,000, syncs **second** | clock **10 min fast**, edits → ₱62,000, syncs **first** | both brief | **A's ₱58,000 wins** — later *server* ts. B's fast clock is irrelevant | A current, B superseded; log shows server ts, not device ts |
 | TC-SE-21 | Identical server_ts | write P | write Q | — | Higher `device_monotonic` wins; if equal, higher `device_id`. Both devices pick the **same** winner | Loser superseded |
 | TC-SE-27 | Different fields, same record | edits `supplier_name` | edits `actual` | A 1 h, B 1 h | **Both persist.** No conflict. Record shows A's name + B's amount | Two independent entries, no supersession |
-| TC-SE-28 | Delete on A vs edit on B | soft-deletes entry (`deleted_at`) at T1 | edits `actual` at T2 > T1 | both offline 1 h | Delete and edit are both field writes under LWW. **B's later edit to `actual` applies, but `deleted_at` remains set** — the row stays deleted with an updated amount. End state: entry absent from all totals. **Finding:** this is defensible but surprising; if the product intent is "edit resurrects the row," that must become an explicit requirement. Not assumed here | Both entries present; neither superseded (different fields) |
+| TC-SE-28 | Delete vs edit, then Restore | soft-deletes entry (`deleted_at`) at T1; later explicitly restores at T3 | edits `actual` at T2 > T1 while offline | both offline 1 h | Delete **gates** B's edit despite its later `server_ts`; no total counts the deleted entry or its children. B's edit remains preserved but suppressed and raises a banner on both devices. Only explicit Restore at T3 (`deleted_at = null`) revalidates **last effective pre-delete values** and eligible children for totals; B's suppressed value does not spring into effect. No one-tap value revert or cascade writes (ADR-47). | Delete, suppressed edit and restore retained with actors, old/new values and ordering; Activity names deletion and preserved edit |
 | TC-SE-29 | Create–create, near-identical | creates "Catering — Hotel A" ₱360,000 | creates "Catering – Hotel A" ₱360,000 | both offline 3 h | **Both rows persist as separate entries** (distinct client UUIDv7 keys); gross counts ₱720,000. No dedup in v1. **Finding:** flagged as a product question — silent duplicate-cost inflation is a realistic user harm; a same-category/amount/supplier warning may be warranted | Two creates, no supersession |
-| TC-SE-30 | Long offline, stale dependent calculations | online throughout; guest count 150 → 200, allocations overridden | offline 6 days holding pre-change state, edits a per-head rate | B 6 days | Derived values are **never persisted** (design §1.4), so B has no stale stored totals to reconcile. On reconnect B replays, projections rebuild, and **both devices show identical recomputed gross/net/variance/buffer**. B's per-head rate edit applies against the *new* guest count, not the count B last saw | B's rate edit present and attributed; no phantom entries for derived figures |
+| TC-SE-30 | Long offline, stale dependent calculations | online throughout; guest count 150 → 200, allocations overridden | offline 6 days holding pre-change state, edits a per-head rate | B 6 days | Per-head effective amount and engine allocation/explanation derive locally from new count, synced inputs and pinned ruleset; only override syncs. **Both devices show identical recomputed gross/net/variance/buffer**, and neither syncs recomputed `estimated_cents` or `engine_cents` (ADR-46). | B's rate edit present and attributed; no phantom entries for derived figures |
 | TC-SE-22 | **Simultaneous mutual removal** (existing) | removes B, server_ts T1 | removes A, server_ts T2 > T1 | both offline | **A survives** — removal with the *earlier* server_ts prevails (REQ-SE-6 cl. 9). Plan never memberless | Losing removal recorded as superseded, actor B preserved |
 | TC-SE-25 | Convergence, order-independent | 20 mixed writes | 20 mixed writes | staggered | Applying the same 40 rows in any arrival order yields identical projections on both devices; re-running sync changes nothing | — |
 | TC-SE-26 | Change-log integrity | — | — | — | Log is append-only: no UI or API path edits or deletes an entry; monetary entries carry prev + new value | — |
 | TC-SE-31 | Ownership-transfer expiry | A requests transfer, A confirms | B confirms just before vs at/after seven-day deadline | — | Before expiry, both confirmations transfer ownership; without both within 7 days of request, pending confirmation expires and ownership/access remain unchanged (REQ-SE-5 cl. 7, ADR-32) | Expired request and any confirmation remain attributed; no transfer event on expiry |
 | TC-SE-32 | Removed partner local wipe offer | A removes B | B reconnects and learns removal | B may have been offline | B's server push/pull are rejected; B retains the existing local copy unless B accepts an offered local wipe. Offer is displayed upon learning removal; no copy claims forced remote deletion (REQ-SE-6 cl. 5–7, ADR-34; OQ-03 open) | Removal attributed to A; no remote-wipe success claim |
+| TC-SE-23 | Join-first onboarding (existing ID) | signs up without a plan, chooses Join | already has plan, shares valid invite | — | SCR-01 offers Start/Join; A may paste link instead of tapping it, joins B's plan with identical overrides and **no second plan**; expired/revoked link rejects (REQ-SE-1 cl. 7–8, ADR-52). | Join attributed; raw token absent from logs; SEC-05 strength/hash verified by TC-SE-42 |
+| TC-SE-33 | **Stale offline write wins and is flagged to BOTH** | changes actual ₱50,000 → ₱60,000, syncs first | while offline sees ₱50,000, edits to ₱55,000, syncs days later with typed `old_value = 5000000` centavos | B 6 days | B wins at later server order: both show ₱55,000. B's `old_value` differs from immediately replaced ₱60,000 (not from any derived status), hence both get a dismissible banner and SCR-16 Conflicts filter with ₱55,000 winner/₱60,000 superseded. Same-value typed comparison including null yields no conflict. | Both immutable writes and original old values remain; mismatch derived on read, no persisted conflict flag or status row (ADR-43) |
+| TC-SE-34 | Compound pricing and fee-component merge | from `(flat,null)` writes complete pricing group `(per_head,100000)`; separately edits a crew-meal fee to `(quantity=2,unit_rate_cents=30000,amount_cents=null)` | from the same prior states writes full pricing group `(per_head,200000)` and fee `(3,20000,null)`; syncs later | 1 h | B's **entire** higher-key snapshot wins each group: `(per_head,200000)` and `(3,20000,null)`, whose fee total is 60000; never `(per_head,null)`, `(3,30000,null)` (90000, authored by neither), or a partly mixed group. Incomplete snapshot rejected, not partially projected; unrelated fields still merge independently. | One `change_group_id` per operation and full snapshot; losing groups retained, ordering `(server_ts,device_monotonic,device_id)` (ADR-44) |
+| TC-SE-35 | Conflict derived vs payment status | changes a scheduled payment date and syncs | observes different local date and offline status; edits the entry's actual | B 2 h | Typed field `old_value` is compared with its immediately replaced field value including null; local `overdue`/`pending` recomputation alone triggers **no** banner and writes no status row. A genuine old-value mismatch on actual still triggers both-device banner. | No persisted `conflict` or `status` field; genuine write and its old value remain (ADR-43) |
+| TC-SE-36 | Merge breaks cross-field invariant | sets ledger actual to ₱60,000 from ₱100,000 | adds live schedule items totalling ₱80,000 against old ₱100,000 | staggered | Individually valid edits together exceed effective amount; both retain raw values, show SCR-19 needs attention, omit invalid dependent schedule contribution, retain independent valid contributions, and converge on same safe totals. No auto-repair write is emitted. Repeat for mismatched subtype/category, incompatible fee-parent subtype, incomplete supplier receipt/payment pair and invalid sponsor linkage; valid over-allocation/overpayment warns without invalidating (REQ-SE-3 cl. 4–6, ADR-45). | Both accepted writes remain; no fabricated correction row |
+| TC-SE-37 | Every total ignores tombstones | deletes ledger parent with schedule, payment, fee components, linked pledge and receipts; separately soft-deletes a gift, refund and another receipt | observes deleted data, then restores parent explicitly | 1 h | While deleted, **gross, net, expected/exposure, deposits, balances, variance, buffer, gifts, net after gifts and reconciliation** omit each deleted contribution and parent-gated children; linked pledge's recorded value survives with “linked entry deleted,” linked support omitted from net. On explicit restore, revalidate and count only valid live descendants once (ADR-47). | No child cascade write; original rows and tombstones remain, Restore is a new `deleted_at = null` write |
+| TC-SE-38 | Atomic create split across pull pages | creates parent ledger entry and child component | pulls with `limit=1`, parent create on page N, child create on N+1 | — | Full validated initial snapshot is a **single** create row, so page N has a whole entry or none, never partial field state; child is hidden until parent arrives. Reversing page arrival holds child pending; totals never include half an entity. | One full-snapshot create event per entity, stable IDs, no partial projection (ADR-47) |
+| TC-SE-39 | Same account, two devices | device 1 edits actual and queues offline | device 2 edits same field and syncs first | 1 h | Later accepted device 1 write wins under ADR-21; both devices converge and show “You changed this on another device,” not “your partner”; per-device session revocation stops only selected device and offers local wipe without claiming remote wipe (ADR-50). | Same `plan_member_id`, distinct `device_id` and monotonic counters; both rows preserved |
+| TC-SE-40 | Former-member attribution | member A contributed ledger and payment history | B reads the activity after A's account-to-alias mapping is removed | — | Existing immutable events still attribute exactly one stable alias but display “Former member”; neither row nor money value rewritten. **Shared-plan erasure outcome is not asserted** (OQ-01, ADR-51). | `plan_member_id` remains on log rows; `actor_user_id` FK is absent |
+| TC-SE-41 | SCR-18 account deletion request | A opens in-app deletion path | B remains a member | — | In-app request is available and identifies the counsel gate; alias unlink can be tested independently, but no success assertion about B's shared records or actual erasure is authored pending OQ-01 (SEC-34, ADR-51). | No immutable row rewritten or fabricated “deleted shared record” entry |
+| TC-SE-42 | Pasted invite SEC-05 parity | creates valid ≥128-bit CSPRNG token, stored as hash only | signs up first, pastes it on Join | — | Pasted and tapped paths accept/reject identical valid, expired, revoked or already-used tokens; neither creates a second plan; raw token absent from DB/logs (ADR-52). | Acceptance attributed to member alias without exposing token |
+| TC-SE-43 | **Cursor row would be skipped by out-of-order commits** | transaction A assigns lower plan server sequence and pauses before commit | concurrent transaction B attempts higher sequence, then pulls `limit=1` | — | B's assignment waits under the per-plan lock; no pull cursor advances past A before A commits or rolls back. After commit, all pages return A/B once in committed order; rollback gap does not hide B (ADR-48). | Retained row IDs and original assigned `server_ts`; cursor only advances through returned committed rows |
+| TC-SE-44 | **Old client gets unknown new field** | compatible newer client inserts a `schema_version` row for unknown field or entity | old client pulls, then upgrades locally | — | Old client preserves unknown full row in log and does not project it; if it is a required financial dependency, affected total shows needs attention rather than wrong money. Upgraded drift schema transactionally rebuilds from whole log and projects the row once, retaining queue and cursor; unsupported major rejects with `min_supported_build` (ADR-49). | Immutable unknown row and ordering metadata survive both versions; no rewritten history |
+
+**Added/changed-clause traceability (planned, not executed).** REQ-LG-1 cl. 3 → TC-LG-41; REQ-AE-5 cl. 7 → TC-AE-15; REQ-SE-1 cl. 7–8 → TC-SE-23/42; REQ-SE-2 cl. 8–9 → TC-SE-33/35, cl. 10 → TC-SE-34 and TC-API-07, cl. 11 → TC-SE-39; REQ-SE-3 cl. 4–6 → TC-SE-36/37 and TC-OF-26; REQ-SE-4 cl. 5 → TC-SE-40 and TC-API-09, cl. 6 → TC-SE-38 and TC-API-07, cl. 7–8 → TC-SE-28/37, cl. 9 → TC-SE-39 and TC-API-09, cl. 10 → TC-SE-41 (request path only; shared erasure OQ-01 blocked); REQ-OF-2 cl. 4–5 → TC-SE-30 and TC-OF-22/26; REQ-OF-5 cl. 6 → TC-SE-43/TC-OF-23/TC-API-06, cl. 7 → TC-OF-25/TC-API-07/08, cl. 8 → TC-SE-44/TC-OF-24/TC-MIG-04, cl. 9 → TC-OF-25/TC-MIG-05.
 
 ---
 
@@ -783,6 +800,11 @@ Every v1 entity, airplane mode, expected **end state** stated.
 | TC-OF-10 | Offline indicator + pending count | Persistent indicator; exact count; escalates per ux-spec §7.2; **no copy contains "lost", "deleted", "discarded", or "failed to save"** — asserted by string scan |
 | TC-OF-11 | Clock handling | `overdue` derived on read from device local date; two devices with different clocks may display different status **without generating a sync conflict**; status never written to shared state (REQ-OF-4) |
 | TC-OF-17 | Two-device simultaneous editing → convergence | A and B both online, 30 s of concurrent edits across ledger, pledges, guests. End state: identical gross, net, expected, exposure, buffer remaining, and every category variance on both devices, to the centavo; change log identical in content and order |
+| TC-OF-22 | Derived-only offline recomputation | Change driving count/rate and allocation input with pinned ruleset installed; offline and online devices calculate identical per-head amount, engine cents/explanation, gross and net on read; only inputs, pinned version and override cents are queued/synced, never recomputed `estimated_cents`, `engine_cents` or explanation (ADR-46). |
+| TC-OF-23 | **Skipped cursor row under concurrent commits** | Pause plan P transaction A after sequence assignment but before commit; start B on same plan; B cannot assign/commit a higher sequence until A commits or rolls back. Pull first page at `limit=1` and subsequent pages while transactions finish: every committed row appears exactly once, none below a cursor commits later; per-plan cursor advances only past returned committed rows, rollback gaps harmless. A different plan can proceed independently (ADR-48). |
+| TC-OF-24 | Compatible old client receives new field/entity | Receive unknown additive `field_name` and `entity_type` carrying `schema_version`; client retains full immutable rows and metadata while omitting unknown projections, without dropping queue/cursor. Upgrade with local drift migration and rebuild from **entire** retained log: unknown rows now project once in server order; a required unknown money input gates affected total with needs attention before upgrade (ADR-49). |
+| TC-OF-25 | Unsupported major protocol and failed local migration | Push/pull with unsupported major version receives structured `min_supported_build`, preserves local queue. Inject a migration/rebuild failure: local schema, log, queue and cursor retain their original logical values and are retryable; no partial money projection. On compatible retry, migration commits and queue replays once (ADR-49). |
+| TC-OF-26 | Missing pinned ruleset on offline device | Device has synced source inputs but lacks referenced immutable ruleset version; log and queued writes stay intact, affected allocation view displays needs attention/update, no invented allocation or derived write; after installing matching version, recomputed allocations and explanation equal partner's (ADR-46). |
 
 ---
 
@@ -790,11 +812,15 @@ Every v1 entity, airplane mode, expected **end state** stated.
 
 | TC ID | Area | Asserts | Maps to |
 |---|---|---|---|
-| TC-API-01 | Contract — push | `POST /sync/push` accepts rows without `server_ts`, returns `{id, server_ts}` per accepted row; rejects malformed rows with 4xx and no partial commit | design §2.4 |
-| TC-API-02 | Contract — pull | `GET /sync/pull?since_server_ts&limit` is cursor-paged, monotonic, terminates; `has_more` accurate | design §2.4 |
+| TC-API-01 | Contract — push | `POST /sync/push` envelope carries `protocol_version`, rows carry `schema_version` but not authoritative `server_ts`; returns `{id, server_ts}` per accepted row; rejects malformed rows with 4xx and no partial commit | design §2.4; REQ-OF-5 cl. 7 |
+| TC-API-02 | Contract — pull | `POST /sync/pull` with `{protocol_version, plan_id, cursor, limit}` returns rows cursor-paged to a committed high-water mark; monotonic, terminates, `has_more` accurate, cursor is last returned committed sequence and never passes an unseen future commit | design §2.4; REQ-OF-5 cl. 6–7 |
 | TC-API-03 | Idempotency | Same batch pushed twice → second is a no-op; no total changes | SEC-20 |
 | TC-API-04 | Auth required | Unauthenticated push/pull → 401 | SEC-01, SEC-03 |
 | TC-API-05 | Membership write path | Direct client insert into `plan_members` → denied | SEC-25 |
+| TC-API-06 | Committed cursor contract | Concurrent two pushes on one plan cannot commit higher `server_ts` before an assigned lower row; paged pull exposes only committed rows at a committed high-water mark, returns the last returned committed cursor, and never skips A when B raced it; rolled-back gaps and separate plans behave correctly | REQ-OF-5 cl. 6, ADR-48 |
+| TC-API-07 | Versioned envelopes and immutable rows | Push and pull carry `protocol_version`; accepted change-log rows carry `schema_version`, `change_group_id` for compound operations, full create snapshot and `plan_member_id`/`device_id`; no `actor_user_id` FK, derived status or stored conflict flag; incomplete group/malformed snapshot rejected atomically | REQ-SE-2 cl. 8–10, REQ-SE-4 cl. 5–6, REQ-OF-5 cl. 7, ADR-43/44/47/49/51 |
+| TC-API-08 | Unsupported major protocol | Push and pull reject unknown major with structured `min_supported_build`; server accepts no rows, client retains unchanged queue and cursor; compatible additive unknown rows can still be pulled and retained for future rebuild | REQ-OF-5 cl. 7–8, ADR-49 |
+| TC-API-09 | Session revocation and attribution | Revoke one of two sessions of same user: revoked device cannot refresh or push/pull; other session stays usable; history uses plan alias and device, renders Former member after alias mapping unlink, no immutable log update; **no shared-record erasure result asserted** | REQ-SE-4 cl. 5, 9–10, SEC-04, ADR-50/51 |
 | TC-EX-01 | Prohibition review | Manual checklist: no marketplace, directory, reviews, ratings, quotes, or booking in code or UI | REQ-EX-1, UT-9 |
 
 ### 7.1 Tenant isolation negative tests — the gate-blocker
@@ -818,6 +844,8 @@ Maps to **SEC-07, SEC-09, SEC-22, SEC-23, SEC-24, SEC-25**.
 | TC-MIG-01 | Forward: every schema version N → N+1 applies against a fixture DB with representative data; no row lost, no money value altered |
 | TC-MIG-02 | Backward: N+1 → N either applies cleanly or fails loudly and refuses to run — **never partially applies** |
 | TC-MIG-03 | Round-trip on a device DB holding queued unsynced writes: queue survives migration; no write dropped or duplicated |
+| TC-MIG-04 | Transactional local drift upgrade from an old client retaining unknown `entity_type`/`field_name` and an unsynced queue: preserve full log, ordering/`schema_version`, cursor and queue; rebuild projections from the complete retained log, project formerly unknown rows exactly once in order and recover correct integer-centavo totals; no premature projection of unknown money inputs (ADR-49). |
+| TC-MIG-05 | Inject failure at drift schema migration and at projection rebuild separately: rollback the whole local transaction in both cases; schema, log, queue and pull cursor remain unchanged, no partially recomputed total; retry after fix succeeds and preserves idempotency (ADR-49). |
 
 ### 7.3 Backup / restore drill
 
@@ -887,13 +915,13 @@ Countable. Every line is pass/fail, no partial.
 | 1 | REQ coverage | **55/55** testable REQ IDs have a passing mapped test. Five deferred REQs are out of v1 (REQ-AI-1…3 and 5 in AI phase; REQ-AI-4 in post-launch payments); REQ-EX-1 has a completed manual review |
 | 2 | Fixtures | **All four fixtures match expected values exactly**: FIX-A/B/C each at base and +25 guests, FIX-D at its fixed date — 9/9 fixture/related TCs green (TC-FIX-A1…D1, TC-PL-19, TC-AE-05) |
 | 3 | Defects | **Zero open S1. Zero open S2.** |
-| 4 | Sync matrix | **12/12 rows in §5 green on both iOS and Android** |
-| 5 | Offline matrix | **11/11 entity rows + 10/10 durability rows green**; the string scan in TC-OF-10 finds zero prohibited words |
+| 4 | Sync matrix | **Every TC-SE row in §5 green on both iOS and Android**; TC-SE-40/41 assert alias/request mechanics only, not counsel-blocked shared erasure |
+| 5 | Offline matrix | **Every entity row in §6.1 and durability/protocol row in §6.2 green**; the string scan in TC-OF-10 finds zero prohibited words |
 | 6 | Tenant isolation | **TC-SEC-01 green in CI**, plus TC-SEC-04…06 green. Non-negotiable |
 | 7 | SEC gate — beta tier | **All security-plan §7 items marked PASS for internal beta are PASS.** Any unverifiable item counts as FAIL |
 | 7b | Device at-rest security | TC-SEC-03, TC-SEC-07…10 green **on physical hardware** — simulator results do not count |
 | 8 | E2E | **TC-E2E-01 all 20 steps + offline gate green on both platforms** |
-| 9 | Migrations | TC-MIG-01…03 green |
+| 9 | Migrations and sync protocol | TC-MIG-01…05 and TC-API-06…09 green; shared erasure remains blocked under OQ-01 |
 | 10 | Restore drill | TC-BAK-02 completed within the last 7 days **with a recorded restore duration** |
 | 11 | Rounding | TC-GEN-05 drift guard green; no cent gained or lost over 1,000 iterations |
 | 12 | Static money check | TC-GEN-01 lint clean — zero `double` in money paths |
@@ -912,7 +940,7 @@ Stated so the residual risk is visible rather than assumed away.
 8. **Localization.** English-only v1 (ux-spec §8.4). No pseudo-localization, no RTL, no translated-string overflow testing.
 9. **Device and OS breadth.** Two devices, latest−1 OS. No matrix across older Android OEM skins, low-memory devices, or tablets.
 10. **Payment rails and AI.** Initiation/settlement of funds (REQ-AI-4) and AI remain out of v1. Manual payment and receipt *records* are v1 and covered above; no PCI or model-behaviour testing.
-11. **Upgrade path from a shipped build.** TC-MIG-* covers schema migration in isolation; there is no test of a real user upgrading from store build N to N+1 with queued offline writes and a pinned older ruleset.
+11. **Upgrade path from a shipped build.** TC-MIG-04/05 cover simulated old-client local migration and retained unknown rows with queued writes; a real store build N → N+1 upgrade on a physical user's device with an older pinned ruleset is still not covered.
 
 ---
 
