@@ -1,10 +1,10 @@
 # Kasaran — Security & Privacy Plan
 
-*Inputs: [design.md](./design.md), [requirements.md](./requirements.md). Checklist items carry an ID (SEC-n), a verifiable pass condition, and an owner. Every item is checkable by someone other than the author.*
+*Inputs: [decision-log.md](./decision-log.md), [design.md](./design.md), [requirements.md](./requirements.md). Checklist items carry an ID (SEC-n), a verifiable pass condition, and an owner. Every item is checkable by someone other than the author.*
 
-## 0.0 Missing input
+## 0.0 Decision record
 
-**`docs/decision-log.md` was listed as an input and does not exist in the repository** (contents: problem-brief, project-brief, mvp-user-stories, requirements, design, ux-spec). Nothing was inferred from it. Decisions this plan depends on are read from design.md §3 (Supabase, RLS, append-only log) and §4 (schema: `users`, `plan_members`, `invites` with `token_hash`, soft deletes). If a consolidated decision log exists elsewhere, this plan should be re-checked against it.
+**`docs/decision-log.md` exists and is the decision authority.** In particular ADR-12 (Flutter), ADR-16 (Supabase), ADR-17 (local encryption), ADR-21 (server-assigned sync ordering), ADR-23/24 (partner removal), and ADR-27/28 (name/payments) inform this plan. The implementation detail is in design.md §3 (Supabase, RLS, append-only log) and §4 (`users`, `plan_members`, `invites` with `token_hash`, soft deletes). Open questions in the decision log, including OQ-01/03/07/10, are not silently resolved here.
 
 **Owner roles used below.** `BACKEND` (Supabase config, RLS, endpoints), `CLIENT` (Flutter app), `DPO` (Data Protection Officer / privacy owner), `RELEASE` (store submission and gate sign-off). At student-project scale one person may hold several; the label marks accountability, not headcount.
 
@@ -14,15 +14,15 @@
 
 Assets and threats first. Controls are chosen to cover these, not the reverse.
 
-| # | Asset | Threat actor | Attack | Impact | Mitigating SEC IDs |
+| # | Asset | Threat actor | Attack | Impact | Mitigating controls |
 |---|---|---|---|---|---|
-| T1 | Shared plan data | Ex-partner after breakup / called-off wedding | Retains app access and keeps reading or editing the plan | Ongoing unauthorised access to finances and guest list; emotional harm | SEC-07, SEC-08, SEC-09, SEC-22 |
-| T2 | Local SQLite store | Opportunistic finder / thief | Lost or stolen **unlocked** phone, opens app | Full read of budget, sponsor names, guest list | SEC-10, SEC-11, SEC-12 |
-| T3 | Another couple's plan | Curious or malicious app user | Crafts requests for a `plan_id` they are not paired to; a broken authz check serves it | Cross-tenant financial data breach | SEC-15, SEC-16, SEC-17 |
+| T1 | Shared plan data | Ex-partner after breakup / called-off wedding | Retains app access and keeps reading or editing the plan | Ongoing unauthorised access to finances and guest list; emotional harm | SEC-07, SEC-08, SEC-09; activity log REQ-SE-4 |
+| T2 | Local SQLite store | Opportunistic finder / thief | Lost or stolen **unlocked** phone, opens app | Full read of budget, sponsor names, guest list | SEC-12…16 |
+| T3 | Another couple's plan | Curious or malicious app user | Crafts requests for a `plan_id` they are not paired to; a broken authz check serves it | Cross-tenant financial data breach | SEC-22…25 |
 | T4 | Plan membership | Anyone who obtains an invite link | Leaked/forwarded invite code used to join a plan | Unauthorised third party joins the couple's plan | SEC-05, SEC-06 |
-| T5 | Entire database | Malicious or curious insider with backend DB access | Direct table reads bypassing the app | Mass breach across all couples | SEC-18, SEC-19, SEC-20 |
-| T6 | Sync traffic | Network attacker on public wifi | Intercepts or replays sync requests | Token theft, data disclosure, duplicated writes | SEC-13, SEC-14 |
-| T7 | Local store via backup | Attacker with cloud-backup or desktop-backup access | Extracts app DB from iCloud / Android backup or an unencrypted iTunes/Finder backup | Offline read of financial data | SEC-11, SEC-12 |
+| T5 | Entire database | Malicious or curious insider with backend DB access | Direct table reads bypassing the app | Mass breach across all couples | SEC-22, SEC-26, SEC-27, SEC-28 |
+| T6 | Sync traffic | Network attacker on public wifi | Intercepts or replays sync requests | Token theft, data disclosure, duplicated writes | SEC-17…21 |
+| T7 | Local store via backup | Attacker with cloud-backup or desktop-backup access | Extracts app DB from iCloud / Android backup or an unencrypted iTunes/Finder backup | Offline read of financial data | SEC-12, SEC-16 |
 
 ### 0.1 The called-off-wedding case — product behaviour, not a hypothetical
 
@@ -31,7 +31,7 @@ This is a first-class requirement (problem-brief describes real couples; REQ-SE-
 1. Removal of a partner is a **mutual, one-sided** action: **either** paired partner may remove the other, without the removed party's consent, and it takes effect on the server immediately (REQ-SE-6, Decisions 1 and 2). It is not creator-only, because if the creator were the hostile party the other partner would have no defensive move. Two-party confirmation applies to *ownership transfer* only (REQ-SE-5 clause 4), never to defensive removal. **Resolved — no longer flagged for confirmation.**
 2. On removal, the server deletes the removed user's `plan_members` row. Their next sync (pull or push) is rejected: they are no longer a member, RLS returns nothing, and writes are refused (SEC-09).
 3. **The removed partner keeps whatever was already on their device.** This is unavoidable and must be stated plainly: a local-first app (REQ-OF-1) means their SQLite copy already holds every figure they synced. No server action can reach into their phone. Pretending otherwise would be a false security claim.
-4. What the retained partner gets: the plan continues under their account, the removed member can no longer read new changes or write anything, and the activity log records the removal with actor and timestamp (SEC-22).
+4. What the retained partner gets: the plan continues under their account, the removed member can no longer read new changes or write anything, and the activity log records the removal with actor and timestamp (REQ-SE-4).
 5. What is offered to limit the residual copy: the client honours a server "membership revoked" signal by moving to a read-only terminal state and offering local wipe (ux-spec §3.3, SEC-08). Whether it *force-wipes* is a privacy decision in §11 — force-wipe is user-hostile if the removed person has a legitimate interest in their own records, and unenforceable if they are offline.
 
 ---
@@ -54,13 +54,13 @@ Justified against the threat model:
 | SEC-04 | Sign-out revokes | Sign-out invalidates the refresh token server-side, not just locally. Verify: sign out, then attempt refresh with the prior token → rejected. | BACKEND |
 | SEC-05 | Pairing code strength | Invite token ≥ 128 bits from a CSPRNG; only a hash is stored server-side (`invites.token_hash`, design.md §4.1); raw token never logged. Verify by inspecting generation code and confirming the DB column holds a hash, not the token. | BACKEND |
 | SEC-06 | Pairing code lifecycle | Invite is single-use and expires 7 days after issuance (REQ-SE-1); acceptance sets `accepted_at` and prevents reuse; revocation sets `revoked_at`. Verify: accept once → second accept refused; wait past expiry → refused; revoke → refused. | BACKEND |
-| SEC-07 | Mutual one-sided defensive removal, with deterministic simultaneous-removal winner | **Either** paired partner can remove the other without the removed party's consent, effective on the removed party's next sync; the right is mutual, not creator-only (REQ-SE-6; Decisions D3, formerly ADR-18/19). The action is logged and attributed (SEC-22, REQ-SE-4). **Simultaneous mutual removal resolves to a deterministic winner** ordered by the server-assigned timestamp (D1/REQ-SE-2) and tiebroken on stable device id (D4/REQ-SE-6 clauses 9–11); the plan is never left with zero members. Verify all three: (a) creator removes partner B — B's `plan_members` row is gone and B's next sync is refused; (b) non-creating partner B removes the creator A — A's row is gone and A's next sync is refused; (c) two offline devices each remove the other, then both sync — exactly one partner survives, identical on both server and both devices, matching the server-timestamp/stable-id order. | BACKEND |
+| SEC-07 | Mutual one-sided defensive removal, with deterministic simultaneous-removal winner | **Either** paired partner can remove the other without the removed party's consent, effective on the removed party's next sync; the right is mutual, not creator-only (REQ-SE-6; Decisions D3, formerly ADR-18/19). The action is logged and attributed (REQ-SE-4). **Simultaneous mutual removal resolves to a deterministic winner** ordered by the server-assigned timestamp (D1/REQ-SE-2) and tiebroken on stable device id (D4/REQ-SE-6 clauses 9–11); the plan is never left with zero members. Verify all three: (a) creator removes partner B — B's `plan_members` row is gone and B's next sync is refused; (b) non-creating partner B removes the creator A — A's row is gone and A's next sync is refused; (c) two offline devices each remove the other, then both sync — exactly one partner survives, identical on both server and both devices, matching the server-timestamp/stable-id order. | BACKEND |
 | SEC-08 | Revocation reaches the client | On membership loss, the client enters read-only terminal state and offers local wipe (ux-spec §3.3). Verify: remove B server-side; B's app on next foreground shows the revoked state and a wipe option. | CLIENT |
 | SEC-09 | Revoked member cannot sync | After removal, both pull and push for that user return no data and are rejected by RLS, not by client-side checks alone. Verify by replaying B's last valid token directly against the sync endpoints post-removal → empty/refused. | BACKEND |
 | SEC-10 | Re-pairing after reinstall | A reinstalled app re-authenticates with the existing account and re-pulls from `since_server_ts = 0`; no residual credential is needed from the old install. Verify: uninstall, reinstall, sign in, confirm full plan restored. | CLIENT |
 | SEC-11 | Device-loss recovery | Losing a device requires no plan-side recovery beyond signing in on a new device; a lost device's local data is addressed by SEC-12 at-rest encryption. Verify: sign in on a second device, confirm access; confirm no plan secret is printed to logs during pairing. | CLIENT |
 
-**Residual-copy statement (binding).** The removed partner retains the local data they had already synced. There is no technical means to guarantee its deletion from a device the operator does not control. This plan does not claim otherwise. SEC-08 offers wipe; it cannot enforce it against an offline or uncooperative device. This limit is disclosed to users in the privacy notice (SEC-24).
+**Residual-copy statement (binding).** The removed partner retains the local data they had already synced. There is no technical means to guarantee its deletion from a device the operator does not control. This plan does not claim otherwise. SEC-08 offers wipe; it cannot enforce it against an offline or uncooperative device. This limit is disclosed to users in the privacy notice (SEC-30).
 
 ---
 
@@ -146,7 +146,7 @@ Kasaran collects **personal data** (names, emails) and **financial and event dat
 | Sponsor names & roles (Ninong/Ninang) | Core function (pledges) | Yes | No | Supabase |
 | Guest names, RSVP, tier | Core function (guest math) | Yes | No | Supabase |
 | Region / wedding location | Core function (regional cost) | Yes (coarse) | No | Supabase |
-| Device sync metadata (HLC, device_id) | Sync integrity | Yes | No | Supabase |
+| Device sync metadata (`server_ts`, `device_monotonic`, `device_id`) | Sync integrity | Yes | No | Supabase |
 
 **No advertising SDKs, no analytics-for-tracking, no data brokers.** Supabase is a processor under instruction, not an independent controller or an advertising third party. If any analytics is added later, this table and both store labels must be revised before that build ships.
 

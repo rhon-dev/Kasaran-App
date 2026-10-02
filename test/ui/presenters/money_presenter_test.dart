@@ -74,33 +74,12 @@ void main() {
       expect(constrainedForm(35000000), equals('₱350,000'));
     });
 
-    // Exit-criteria table: 125900000 → '₱1.2M' (truncated, not ₱1.3M)
-    // Phase spec says 125900000 → '₱1.25M' but let's verify the math:
-    // 125900000 centavos = ₱1 259 000.00
-    // tens-of-thousands units: 125900000 ~/ 1000000 = 125
-    // wholePart = 125 ~/ 10 = 12, fracPart = 125 % 10 = 5
-    // → '₱12.5M' — that can't be right. Let me re-check the spec value.
-    //
-    // Actually the spec says: '₱1,259,000.00 → ₱1.25M'
-    // 125900000 centavos = ₱1,259,000.00
-    // multiplyBp approach: 125900000 ~/ 1000000 = 125 (units of 0.01M)
-    // But 0.01M = ₱10,000 = 1,000,000 centavos. Wait—
-    //
-    // Let's re-derive. ₱1M = 100,000,000 centavos.
-    // We want one decimal place in millions, so our unit = 0.1M = 10,000,000 centavos.
-    // abs ~/ 10_000_000 gives units of 0.1M.
-    // 125_900_000 ~/ 10_000_000 = 12 (truncated toward zero — 12.59 → 12)
-    // wholePart = 12 ~/ 10 = 1, fracPart = 12 % 10 = 2
-    // → '₱1.2M'  (truncated, so '₱1.2M' not '₱1.3M')
-    //
-    // The phase spec exit-criteria says '₱1.25M' for 125900000. That would
-    // require TWO decimal places. The implementation uses ONE decimal place
-    // (design.md §1.5: "one-decimal millions shorthand"). The discrepancy is
-    // between the spec table text and the design text; the design wins.
-    // We assert '₱1.2M' (the correct one-decimal truncated value).
-    test('₱1.2M — 1 259 000 truncates to ₱1.2M (not ₱1.3M)', () {
-      // 125900000 centavos = ₱1,259,000.00
-      expect(constrainedForm(125900000), equals('₱1.2M'));
+    test('₱1.25M — 1 259 000 truncates to two decimals', () {
+      expect(constrainedForm(125900000), equals('₱1.25M'));
+    });
+
+    test('−₱1.25M — negative 1 259 000 truncates toward zero', () {
+      expect(constrainedForm(-125900000), equals('−₱1.25M'));
     });
 
     // Exit-criteria table: '₱350,999.99 → ₱350,999'
@@ -118,20 +97,28 @@ void main() {
       expect(constrainedForm(0), equals('₱0'));
     });
 
-    test('₱1,000,000 — exactly 1M renders without shorthand', () {
-      // Exactly at the threshold: 100_000_000 centavos.
-      // abs ~/ 10_000_000 = 10 → wholePart=1, fracPart=0 → '₱1.0M'
-      expect(constrainedForm(100000000), equals('₱1.0M'));
+    test('₱1.00M — exactly 1M uses two-decimal shorthand', () {
+      expect(constrainedForm(100000000), equals('₱1.00M'));
     });
 
-    test('₱2.5M — 250 000 000 centavos', () {
-      // 250_000_000 ~/ 10_000_000 = 25 → 2.5M
-      expect(constrainedForm(250000000), equals('₱2.5M'));
+    test('−₱1.00M — negative exactly 1M', () {
+      expect(constrainedForm(-100000000), equals('−₱1.00M'));
     });
 
-    test('₱10.0M — 1 000 000 000 centavos', () {
-      // 1_000_000_000 ~/ 10_000_000 = 100 → wholePart=10, fracPart=0 → '₱10.0M'
-      expect(constrainedForm(1000000000), equals('₱10.0M'));
+    test('₱999,999 — immediately below 1M remains unshortened', () {
+      expect(constrainedForm(99999999), equals('₱999,999'));
+    });
+
+    test('−₱999,999 — negative immediately below 1M', () {
+      expect(constrainedForm(-99999999), equals('−₱999,999'));
+    });
+
+    test('₱2.50M — 250 000 000 centavos', () {
+      expect(constrainedForm(250000000), equals('₱2.50M'));
+    });
+
+    test('₱10.00M — 1 000 000 000 centavos', () {
+      expect(constrainedForm(1000000000), equals('₱10.00M'));
     });
 
     // Truncation never overstates: displayed value ≤ true value.
@@ -139,19 +126,19 @@ void main() {
       for (var cents = 100000000; cents < 200000000; cents += 1000000) {
         final display = constrainedForm(cents);
         // Parse the displayed value back and compare.
-        // '₱X.YM' → strip ₱, M → parse as decimal millions.
+        // '₱X.YYM' → parse back into integer centavos without floating point.
         final raw = display
             .replaceAll('₱', '')
             .replaceAll('−', '')
             .replaceAll(',', '');
-        final double displayedPesos;
+        final int displayedCentavos;
         if (raw.endsWith('M')) {
-          displayedPesos =
-              double.parse(raw.substring(0, raw.length - 1)) * 1000000;
+          final parts = raw.substring(0, raw.length - 1).split('.');
+          displayedCentavos =
+              int.parse(parts[0]) * 100000000 + int.parse(parts[1]) * 1000000;
         } else {
-          displayedPesos = double.parse(raw);
+          displayedCentavos = int.parse(raw) * 100;
         }
-        final displayedCentavos = (displayedPesos * 100).round();
         final trueCentavos = display.startsWith('−') ? -cents : cents;
         final absTrueCentavos = trueCentavos.abs();
         expect(
@@ -178,7 +165,7 @@ void main() {
     });
 
     test('a11y label for 1M amount is full form, not shorthand', () {
-      // Constrained form is '₱1.0M'; a11y must be '₱1,000,000.00'.
+      // Constrained form is '₱1.00M'; a11y must be '₱1,000,000.00'.
       expect(accessibilityLabel(100000000), equals('₱1,000,000.00'));
     });
 
@@ -188,8 +175,7 @@ void main() {
         expect(
           accessibilityLabel(amount),
           isNot(equals(constrainedForm(amount))),
-          reason:
-              'a11y label for $amount must differ from its constrainedForm',
+          reason: 'a11y label for $amount must differ from its constrainedForm',
         );
       }
     });

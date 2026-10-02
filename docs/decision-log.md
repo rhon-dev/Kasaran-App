@@ -56,7 +56,7 @@ Short history, for anyone tracing the name's status changes:
 | OQ-02 | NPC registration threshold and formal DPO designation at this scale. Counsel-gated. | OPEN | SEC-37 |
 | OQ-03 | Force-wipe vs wipe-offer for the removed partner's local copy. Current plan offers, does not force. | OPEN | SEC-08, REQ-SE-6 (cl. 7) |
 | OQ-04 | Reference cost benchmarks per region tier for budget adequacy. | OPEN | REQ-AE-2 (cl. 2) |
-| OQ-05 | Ownership-transfer confirmation expiry duration. | OPEN | REQ-SE-5 (cl. 7) |
+| OQ-05 | Ownership-transfer confirmation expiry duration. | **CLOSED** → ADR-32 (seven days) | REQ-SE-5 (cl. 7), ADR-32 |
 | OQ-06 | Final product name / brand (whether to keep "Kasaran"). | **CLOSED** → ADR-27 (name is Kasaran, 2026-09-14) | GIV-07, ADR-06, ADR-27 |
 | OQ-07 | **Data residency.** No ADR covers where Philippine personal data is stored. Supabase has no PH region; the deployment plan assumes `ap-southeast-1` (Singapore). DPA 2012 permits cross-border transfer but the controller stays accountable and must disclose the location. | OPEN | deployment-plan §2.2, SEC-30. **Blocks the privacy notice, which blocks store submission** |
 | OQ-08 | **Bundled vs remote allocation ruleset.** ADR-15 bundles the ruleset in the app binary. Flutter has no code OTA, so a wrong baseline or regional modifier requires a full store release (days). Remote-with-bundled-fallback would make it a minutes-scale fix. | OPEN | deployment-plan §3.6, ADR-15, REQ-AE-3, OQ-04. Requires amending ADR-15 |
@@ -86,7 +86,7 @@ Short history, for anyone tracing the name's status changes:
 | ADR-11 | Regional cost index drives cost expectation and rate suggestions, not allocation shares. | DECIDED | 2026-09-13 | REQ-AE-2 |
 | ADR-12 | Platform: Flutter (Android + iOS), SQLite via `drift`/`sqflite`, web excluded from v1. | DECIDED | 2026-09-13 | GIV-02 (supersedes RN), GIV-03, REQ-PLT-1, REQ-PLT-2 |
 | ADR-13 | Money stored as int64 centavos; Dart `int` satisfies this natively. | DECIDED | 2026-09-13 | REQ-GEN-1 |
-| ADR-14 | Constrained monetary display permitted in bento tiles (centavos dropped below ₱1M, `₱1.25M` above, truncated toward zero); full form everywhere else and in all a11y labels. | DECIDED | 2026-09-13 | REQ-GEN-2A |
+| ADR-14 | Constrained monetary display permitted in bento tiles (centavos dropped below ₱1M, `₱1.25M` above, truncated toward zero); full form everywhere else and in all a11y labels. Exact two-decimal million precision is clarified by ADR-30. | DECIDED, refined by ADR-30 | 2026-09-13 | REQ-GEN-2A, ADR-30 |
 | ADR-15 | Ruleset config is a JSON asset bundled in the app binary for v1, validated at load; no web authoring dashboard. | DECIDED | 2026-09-13 | REQ-AE-1 |
 | ADR-16 | Backend: Supabase (Postgres + Auth + RLS). Tenant isolation enforced by forced RLS on every plan table. | DECIDED | 2026-09-13 | GIV-03, SEC-22, SEC-23, SEC-24 |
 | ADR-17 | No cloud auto-backup of the local encrypted DB; local store encrypted with SQLCipher, key in Keychain/Keystore. | DECIDED | 2026-09-13 | SEC-12, SEC-13, SEC-16 |
@@ -101,10 +101,61 @@ Short history, for anyone tracing the name's status changes:
 | ADR-26 (D6) | Shared-record erasure test cases are left UN-STUBBED and marked blocked-pending-counsel, with no asserted expected value. A guessed expected result is forbidden. | DECIDED (process rule) | 2026-09-14 | testing-plan §5, SEC-33, SEC-38, OQ-01 |
 | ADR-27 | **Final product name is Kasaran.** Confirms and closes the naming question. Adopted as a distinct, ownable mark; cleared for logo/domain. Supersedes ADR-06 (working-name-only) and closes OQ-06; GIV-07 RESOLVED. | DECIDED | 2026-09-14 | GIV-07, OQ-06, ADR-06, problem-brief |
 | ADR-28 | **Payments (REQ-AI-4) is its own post-launch phase, pulled out of the AI tail entirely.** Becomes development phase 25, owned by **Backend Agent** with Security as mandatory reviewer — payments is a financial-rail integration, not inference, and was only ever grouped with AI because both were deferred. The ID `REQ-AI-4` is retained un-renumbered; its `AI-` prefix is now a historical artifact. | DECIDED | 2026-09-14 | REQ-AI-4, development-phases §25, agents.md, OQ-10 |
+| ADR-29 | Bohol retains Provincial cost tier (0.85) but has `is_destination = true`. OOT defaulting uses the destination flag, not the tier; the tier only selects the cost index. | DECIDED | 2026-10-02 | REQ-BS-4, REQ-HF-3, design §4.2 |
+| ADR-30 | Refines ADR-14: bento shorthand at or above ₱1M always shows exactly two decimal million digits, truncated toward zero (`₱1.00M`, `₱1.20M`, `₱1.25M`). | DECIDED | 2026-10-02 | ADR-14, REQ-GEN-2A, TC-GEN-03 |
+| ADR-31 | New plans default the designated driving RSVP status to `invited`; each new guest's RSVP remains explicitly set. Priority tier alone does not remove guests from cost projections. | DECIDED | 2026-10-02 | REQ-GM-1, requirements §13.2, ux-spec UT-5 |
+| ADR-32 | Ownership-transfer confirmation expires seven days after initiation unless both partners confirm. Closes OQ-05; defensive removal has no confirmation window. | DECIDED | 2026-10-02 | OQ-05, REQ-SE-5 (cl. 7), ux-spec UT-4 |
+| ADR-33 | Notes have a hard 2,000-character limit. Show a live count and stop input at the limit; do not silently truncate saved text. | DECIDED | 2026-10-02 | REQ-LG-1 (cl. 8), ux-spec UT-3 |
+| ADR-34 | On defensive removal, the app SHALL offer the removed partner a local wipe; it does not force one. OQ-03 remains open. | DECIDED | 2026-10-02 | REQ-SE-6 (cl. 7), OQ-03, ux-spec UT-6 |
+| ADR-35 | Tier-specific per-head rates are not in v1. Guest priority tier drives the cut-list only; it does not alter the per-head rate. | DECIDED | 2026-10-02 | REQ-GM-1 (cl. 9), requirements §13.3 |
 
 ---
 
 ## Decision narratives
+
+## ADR-29 — Destination flag independent of cost tier
+
+**Context.** Bohol appears in the Provincial 0.85 tier but also triggers destination OOT prompts. Treating the tier itself as the destination test makes these two rules conflict.
+
+**Decision.** Keep Bohol's Provincial cost index and set `is_destination = true`. Use that flag for OOT defaults; use `tier_code` only for the cost index. **Consequence:** no reclassification or new region benchmark is implied.
+
+## ADR-30 — Two-decimal bento million shorthand
+
+**Context.** REQ-GEN-2A said one decimal, while ADR-14, TC-GEN-03 and the UI examples used `₱1.25M`.
+
+**Decision.** Exactly two decimals for every million shorthand, truncated toward zero. Below ₱1M the constrained form drops centavos without million shorthand. Full monetary form and screen-reader labels remain unchanged. **Consequence:** the presenter and its tests use hundredths of a million.
+
+## ADR-31 — Conservative RSVP default
+
+**Context.** The driving RSVP status was designated but its default was unspecified.
+
+**Decision.** Default to `invited`. This counts invited guests until the couple changes status, rather than underestimating headcount. **Consequence:** setup and guest-flow defaults align.
+
+## ADR-32 — Ownership-transfer confirmation window
+
+**Context.** REQ-SE-5 required expiry but did not define a duration; OQ-05 remained open.
+
+**Decision.** A pending transfer expires seven days after initiation if both partners have not confirmed. The plan stays unchanged. Defensive removal is immediate and has no transfer window. **Consequence:** close OQ-05 and show the fixed window in the transfer UI.
+
+## ADR-33 — Notes input bound and feedback
+
+**Context.** REQ-LG-1 set a 2,000-character bound without specifying what happens at the limit.
+
+**Decision.** Display a live count and stop further input at 2,000 characters. Do not silently truncate notes on save. **Consequence:** the entry editor exposes the limit before it is reached.
+
+## ADR-34 — Local wipe offer on removal
+
+**Context.** REQ-SE-6 permitted but did not require a wipe offer; the removed partner's local copy is retained under ADR-20.
+
+**Decision.** Offer a local wipe when removal is detected, without forcing it. **Consequence:** OQ-03 (whether to force a wipe) remains open; no remote wipe is implied.
+
+## ADR-35 — Priority tier does not change per-head rate in v1
+
+**Context.** REQ-GM-1 allowed tier-specific rates without any prescribed tier rates.
+
+**Decision.** Exclude tier-specific per-head rates from v1. Use priority tier only for the cut-list. **Consequence:** no prices are invented; per-head projections use the couple's own rate and driving RSVP status.
+
+**v1 gate for ADR-29–35.** Each decision is deterministic and explainable; none moves money or recommends a supplier. Payment rails remain a separate post-launch phase (ADR-28).
 
 ## ADR-21 (D1) — Server-assigned LWW clock authority
 

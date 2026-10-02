@@ -30,9 +30,10 @@ These terms are used with exactly these meanings throughout. Ambiguity in any re
 | **Deposit paid** | Cumulative amount already handed to the supplier for an entry. Defaults to 0. |
 | **Balance due** | `effective_amount − deposit_paid`, floored at 0. |
 | **Gross event total** | Sum of `effective_amount` across all ledger entries, including hidden-fee entries. What the wedding costs. |
-| **Net out-of-pocket** | `gross_event_total − (sum of confirmed pledges + sum of received pledges)`. What the couple personally pays. |
+| **Net out-of-pocket** | `gross_event_total − sum of received pledges`. Only fulfilled pledges reduce what the couple personally pays (ADR-22). |
+| **Expected pledge support** | Sum of pledge values with status `tentative` or `confirmed`; shown separately and never subtracted from net (ADR-22). |
 | **Outstanding pledge exposure** | Sum of pledge values with status `confirmed` and not yet `received`. Promised but not in hand. |
-| **Driving guest count** | The single guest tier designated to drive per-head cost calculations. |
+| **Driving guest count** | The count of guests in the designated RSVP status (`invited` by default), regardless of priority tier; drives per-head cost calculations. |
 | **Crew headcount** | Total supplier crew requiring meals. Tracked separately; never part of any guest count. |
 | **Per-head entry** | A ledger entry whose effective amount is `per_head_rate × driving_guest_count`. |
 | **Flat-rate entry** | A ledger entry whose effective amount is independent of any guest count. |
@@ -101,13 +102,13 @@ THE SYSTEM SHALL use exactly these six allocation categories, with these NCR bas
 **REQ-GEN-2A [v1] — Constrained monetary display in bento tiles**
 WHERE a monetary value is rendered inside a dashboard bento grid tile, THE SYSTEM SHALL be permitted to use a constrained form, and SHALL use the full form of REQ-GEN-2 everywhere else.
 
-1. For a value below ₱1,000,000, the constrained form drops centavos: `₱350,000`.
-2. For a value at or above ₱1,000,000, the constrained form uses one-decimal millions shorthand: `₱1.25M`.
-3. Constrained forms SHALL truncate toward zero, so the displayed figure never exceeds the true value: `₱1,259,000.00` renders as `₱1.25M`, and `₱350,999.99` renders as `₱350,999`.
+1. For an absolute value below ₱1,000,000, the constrained form drops centavos: `₱350,000`.
+2. For an absolute value at or above ₱1,000,000, the constrained form uses exactly two decimal places in millions shorthand: `₱1.00M`, `₱1.20M`, `₱1.25M` (ADR-30, refining ADR-14).
+3. Constrained forms SHALL truncate toward zero, so the displayed magnitude never exceeds the true magnitude: `₱1,259,000.00` renders as `₱1.25M`, `₱350,999.99` as `₱350,999`, and `−₱1,259,000.00` as `−₱1.25M`.
 4. The constrained form is permitted **only** inside dashboard bento tiles. It SHALL NOT appear on detail cards, modal sheets, ledger rows, editors, previews, or the change log.
 5. WHEN a partner taps a constrained figure, THE SYSTEM SHALL reveal the full form of REQ-GEN-2.
 6. Every screen-reader accessibility label for a constrained figure SHALL announce the full form, never the constrained form.
-7. A negative value in constrained form retains the leading minus: `−₱1,200`.
+7. A negative value in constrained form retains the leading minus: `−₱1,200` or `−₱1.25M`; the threshold and truncation apply to its absolute value.
 
 ---
 
@@ -153,10 +154,10 @@ THE SYSTEM SHALL classify wedding location using a fixed, versioned region taxon
    | Destination | 1.20 | Boracay / Aklan, Palawan (Puerto Princesa, El Nido, Coron), Siargao |
 
 2. Every region maps to exactly one cost tier; no region is unmapped.
-3. Region records and tier indices are configuration data, versioned with the ruleset, and changeable without a code change.
-4. Regions in the Destination tier default the OOT prompt in REQ-HF-3 to an enabled state.
+3. Region records, `is_destination` flags, and tier indices are configuration data, versioned with the bundled ruleset, and changeable without changing engine code.
+4. WHERE a region has `is_destination = true`, THE SYSTEM SHALL default the OOT prompt in REQ-HF-3 to enabled, independently of its cost tier. Bohol has `is_destination = true` while retaining the Provincial cost index 0.85; Boracay / Aklan, Palawan, and Siargao also have `is_destination = true` (ADR-29).
 5. Selecting a region never itself creates, deletes, or modifies a ledger entry.
-6. The regional cost index is applied only as specified in REQ-AE-2, and SHALL NOT be applied to allocation shares.
+6. The regional cost index is applied only as specified in REQ-AE-2, and SHALL NOT be applied to allocation shares; `is_destination` controls OOT defaulting and SHALL NOT itself change the cost index.
 
 **REQ-BS-5 [v1] — Guest cap is a ceiling, not a cost driver**
 THE SYSTEM SHALL treat guest cap as a partner-set ceiling used for warnings only, and SHALL NOT use guest cap as the driving guest count.
@@ -189,7 +190,7 @@ THE SYSTEM SHALL provide each ledger entry with a category, supplier name, estim
 5. Deposit paid defaults to 0 and is ≥ 0.
 6. Due date is optional.
 7. Entry type is exactly one of: standard, or one of the six hidden-fee subtypes in REQ-HF-2.
-8. Notes accept free text up to 2,000 characters.
+8. WHEN a partner enters notes, THE SYSTEM SHALL show a live character counter, accept at most 2,000 characters, and stop accepting input at the limit without silently truncating existing text (ADR-33).
 
 **REQ-LG-2 [v1] — Ledger CRUD by either partner**
 THE SYSTEM SHALL permit both partners to create, read, update, and delete any ledger entry in the plan.
@@ -263,11 +264,12 @@ THE SYSTEM SHALL model each hidden-fee subtype with its own input fields and its
 6. **Venue power** accepts separate generator, surcharge, and electrical-requirement amounts.
 7. Each hidden-fee entry appears in gross event total as its own attributable line and is never merged into a parent category's single figure.
 8. Crew meals total independently of guest catering and are excluded from per-head recalculation per REQ-GM-4.
+9. THE SYSTEM SHALL assign crew meals, church aircon, corkage, and venue power to Catering & Venue, and OOT fees and overtime to Coordination. Each fee SHALL display its assigned category as a read-only label; partners SHALL NOT reclassify these six subtypes.
 
 **REQ-HF-3 [v1] — Region-driven OOT defaulting**
 WHERE the selected region carries a destination flag, THE SYSTEM SHALL default the OOT prompt to enabled and SHALL leave its amounts unfilled.
 
-1. Selecting Palawan, Boracay, Siargao, or Bohol enables the OOT prompt by default.
+1. Selecting Palawan, Boracay, Siargao, or Bohol enables the OOT prompt by default based on `is_destination = true`, regardless of cost tier; Bohol remains Provincial at 0.85 (REQ-BS-4).
 2. Selecting NCR leaves the OOT prompt available but not defaulted to enabled.
 3. Defaulting affects only the prompt state; it never writes an amount.
 4. The partner can dismiss a defaulted-enabled OOT prompt, and the dismissal is recorded per REQ-HF-1.
@@ -332,10 +334,10 @@ THE SYSTEM SHALL record for every guest both an RSVP status and a priority tier,
 3. A newly added guest defaults to priority tier Tier 2.
 4. A newly added guest's RSVP status is set explicitly and does not default silently to confirmed.
 5. The two fields are independently editable; changing one never changes the other.
-6. The driving guest count is derived from a designated RSVP status, and the designated status is visible wherever per-head totals are shown.
+6. WHEN a plan is created, THE SYSTEM SHALL default the designated driving RSVP status to `invited`; the designated status is visible wherever per-head totals are shown and drives the guest count (ADR-31).
 7. WHEN a partner changes the designated RSVP status, every per-head entry recomputes in the same operation.
 8. THE SYSTEM SHALL report guest counts broken down by priority tier within the driving RSVP status.
-9. Priority tier SHALL NOT be used as a multiplier in any per-head calculation unless a tier-specific per-head rate is explicitly configured under REQ-GM-2.
+9. In v1, THE SYSTEM SHALL use one per-head rate per entry, regardless of priority tier. Tier 1 and Tier 2 SHALL NOT have distinct per-head rates; priority tier drives only the Tier 2-first cut-list in REQ-GM-5 clause 9 (ADR-35).
 10. Crew headcount is stored separately and is excluded from all guest counts and both axes.
 
 **REQ-GM-2 [v1] — Per-head versus flat-rate classification**
@@ -415,10 +417,10 @@ WHEN a plan is created, THE SYSTEM SHALL pin the ruleset version then in force, 
 4. Adopting a newer ruleset preserves manual overrides per REQ-AE-5.
 
 **REQ-AE-4 [v1] — Explainability**
-WHEN a partner inspects any engine-produced figure, THE SYSTEM SHALL display the rule identifier, the input values, and the applied modifier that produced it.
+WHEN a partner inspects any engine-produced figure, THE SYSTEM SHALL display the rule identifier, the input values, and the factors that produced it.
 
 1. Every allocated figure exposes its originating rule identifier.
-2. The explanation states the baseline percentage, the regional modifier, and the resulting amount.
+2. For an allocation, THE SYSTEM SHALL explain the baseline percentage, the per-category skew multiplier (1.0 by default), and the resulting amount. THE SYSTEM SHALL state that the regional cost index affects expected cost and rate suggestions only, not allocation shares (ADR-11).
 3. The explanation is rendered in plain language, not as a raw formula or code expression.
 4. THE SYSTEM SHALL NOT display any allocation figure that cannot be traced to a rule and its inputs.
 
@@ -493,7 +495,7 @@ THE SYSTEM SHALL restrict plan deletion to the creating partner, SHALL permit ei
 4. Transferring ownership requires affirmative confirmation from both partners before it takes effect; this is the only lifecycle action that requires two-party confirmation. *(Amended per Decision 1: two-party confirmation is scoped to ownership transfer only. Partner removal is governed by REQ-SE-6.)*
 5. Defensive partner removal is NOT a two-party action and is governed entirely by REQ-SE-6; this clause exists so that any reference to "REQ-SE-5 clause 5" resolves to a substantive statement rather than a placeholder. *(Per Decision D5: the former reserved placeholder is replaced with real content; the consolidation of the old ownership-transfer clause into clause 4 is recorded in the retired-IDs appendix, §14.)*
 6. WHILE an ownership-transfer confirmation is pending, both partners retain full data access unchanged.
-7. A pending ownership-transfer confirmation expires if not completed by both partners, and expiry leaves the plan unchanged.
+7. IF both partners have not confirmed ownership transfer within 7 days of the confirmation request, THEN THE SYSTEM SHALL expire the pending request and leave ownership and plan access unchanged (ADR-32; closes OQ-05).
 8. Every lifecycle action and confirmation is recorded in the change log per REQ-SE-4.
 9. Data-level access remains fully symmetric per REQ-SE-1; this requirement governs lifecycle actions only.
 
@@ -506,7 +508,7 @@ THE SYSTEM SHALL permit either paired partner to unilaterally revoke the other p
 4. The removal is recorded in the change log, attributed to the acting partner per REQ-SE-4, with a timestamp.
 5. A removed partner RETAINS the local copy of data already synced to their device. THE SYSTEM SHALL NOT claim to remotely wipe that copy, because a local-first store on an uncontrolled device cannot be remotely erased.
 6. Following removal, the removed partner's server access stops and no future edits from that partner sync in either direction.
-7. THE SYSTEM MAY offer the removed partner a local wipe on their own device, but SHALL NOT represent it as enforceable against an offline or uncooperative device.
+7. WHEN the removed partner's device learns of the removal, THE SYSTEM SHALL offer that partner a local wipe of their own device's plan copy, but SHALL NOT represent this offer as an enforceable remote wipe against an offline or uncooperative device (ADR-34; force-wipe OQ-03 remains open).
 8. Removal does not delete the plan and does not remove the acting partner; the plan continues under the remaining partner's account.
 9. IF both partners each remove the other — including from two offline devices whose removals sync in either order — THEN THE SYSTEM SHALL resolve to a single deterministic winner: the removal bearing the earlier server-assigned timestamp (REQ-SE-2) prevails; the partner named in that winning removal is the one removed, and the acting partner of that winning removal remains. *(Added per Decision D4: no undefined "whoever syncs first" behaviour in the removal path.)*
 10. IF the two competing removals carry the same server-assigned timestamp, THEN THE SYSTEM SHALL break the tie by the stable device identifier of REQ-SE-2 clause 4, so both servers and both devices converge on the same surviving partner.
@@ -550,7 +552,7 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 
 1. Replay begins without the partner opening a specific screen or pressing a control.
 2. A write delivered twice applies exactly once; no total is double-counted.
-3. Replay preserves the original write timestamps for REQ-SE-2 resolution, rather than using reconnect time.
+3. WHEN queued writes replay, THE SYSTEM SHALL preserve each write's original `device_monotonic` order and `device_id`; the server SHALL assign `server_ts` when it accepts each new row, not when the offline edit was made. A duplicate replay SHALL retain the row's originally assigned `server_ts` and SHALL NOT create a second row (REQ-SE-2, ADR-21).
 4. IF a queued write cannot be applied, THEN THE SYSTEM SHALL retain the write with its data intact, surface it to the partner, and SHALL NOT discard it.
 5. Sync progress and completion are visible to the partner.
 
@@ -573,7 +575,7 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 | Area | Requirements | Source stories |
 |---|---|---|
 | Platform | REQ-PLT-1 … 3 | Cross-cutting |
-| Monetary base | REQ-GEN-1 … 2 | Cross-cutting |
+| Monetary base | REQ-GEN-1 … 2A | Cross-cutting |
 | Budget setup | REQ-BS-1 … 6 | BS-1, BS-2 |
 | Expense ledger | REQ-LG-1 … 6 | LG-1, LG-2, LG-3 |
 | Hidden fees | REQ-HF-1 … 3 | HF-1, HF-2 |
@@ -588,13 +590,13 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 
 ## 11. Decisions resolved
 
-All previously open items are now closed.
+The decisions in this section are resolved. Remaining open questions and formerly open defaults are identified in §13 and the decision log.
 
 | # | Decision | Requirements |
 |---|---|---|
 | 1 | Payment states are `paid` / `pending` / `overdue`, derived not editable, with deposits modelled separately and partial payment as an indicator on `pending`. | REQ-LG-4, REQ-LG-5 |
 | 2 | Sync conflicts resolve by field-level last-write-wins ordered by a **server-assigned timestamp** applied at sync time (device wall-clocks never authoritative), with a device monotonic counter + stable device id as tiebreaker, and an immutable change log preserving superseded writes. *(D1)* | REQ-SE-2, REQ-SE-4 |
-| 3 | Region is a first-class setup input on a versioned taxonomy of three cost tiers: Metro 1.00, Provincial 0.85, Destination 1.20. | REQ-BS-4 |
+| 3 | Region is a first-class setup input on three cost tiers: Metro 1.00, Provincial 0.85, Destination 1.20. Destination flags control OOT independently; Bohol is Provincial at 0.85 and destination-flagged (ADR-29). | REQ-BS-4, REQ-HF-3 |
 | 4 | Baseline allocations are Catering & Venue 40%, Photo & Video 15%, Attire & Styling 10%, Coordination 10%, Entourage & Miscellaneous 5%, Buffer 20%. | REQ-AE-1 |
 | 5 | The regional cost index drives cost expectation, budget adequacy, and rate suggestions — not allocation shares. See section 12. | REQ-AE-2 |
 | 6 | Plan deletion is creator-only. Two-party confirmation applies to ownership transfer only. Either partner may defensively remove the other without consent (mutual, one-sided); the removed partner keeps their existing local copy, which is not remotely wiped. Simultaneous mutual removal resolves to a deterministic winner by server timestamp then stable id. Data access stays symmetric. *(D3, D4)* | REQ-SE-5, REQ-SE-6 |
@@ -603,7 +605,7 @@ All previously open items are now closed.
 | 9 | Partner invites expire 7 days after issuance. | REQ-SE-1 |
 | 10 | Rounding remainder is assigned to the Buffer category. | REQ-AE-1, REQ-AE-6 |
 | 11 | One active plan per account. | REQ-PLT-3 |
-| 12 | Bento tiles may use a constrained monetary form (centavos dropped below ₱1M, `₱1.25M` shorthand above, truncated toward zero); full two-decimal form is mandatory everywhere else and in every screen-reader label. | REQ-GEN-2, REQ-GEN-2A |
+| 12 | Bento tiles may use a constrained monetary form (centavos dropped below ₱1M, exactly two decimal places in millions shorthand at/above ₱1M, truncated toward zero; ADR-30 refines ADR-14); full two-decimal form is mandatory everywhere else and in every screen-reader label. | REQ-GEN-2, REQ-GEN-2A |
 | 13 | Ruleset config is a JSON asset bundled in the app binary for v1, validated at app load. No web authoring dashboard. | REQ-AE-1 |
 | 14 | A pledge reduces the couple's out-of-pocket total ONLY on fulfillment (`received`). Promised-but-unfulfilled pledges (`tentative`, `confirmed`) show as a separate "expected" figure and never reduce net. Both figures shown distinctly. *(D2)* | REQ-PL-2, REQ-PL-3, REQ-PL-4 |
 | 15 | Retired or merged requirement IDs are recorded in the retired-IDs appendix (§14), never left as hollow live "reserved" clauses. *(D5)* | §14 |
@@ -639,18 +641,18 @@ The earlier open item asked which of `confirmed` / `invited` / `tentative` shoul
 Collapsing them into one field would lose whichever axis it replaced. REQ-GM-1 therefore models both:
 
 - **RSVP status** drives the guest count used for per-head costs, because attendance is what generates cost.
-- **Priority tier** defaults to Tier 2 as specified, and drives the cut-list logic in REQ-GM-5 clause 9: when previewing a headcount reduction, the system reports how many Tier 2 guests absorb the cut before any Tier 1 guest is touched.
+- **Priority tier** defaults to Tier 2 as specified, and drives only the cut-list logic in REQ-GM-5 clause 9: when previewing a headcount reduction, the system reports how many Tier 2 guests absorb the cut before any Tier 1 guest is touched. It does not change per-head rates in v1 (ADR-35).
 
 This preserves your intent — sponsors and close family are explicitly categorised and protected — without breaking per-head arithmetic.
 
-## 13. Remaining open items
+## 13. Open items and resolved defaults
 
-Platform, database engine, monetary display, and ruleset management are now all resolved (section 11, decisions 7, 12, 13). What remains is smaller, and none of it blocks design or implementation start.
+Platform, database engine, monetary display, and ruleset management are resolved (§11, decisions 7, 12, 13). Item 1 remains open (OQ-04); items 2–4 below record resolved defaults without reopening them. OQ-03 and other decision-log questions retain their own status.
 
 1. **Reference cost benchmarks for budget adequacy.** REQ-AE-2 clause 2 needs a reference cost per guest per region tier to compute expected total cost. The baseline *percentages* are settled; this is the separate absolute figure — roughly what a Metro-tier wedding costs per head. Without it the adequacy indicator cannot be built, though every other allocation requirement can. This is the one genuinely blocking item for a single feature.
-2. **Designated driving RSVP status default.** REQ-GM-1 clause 6 makes it designated but does not fix the default. `invited` is the safer planning default, since budgeting for fewer guests than show up is the expensive failure.
-3. **Tier-specific per-head rates.** REQ-GM-1 clause 9 permits them but no requirement sets any. Confirm whether Tier 1 guests should ever carry a different per-head rate, or whether tier is purely a cut-list device.
-4. **Ownership-transfer confirmation expiry.** REQ-SE-5 clause 7 requires expiry but does not fix the duration. Now scoped to ownership transfer only (Decision 1); defensive removal under REQ-SE-6 is immediate and has no pending-confirmation window. The 7-day invite window remains an obvious candidate for consistency.
+2. **Driving RSVP default — resolved (ADR-31).** `invited` is the designated status on a new plan (REQ-GM-1 clause 6).
+3. **Tier-specific per-head rates — resolved for v1 (ADR-35).** Not in v1: one rate per entry regardless of tier; priority tier drives only the Tier 2-first cut-list (REQ-GM-1 clause 9, REQ-GM-5 clause 9).
+4. **Ownership-transfer confirmation expiry — resolved (ADR-32; OQ-05 closed).** Pending requests expire after 7 days; defensive removal is immediate and has no pending-confirmation window (REQ-SE-5 clause 7, REQ-SE-6).
 
 ---
 

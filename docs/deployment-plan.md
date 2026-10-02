@@ -13,19 +13,13 @@
 
 Both preconditions are met, so this is a single-option plan for Supabase and the store metadata uses the real name. **No `NAME PENDING` marker is needed.**
 
-### 0.1 Two gaps that affect this document
+### 0.1 Constraints that affect this document
 
 Neither triggers the stop condition, but both change what this plan can promise.
 
 **(a) There is no data residency ADR.** §2 was requested "including region and its relation to the data residency ADR." I searched the doc set: no residency decision exists. I have not invented one. §2.2 states what this plan *assumes*, why it matters legally, and logs it as **OQ-07** for you to decide. It is not a blocker for staging, but it must be settled before the privacy notice is published, because SEC-30 requires disclosing data recipients and locations.
 
-**(b) Platform conflict — with a material consequence this time.** §3 asks for "Expo EAS Build or Fastlane" and "Expo-managed or bare RN." Those are React Native concepts. **ADR-12 locks the platform as Flutter**, and GIV-02 records React Native as SUPERSEDED.
-
-This is not a naming quibble. It removes a capability your §8 reasoning depends on:
-
-> **Flutter has no supported over-the-air code push.** Dart is AOT-compiled for release builds; there is no Flutter equivalent of EAS Update or CodePush in the first-party toolchain. Under React Native, a JS-only hotfix can reach users in minutes. Under Flutter, **every code fix requires a store release.**
-
-Your §8 says "a native iOS fix can take days, which is why the OTA policy in section 3 matters." Under Flutter that mitigation largely does not exist, so §3.5 replaces the OTA policy with the levers that *do* exist, and §8 is written against the honest worst case rather than assuming a hotfix channel.
+**(b) Flutter store-release constraint.** ADR-12 selects Flutter for iOS and Android. The first-party Flutter release pipeline does not provide code OTA; Dart release builds are AOT-compiled. **Client code fixes require a store release.** §3.5 describes the available backend and configuration levers, and §8 uses store-review latency rather than promising an instant client hotfix.
 
 **Compounding this:** ADR-15 bundles the allocation ruleset as a **JSON asset inside the app binary**. Combined with no OTA, a wrong baseline percentage or a bad regional modifier cannot be corrected without a full store release on both platforms. Given the reference-cost values are still unpopulated (OQ-04), that is a live operational risk. Mitigation options are in §3.6; changing it requires amending ADR-15, which I am not doing unilaterally.
 
@@ -186,13 +180,13 @@ Supabase PITR can restore production to a prior timestamp. Two consequences to u
 
 ## 3. Mobile build tooling
 
-### 3.1 Project type — the question does not apply as asked
+### 3.1 Flutter project and native dependencies
 
-The request asks whether the app is **Expo-managed or bare React Native**. Neither: **ADR-12 locks Flutter.** For completeness, the RN counterfactual is worth one line because it points the same way: this app needs **SQLCipher-backed SQLite** (SEC-12, via `drift` + `sqlcipher_flutter_libs`), which requires native linking. Under React Native that would have forced a **bare** project, ruling out Expo-managed anyway. The native-crypto requirement drives the answer on either platform.
+**ADR-12 locks Flutter.** The iOS and Android platform projects build native SQLCipher-backed SQLite dependencies (SEC-12, via `drift` and `sqlcipher_flutter_libs`). Build and signing jobs must compile and link those native libraries on their respective platform toolchains.
 
 ### 3.2 Build tooling decision: **Fastlane** (+ GitHub Actions)
 
-**Expo EAS Build is not an option** — EAS builds React Native / Expo projects; it does not build Flutter apps. So the stated choice is resolved by the platform, not by preference. Justified against the three criteria anyway:
+Fastlane is the chosen Flutter iOS and Android release orchestrator, with GitHub Actions for CI. The criteria are:
 
 | Criterion | Assessment |
 |---|---|
@@ -222,7 +216,7 @@ Both: credentials are rotated on suspected exposure, and their storage locations
 
 ### 3.5 OTA update policy — there is no code OTA
 
-**Policy: no over-the-air code updates in v1. Every code change ships through the stores.**
+**Policy: no over-the-air client code updates in v1. Every client code change ships through the stores.**
 
 This follows from Flutter (§0.1b), not from choice. Consequences and the levers that remain:
 
@@ -243,7 +237,7 @@ This follows from Flutter (§0.1b), not from choice. Consequences and the levers
 
 Rationale: each of these can put a client into a state where it corrupts or loses data that the server cannot repair, and OTA patches skip store review — so they also skip the only external check.
 
-**Avoiding OTA/backend desync.** With no code OTA, the classic desync (patched JS bundle expecting a backend that has not shipped) cannot occur. The remaining desync is **old client vs new backend**, addressed by three layers already specified: the one-release backward-compatibility rule (§2.4), the old-client compatibility probe run after every production migration (§2.4), and the forced-update floor (§4.4). If a third-party Flutter code-push tool is ever adopted, the four prohibitions above become the hard boundary, and patched builds must still pass the tenant-isolation suite (TC-SEC-01) before release.
+**Avoiding client/backend desync.** The relevant risk is **old client vs new backend**, addressed by the one-release backward-compatibility rule (§2.4), the old-client compatibility probe after each production migration (§2.4), and the forced-update floor (§4.4). If a third-party Flutter code-push tool is ever adopted, the four prohibitions above become the hard boundary, and patched builds must still pass the tenant-isolation suite (TC-SEC-01) before release.
 
 ### 3.6 Kill switch and the bundled-ruleset problem
 
@@ -561,7 +555,7 @@ Honest numbers, and the reason §3.5 matters:
 
 | Cost | What to watch | Alarm |
 |---|---|---|
-| Supabase | DB size, egress, monthly active users, PITR retention | Email at 70% of any plan quota; the free tier's idle-project pause is a demo hazard (security-plan §3) |
+| Supabase | DB size, egress, monthly active users, PITR retention | Email at 70% of any plan quota; the free tier's idle-project pause is a demo hazard (design.md §3) |
 | CI | GitHub Actions minutes, **macOS multiplier ≈ 10×** | Alarm at 70% of the monthly allowance; iOS builds are the dominant cost and are already restricted to RC + nightly (§3.2) |
 | Sentry | Event quota | Alarm at 70%; a crash loop can exhaust a month's quota in hours, so a spike is itself a P1 signal |
 | Apple / Google | Apple Developer USD 99/yr; Google Play USD 25 one-off | Calendar reminder 30 days before Apple renewal — **an expired membership removes the app from sale** |

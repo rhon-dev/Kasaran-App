@@ -1,6 +1,6 @@
 # Kasaran — MVP Definition & User Stories
 
-*Derived from [project-brief.md](./project-brief.md). Every story is tagged **[v1]** or **[AI-phase]**. The tag is binding: an AI-phase story does not enter a v1 sprint without an explicit written scope decision.*
+*Derived from [project-brief.md](./project-brief.md). Stories are tagged **[v1]**, **[AI-phase]**, or **[post-launch payments]**. The tag is binding: deferred stories do not enter a v1 sprint without an explicit written scope decision (ADR-28 separates payments from AI).*
 
 ---
 
@@ -9,8 +9,8 @@
 The MVP is "done" when the following scenario runs start to finish, on real devices, without a workaround at any step. This is the acceptance test for the release, not an illustration.
 
 1. **Partner A creates an account and a wedding plan**, setting the wedding date and confirming PHP as the currency. The plan is the single container for all budget data.
-2. **A completes budget setup**: total budget ₱350,000, guest count 150, venue type *garden*, ceremony type *church*, out-of-town *yes*. Setup completes in under 10 minutes.
-3. **The allocation engine produces a category-level budget** from those five inputs, using a pinned ruleset version. Every allocated figure is inspectable — A can tap any category and see which rule and inputs produced it.
+2. **A completes budget setup**: total budget ₱350,000, wedding date, guest cap 150, and a selected region (REQ-BS-1). A separately enters guests for cost calculations; the cap is only a warning ceiling (REQ-BS-5). Setup completes in under 10 minutes.
+3. **The allocation engine produces a category-level budget** from the setup and pinned ruleset version. Every allocated figure is inspectable — A can tap any category and see which rule and inputs produced it.
 4. **A overrides one category allocation manually** (raises catering, lowers flowers). The override is stored, visibly marked as an override, and the remaining categories rebalance without discarding it.
 5. **A invites Partner B to the plan.** B accepts, signs in on a separate device, and sees the identical plan with identical figures — including A's override.
 6. **The app prompts for all six hidden-fee categories** as part of setup, not buried in a menu: crew meals, OOT fees, church aircon, corkage, overtime, venue power.
@@ -27,7 +27,7 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 17. **A commits the what-if.** The dashboard updates gross, net, per-category variance, and the over/under-budget state consistently. B's device reflects the same figures.
 18. **B goes fully offline** (airplane mode) and keeps working: edits a supplier's actual amount, adds a new ledger entry, and marks a payment. All writes succeed locally.
 19. **A, still online, edits a different field on the same ledger entry B is editing.** Both edits are retained.
-20. **B reconnects.** Sync converges both devices to identical figures with no lost writes, the change history attributes each edit to the partner who made it, and any true field-level conflict is surfaced rather than silently resolved.
+20. **B reconnects.** Sync converges both devices to identical figures; the change history preserves and attributes each edit. For a same-field conflict, field-level LWW selects the later server-assigned `server_ts` (ADR-08/21), and the superseded write remains visible in history.
 
 **Additional gate — offline is not a degraded mode.** Steps 2 through 17 must also be completable start to finish with connectivity disabled for the entire duration, with all work queued and syncing correctly on reconnect. If any step in that range requires a network round-trip, the MVP is not done.
 
@@ -55,10 +55,10 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 **BS-1 [v1] — Guided initial setup**
 *As a partner, I want to enter my total budget and a few basic wedding facts, so that I get a usable category budget without building it from scratch.*
 
-1. Setup SHALL collect exactly five inputs: total budget (PHP), wedding date, guest count, venue type, ceremony type, plus an out-of-town flag.
-2. Venue type SHALL offer *hotel*, *garden*, and *other*; ceremony type SHALL offer *church*, *civil*, and *other*.
+1. Setup SHALL require exactly four inputs: total budget (PHP), wedding date, guest cap, and region (REQ-BS-1).
+2. Region SHALL be selected from the versioned taxonomy (REQ-BS-4); the guest cap SHALL be a ceiling, not the per-head cost driver (REQ-BS-5).
 3. The system SHALL reject a total budget that is non-numeric, negative, or zero, with an inline message naming the problem.
-4. The system SHALL accept any total budget from ₱1 upward, and SHALL NOT block budgets below ₱30,000 or above ₱500,000.
+4. The system SHALL accept any positive integer-centavo total budget, and SHALL NOT block budgets below ₱30,000 or above ₱500,000 (REQ-BS-1).
 5. All monetary values SHALL display as PHP with a peso sign and thousands separators.
 6. On completion, the system SHALL produce a category-level allocation and route the partner to the hidden-fee prompts.
 7. A partner SHALL be able to return to setup at any later time and change any input, with downstream figures recomputing.
@@ -77,10 +77,10 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 *As a partner, I want my budget split across supplier categories automatically, so that I start from a realistic plan instead of a blank sheet.*
 
 1. Given identical setup inputs and an identical ruleset version, the engine SHALL always produce identical allocations.
-2. The engine SHALL derive allocations only from budget band, guest count, venue type, ceremony type, and the OOT flag.
+2. The engine SHALL derive category allocations from the total budget, versioned baseline shares, and any per-category region skew; the regional cost index SHALL affect cost expectations, not allocation shares (REQ-AE-1, REQ-AE-2, ADR-11).
 3. The engine SHALL NOT use inference, prediction, learned models, or any generative component.
-4. The sum of category allocations SHALL equal the total budget, with any rounding remainder assigned to a single named category rather than silently dropped.
-5. Allocation rules SHALL be stored as versioned data, editable without a code change.
+4. The sum of category allocations SHALL equal the total budget, with any rounding remainder assigned to Buffer (REQ-AE-1 clause 6).
+5. Allocation rules SHALL be stored as a versioned JSON asset bundled in the app binary and validated at load; changing rules requires an app release (ADR-15; OQ-08 remains open).
 6. Each plan SHALL pin the ruleset version in force when it was created, so published rule updates never silently change an existing couple's numbers.
 
 **AE-2 [v1] — Explainable allocation**
@@ -113,7 +113,7 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 **LG-2 [v1] — Payment state tracking**
 *As a partner, I want to track how far along each supplier payment is, so that I know what we still owe and when.*
 
-1. Each entry SHALL carry exactly one payment state from a fixed set (pending confirmation with the user — see open items).
+1. Each entry SHALL have exactly one derived, read-only payment status (`paid`, `pending`, or `overdue`); deposits and balance determine it (ADR-07, REQ-LG-4/5).
 2. The system SHALL compute total committed, total paid, and total outstanding across the plan.
 3. The system SHALL surface entries whose due date has passed while still carrying an unsettled state.
 4. The system SHALL record that a payment occurred; it SHALL NOT initiate, process, or transfer funds.
@@ -164,7 +164,7 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 1. The dashboard SHALL display gross event total and net couple out-of-pocket as two distinct, simultaneously visible figures.
 2. Net out-of-pocket SHALL equal gross total minus the sum of *received* (fulfilled) pledges only (Decision D2). *(Was "confirmed and received"; amended so only fulfillment reduces net.)*
 3. *Tentative* and *confirmed* (promised, not yet fulfilled) pledges SHALL NOT reduce net out-of-pocket, and SHALL be shown separately as an expected-pledge figure (Decision D2).
-4. Changing a pledge status SHALL update net immediately.
+4. Changing a pledge status SHALL recompute the displayed figures immediately; net changes only when a pledge enters or leaves `received` (REQ-PL-2, ADR-22).
 5. The system SHALL let a partner see which pledges are reducing net, and by how much.
 
 **PL-3 [v1] — Outstanding pledge exposure**
@@ -179,8 +179,8 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 **GM-1 [v1] — Guest count with tiers**
 *As a partner, I want to track guests by how certain they are, so that our headcount reflects reality.*
 
-1. The system SHALL maintain guest counts in three tiers: *confirmed*, *invited*, and *tentative*.
-2. The system SHALL expose which tier drives cost calculations, and allow the partner to choose.
+1. The system SHALL track RSVP status (*confirmed*, *invited*, *tentative*) separately from priority tier (Tier 1/Tier 2); new guests default to Tier 2 (REQ-GM-1).
+2. The system SHALL expose and allow selection of the driving RSVP status; its default SHALL be *invited* (ADR-31). Priority tier does not determine per-head count.
 3. Crew headcount SHALL be maintained separately and SHALL NOT be included in guest counts.
 
 **GM-2 [v1] — Per-head cost propagation**
@@ -216,7 +216,7 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 1. Concurrent edits to *different* fields or entries SHALL both be retained.
 2. Sync SHALL converge both devices to an identical state given the same set of writes, regardless of arrival order.
 3. Conflict resolution SHALL be deterministic and rule-based, with no inference or AI merge.
-4. A true same-field conflict SHALL be surfaced to the partners rather than silently discarded (exact policy pending — see open items).
+4. A true same-field conflict SHALL resolve by field-level LWW using server-assigned `server_ts`, with the losing write preserved in immutable change history (ADR-08/21, REQ-SE-2/4).
 5. Sync SHALL NOT drop an accepted local write under any resolution outcome.
 
 **SE-3 [v1] — Change attribution**
@@ -254,7 +254,7 @@ Recorded here only so the boundary stays explicit. None of these enter a v1 spri
 **AI-1 [AI-phase] — OCR contract parsing.** *As a partner, I want to photograph a supplier contract and have its line items extracted, so that I stop typing them in.*
 **AI-2 [AI-phase] — On-device AI categorization.** *As a partner, I want entries categorised automatically, so that I do not pick a category every time.*
 **AI-3 [AI-phase] — Cloud AI reasoning.** *As a partner, I want budget advice, risk warnings, and forecasts, so that I get guidance beyond arithmetic.*
-**AI-4 [AI-phase] — InstaPay / QR Ph payments.** *As a partner, I want to pay suppliers in-app, so that recording and paying are one action.*
+**AI-4 [post-launch payments] — InstaPay / QR Ph payments.** *As a partner, I want to pay suppliers in-app, so that recording and paying are one action.* The historical AI-4 identifier is retained, but ADR-28 assigns this to its own payments phase (phase 25), not the AI tail.
 **AI-5 [AI-phase] — Chat assistant.** *As a partner, I want to ask questions in plain language, so that I do not navigate menus.*
 
 **Excluded entirely, not deferred:** supplier marketplace, vendor directory, reviews, and booking. Per the project brief this is a different business, not a later release.
@@ -265,13 +265,13 @@ Recorded here only so the boundary stays explicit. None of these enter a v1 spri
 
 A story may enter development only when all of the following hold:
 
-1. The story is tagged **[v1]**, and passes all four v1/AI-phase line tests in the project brief (deterministic, explainable, does not touch a payment rail, does not recommend a supplier).
+1. The story is tagged **[v1]**, and passes all four v1 scope tests in the project brief (deterministic, explainable, does not touch a payment rail, does not recommend a supplier).
 2. Acceptance criteria are written, numbered, and individually testable — no criterion requiring subjective judgement to verify.
 3. Every monetary calculation in the story has its formula stated explicitly, including rounding behaviour.
 4. Offline behaviour is specified: what works offline, what queues, and what the partner sees.
 5. Sync and conflict behaviour is specified for any story that writes shared data.
 6. Symmetric-access implications are confirmed — no story introduces an unintended A/B permission asymmetry.
-7. Any dependency on unresolved open items (allocation source data, payment states, conflict policy, platform) is either resolved or explicitly stubbed with a decision to revisit.
+7. Any dependency on unresolved open items (notably regional reference-cost benchmarks, OQ-04) is either resolved or explicitly stubbed with a decision to revisit; payment states, conflict policy, and platform are already decided.
 8. Test data is identified, including at least one case below ₱30,000 and one above ₱500,000.
 
 ## 5. Definition of Done
@@ -294,13 +294,13 @@ A story is done only when all of the following hold:
 
 ## Open items to confirm
 
-Carried forward from the project brief, plus new ones this document surfaced. The starred items block specific stories.
+Carried forward from the project brief, with resolution pointers. Only item 3 remains open.
 
-1. **★ Payment states (blocks LG-2).** I left the state set deliberately unspecified. My earlier proposal was quoted / committed / partially paid / settled, but local practice is closer to reservation fee → downpayment → balance. Which model do you want?
-2. **★ Offline conflict policy (blocks SE-2 AC-4).** Field-level last-write-wins, per-entry ownership, or surface-to-partner for manual resolution? This drives the data model, so it needs deciding before design.
-3. **★ Allocation rule source data (blocks AE-1).** Still the biggest gap. The engine needs real PH category benchmarks for the ₱30K–₱500K band. I have not invented percentages and will not.
-4. **Plan-lifecycle permissions — RESOLVED (Decisions 1 and 2).** Plan deletion is creator-only; ownership transfer needs two-party confirmation; defensive partner removal is mutual and one-sided (either partner, no consent, removed partner keeps their local copy). See REQ-SE-5, REQ-SE-6.
-5. **Driving guest tier (affects GM-1 AC-2).** I made this partner-selectable. Simpler alternative is to always drive costs from *confirmed*. Preference?
-6. **Tentative pledges and net (affects PL-2 AC-3).** I ruled that tentative pledges do not reduce net, on conservatism grounds. Confirm you agree — it is a judgement call, not a given.
-7. **Platform.** Still undecided, and OF-1/OF-2 cannot be estimated without it. iOS, Android, web, or cross-platform, and is web in v1 at all?
-8. **Single active plan per account?** Assumed yes for v1.
+1. **RESOLVED — payment states.** Deposits and balance follow REQ-LG-4; `paid`/`pending`/`overdue` are derived, never manually selected (ADR-07, REQ-LG-5).
+2. **RESOLVED — offline conflict policy.** Field-level LWW and immutable change history (ADR-08), with server-assigned timestamp ordering (ADR-21; REQ-SE-2/4).
+3. **OPEN — reference-cost benchmarks (OQ-04).** Real PH regional reference-cost data for budget adequacy remains unpopulated. Do not invent it; this blocks verified budget adequacy, not the decided allocation-share baseline (ADR-10).
+4. **RESOLVED — plan-lifecycle permissions.** Creator-only plan deletion, two-party ownership transfer, and mutual one-sided defensive removal (REQ-SE-5/6, ADR-23/24).
+5. **RESOLVED — driving guest RSVP status.** The default is *invited*; the partner can change the driving status (ADR-31, REQ-GM-1).
+6. **RESOLVED — tentative pledges and net.** Only *received* pledges reduce net; tentative/confirmed remain expected support (ADR-22, REQ-PL-2/3).
+7. **RESOLVED — platform.** Flutter for iOS and Android; no web in v1 (ADR-12).
+8. **RESOLVED — active-plan limit.** One active plan per account (REQ-PLT-3).
