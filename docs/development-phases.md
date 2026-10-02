@@ -1,6 +1,6 @@
 # Kasaran — Development Phases
 
-**INDEX ONLY.** No phase bodies. Awaiting approval of this index before any phase is written out.
+**Index plus phase bodies 01–06 (batch 1).** The index's one-sitting versus phase-cap conflict is still awaiting a decision; later phase bodies are pending. Written bodies do not imply their exit criteria have passed.
 
 *Inputs: `requirements.md` (54 REQ IDs), `testing-plan.md` (TC IDs), `security-plan.md` (SEC IDs), `agents.md`, `decision-log.md`.*
 
@@ -207,11 +207,11 @@ Phases 25 (payments) and 26 (AI on-device) both depend on 24 and **not on each o
 
 ## Stopping here
 
-Index only, as instructed.
+The index is followed below by phase bodies 01–06; later bodies remain pending.
 
 **Decision 2 — RESOLVED.** REQ-AI-4 is phase 25, its own phase, outside the AI tail, owned by Backend with Security as mandatory reviewer (ADR-28).
 
-**Still needed before I write any phase body:**
+**Still needed before writing later phase bodies:**
 
 1. **The one-sitting vs phase-cap conflict** in (c) — options 1, 2, or 3. Decision 2 has pushed the index to 27, already over the cap, so this now needs resolving either way.
 2. **OQ-10 (new):** payment-rail security has no SEC block. `security-plan.md` §9 scoped it out of v1 on the assumption payments would arrive inside the AI phase. Phase 25 cannot start until that block exists.
@@ -304,7 +304,7 @@ Also carried forward: **8 OQ items remain OPEN** in `decision-log.md`. Per the `
 
 1. Create `domain/money/centavos.dart` — arithmetic and parsing helpers as extensions on `int`. **No wrapper type**, per `design.md` §1.5 (Dart `int` is natively 64-bit and satisfies REQ-GEN-1 directly).
 2. Create `ui/presenters/money_presenter.dart` implementing the **full form** per REQ-GEN-2: peso sign, comma thousands separators, exactly two decimals, half-up rounding away from zero, leading minus inside the format.
-3. Extend the presenter with the **constrained bento form** per REQ-GEN-2A: drop centavos below ₱1,000,000; one-decimal millions shorthand at or above; truncate toward zero so a tile never overstates.
+3. Extend the presenter with the **constrained bento form** per REQ-GEN-2A: drop centavos below ₱1,000,000; exactly two-decimal millions shorthand at or above; truncate toward zero so a tile never overstates.
 4. Add a presenter method returning the **accessibility-label form**, which is always the full form and never the constrained one (REQ-GEN-2A cl. 6).
 5. Implement the custom lint rule banning `double` and `num` in monetary paths across `domain/` and `data/`; register it in `analysis_options.yaml`.
 6. Write unit tests for the full form: `₱350,000.00`, `₱0.00`, `−₱1,200.00`, and half-centavo rounding `₱0.005 → ₱0.01`.

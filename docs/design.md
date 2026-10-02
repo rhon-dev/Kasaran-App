@@ -59,7 +59,7 @@ platform/
 (invite)
   accept/[token]              deep link, 7-day expiry per REQ-SE-1
 (onboarding)                  setup wizard, REQ-BS-1
-  budget → date → guest-cap → region → hidden-fees
+  budget-and-date → guest-cap-and-region → hidden-fees   (SCR-03 → SCR-04 → SCR-05)
   hidden-fees blocks completion until all six touched (REQ-HF-1 clause 6)
 (app)                         tabs
   dashboard                   gross, net, exposure, buffer, adequacy, outstanding fees
@@ -107,20 +107,20 @@ write path:   user edit → one change_log row per changed field
 read path:    projection tables (fast queries)
 
 sync:         push local log rows, pull remote log rows,
-              apply in clock order, last write per field wins
+              apply in server-assigned order, last write per field wins
 ```
 
 Consequences that fall out for free:
 
 - **REQ-SE-2 clause 1 and 2** — different fields and different entries never collide, because log rows are keyed by `(entity_type, entity_id, field_name)`.
-- **REQ-SE-2 clause 5** — a losing write is never discarded; it is already in the log, marked superseded.
+- **REQ-SE-2 clause 6** — a losing write is never discarded; it is already in the log and reads as superseded.
 - **REQ-SE-4 clause 3** — superseded writes are visible with their values intact.
 - **REQ-SE-3 clause 1** — convergence is order-independent, because applying a set of log rows sorted by clock yields the same projection regardless of arrival order.
 - **REQ-OF-5 clause 2** — idempotency is a primary-key conflict on the log row's client-generated ID.
 
 The alternative — sync whole rows and keep the log as a side audit table — cannot satisfy field-level LWW without a second mechanism, and lets the log drift out of agreement with state.
 
-### 2.2 Clocks: hybrid logical clock, not wall time
+### 2.2 Clocks: server-assigned ordering (D1)
 
 REQ-SE-2 (amended per Decision D1) resolves conflicts by a **server-assigned timestamp applied at sync time**, with a device-side monotonic counter as tiebreaker. Device wall clocks are never authoritative for ordering: a phone running ten minutes fast must not win a conflict, and REQ-OF-4 explicitly anticipates devices disagreeing about the date.
 
@@ -134,7 +134,7 @@ Each log row carries an ordering key `(server_ts, device_monotonic, device_id)`,
 
 **Why not a hybrid logical clock seeded from the wall clock (prior design):** an HLC still folds the device wall clock into `physical_ms`, so a badly-set clock still distorts ordering — HLC only bounds the damage. D1 removes device time from the authority chain entirely by deferring the ordering stamp to the server. The device monotonic counter carries no wall-clock meaning; it is a pure sequence.
 
-**Consequence for offline writes.** A write made offline has no `server_ts` until it syncs (REQ-SE-2 clause 5). Locally it is ordered after the device's last-synced state by `device_monotonic`; on sync the server assigns `server_ts` and the authoritative order is settled then. An offline write therefore cannot beat an already-synced write merely because the offline device's clock reads earlier.
+**Consequence for offline writes.** A write made offline has no `server_ts` until it syncs (REQ-SE-2 clause 5). Locally its provisional value is visible immediately, with the device's own unsynced writes sequenced by `device_monotonic`; on sync the server assigns `server_ts` and settles the authoritative order. **The same-field write that syncs last wins, even if it was made offline days earlier.** If A's same-field write synced first and B's older offline edit syncs later, B wins because B receives the later server timestamp. The age of the offline edit and either device's wall clock do not determine the winner. Both writes remain in the immutable log; A's becomes superseded.
 
 **Expensive to reverse.** The ordering key lives in a column on every log row and in every comparison. This is a change from the earlier HLC design; the schema (§4.6) reflects `server_ts` + `device_monotonic` rather than `hlc_physical` + `hlc_counter`.
 
@@ -161,7 +161,7 @@ GET  /sync/pull   ?plan_id&since_server_ts&limit
 
 - Pull is cursor-paged on `server_ts` so a long offline period syncs incrementally rather than in one oversized response.
 - Push batches with a cap; partial success is fine because retry is idempotent.
-- **The server assigns `server_ts` on acceptance (D1); the device never sends an authoritative ordering timestamp.** The device sends `device_monotonic` and `device_id`, which the server preserves for tiebreaking. This differs from a preserved-client-timestamp scheme: the ordering authority is the server, per Decision D1, so REQ-OF-5 clause 3's "preserve original ordering" means preserving the device sequence, with `server_ts` settled at first acceptance and never rewritten thereafter.
+- **The server assigns `server_ts` on acceptance (D1); the device never sends an authoritative ordering timestamp.** The device sends `device_monotonic` and `device_id`, which the server preserves for tiebreaking. This differs from a preserved-client-timestamp scheme: the ordering authority is the server, per Decision D1, so REQ-OF-5 clause 3's "preserve original ordering" means preserving the device sequence, with `server_ts` settled at first acceptance and never rewritten thereafter. A later-accepted offline edit wins a same-field conflict over an earlier-accepted online edit.
 - `sync_state` holds `last_pushed_server_ts`, `last_pulled_server_ts`, and the device's `device_monotonic` per device per plan.
 
 ### 2.5 First login on a second device
@@ -187,7 +187,7 @@ Bootstrapping a long-lived plan means replaying every field change ever made. Fo
 
 ## 3. Backend and data store
 
-### Option A — Supabase *(recommended)*
+### Decided backend — Supabase (ADR-16)
 
 Managed Postgres with built-in auth, row-level security, and generated REST.
 
@@ -202,7 +202,7 @@ Managed Postgres with built-in auth, row-level security, and generated REST.
 - Auth is the lock-in. The database migrates cleanly; user identities and password hashes do not.
 - Free tier pauses idle projects. Fine for a student project, surprising in a demo.
 
-### Option B — Managed Postgres plus a thin API
+### Considered alternative — Managed Postgres plus a thin API (not selected)
 
 Neon, Railway, or Fly Postgres behind a small Hono or Fastify service.
 
@@ -210,9 +210,9 @@ Neon, Railway, or Fly Postgres behind a small Hono or Fastify service.
 
 **Costs:** auth is now yours to build and keep secure — sessions, refresh rotation, reset flows, rate limiting. That is a large, security-sensitive surface for a scope that is otherwise domain logic. Plus a service to deploy, monitor, and keep patched.
 
-### Recommendation
+### Decision
 
-**Supabase.** The backend here is genuinely thin — two idempotent endpoints over an append-only table — and almost all remaining server work is authentication, which is exactly what the BaaS supplies. Option B buys control this protocol does not need.
+**Supabase (Postgres + Auth + forced RLS on every plan table), decided by ADR-16.** The backend here is genuinely thin — two idempotent sync operations over an append-only table — and almost all remaining server work is authentication, which is exactly what the BaaS supplies. Option B buys control this protocol does not need. Plan isolation is enforced server-side with forced RLS, not merely with client membership checks.
 
 Note the tradeoff honestly: it trades a build-it-yourself auth risk for a vendor-migration risk. Given the alternative is hand-rolling auth, the vendor risk is the smaller one.
 
@@ -244,14 +244,14 @@ plans (
   wedding_date         date not null,            -- REQ-BS-1
   total_budget_cents   bigint not null check (total_budget_cents > 0),
   guest_cap            integer not null check (guest_cap >= 0),
-  region_code          text not null references regions,
+  region_code          text not null,                    -- with ruleset_version: composite FK to regions
   ruleset_version      text not null,            -- pinned, REQ-AE-3
   driving_rsvp_status  text not null,            -- REQ-GM-1 clause 6
-  remainder_category   text not null default 'buffer',
   is_active            boolean not null default true,   -- REQ-PLT-3
   setup_completed_at   timestamptz,
   created_at           timestamptz not null,
-  deleted_at           timestamptz               -- soft delete, creator only
+  deleted_at           timestamptz,              -- soft delete, creator only
+  foreign key (ruleset_version, region_code) references regions (ruleset_version, code)
 )
 
 plan_members (
@@ -294,7 +294,7 @@ lifecycle_confirmations (          -- REQ-SE-5 (ownership transfer only)
 
 ### 4.2 Ruleset configuration
 
-Versioned and immutable once published, so REQ-AE-3 clause 2 holds.
+**Source of truth in v1: a versioned JSON asset bundled in the app binary (ADR-15, REQ-AE-1 clause 3), validated at app load.** The SQL-shaped relations below describe the data shape and keys for implementation and version pinning; they are **not** a remote-authoring or publish-time database workflow, nor a substitute source of ruleset values. Published/bundled versions remain immutable so REQ-AE-3 clause 2 holds. Changing the asset requires an app release; remote ruleset delivery is still OQ-08, not a v1 feature. Buffer is the fixed destination for rounding remainder (REQ-AE-1 clause 6), not a per-plan setting.
 
 ```sql
 rulesets (
@@ -315,7 +315,7 @@ ruleset_baselines (                         -- REQ-AE-1
   baseline_bp     integer not null,         -- 4000 = 40%
   primary key (ruleset_version, category_code)
 )
--- REQ-AE-1 clause 4: sum(baseline_bp) = 10000 per version, validated on publish.
+-- REQ-AE-1 clause 4: sum(baseline_bp) = 10000 per version, validated at app load.
 
 cost_tiers (                                -- REQ-BS-4
   ruleset_version text references rulesets,
@@ -330,7 +330,8 @@ regions (
   name            text not null,
   tier_code       text not null,
   is_destination  boolean not null,          -- REQ-HF-3 defaulting
-  primary key (ruleset_version, code)
+  primary key (ruleset_version, code),
+  foreign key (ruleset_version, tier_code) references cost_tiers (ruleset_version, tier_code)
 )
 
 region_category_skew (                       -- REQ-AE-2 clauses 7, 8
@@ -338,7 +339,8 @@ region_category_skew (                       -- REQ-AE-2 clauses 7, 8
   region_code     text,
   category_code   text,
   skew_bp         integer not null default 10000,   -- 1.0, no-op
-  primary key (ruleset_version, region_code, category_code)
+  primary key (ruleset_version, region_code, category_code),
+  foreign key (ruleset_version, region_code) references regions (ruleset_version, code)
 )
 
 reference_costs (                            -- REQ-AE-2 clause 2
@@ -346,11 +348,12 @@ reference_costs (                            -- REQ-AE-2 clause 2
   tier_code          text,
   per_head_cents     bigint not null,
   fixed_base_cents   bigint not null,
-  primary key (ruleset_version, tier_code)
+  primary key (ruleset_version, tier_code),
+  foreign key (ruleset_version, tier_code) references cost_tiers (ruleset_version, tier_code)
 )
 ```
 
-`reference_costs` is the table for the still-missing benchmark noted in requirements section 13 item 1. The schema is ready; the values are not. Budget adequacy stays hidden until it is populated.
+The bundled taxonomy maps Bohol to **Provincial (0.85 / 8500 bp)** with `is_destination = true`; Boracay/Aklan, Palawan, and Siargao are Destination (1.20 / 12000 bp) with the same flag. NCR is Metro (1.00 / 10000 bp) with the flag false. The **flag**, not the tier, defaults the OOT prompt to enabled (REQ-HF-3); neither creates an amount. The cost-tier index affects cost expectations and suggested rates, **never allocation shares** (REQ-AE-2). `reference_costs` is the shape for the still-missing benchmark noted in requirements §13 item 1. Values are not yet supplied; budget adequacy renders unavailable until they are, rather than implying a computed result.
 
 ### 4.3 Allocations
 
@@ -408,6 +411,8 @@ fee_components (
   deleted_at     timestamptz
 )
 ```
+
+Each hidden fee remains a `ledger_entries` line with a category from the six-category allocation taxonomy (REQ-LG-1 clause 1); `entry_type` is a separate subtype, **not** a seventh allocation category. The fixed subtype-to-category mapping is: crew meals → Catering & Venue; OOT fees → Coordination; church aircon → Catering & Venue; corkage → Catering & Venue; overtime → Coordination; venue power → Catering & Venue. The fee editor shows the mapped category read-only (REQ-HF-2 clause 9). Totals and variance accrue to that category while the fee remains its own attributable ledger line (REQ-HF-2 clause 7). No category is inferred from a component amount.
 
 One generic `fee_components` table covers all six hidden-fee shapes from REQ-HF-2 rather than six subtype tables:
 
@@ -518,31 +523,35 @@ sync_state (                     -- local only, never synced
 
 ### 5.1 A pure function
 
-```ts
-interface BudgetAllocator {
-  readonly kind: string;       // persisted to plan_allocations.allocator_kind
-  readonly version: string;
+```dart
+abstract interface class BudgetAllocator {
+  String get kind;             // persisted to plan_allocations.allocator_kind
+  String get version;
 
-  allocate(input: AllocationInput, ruleset: Ruleset): AllocationResult;
+  AllocationResult allocate(AllocationInput input, Ruleset ruleset);
 }
 
-type AllocationInput = {
-  totalBudgetCents: number;
-  regionCode: string;
-  drivingGuestCount: number;
-  guestCap: number;
-  weddingDate: string;
-};
+class AllocationInput {
+  final int totalBudgetCents;
+  final String regionCode;
+  final int drivingGuestCount;
+  const AllocationInput(this.totalBudgetCents, this.regionCode,
+      this.drivingGuestCount);
+}
 
-type AllocationResult = {
-  categories: Array<{
-    categoryCode: string;
-    amountCents: number;
-    explanation: Explanation;     // REQ-AE-4, opaque JSON
-  }>;
-  expectedTotalCostCents: number; // REQ-AE-2 clause 2
-  suggestions: RateSuggestion[];  // REQ-AE-2 clauses 5, 6
-};
+class CategoryAllocation {
+  final String categoryCode;
+  final int amountCents;
+  final Explanation explanation; // REQ-AE-4, serialised as opaque JSON
+  const CategoryAllocation(this.categoryCode, this.amountCents, this.explanation);
+}
+
+class AllocationResult {
+  final List<CategoryAllocation> categories;
+  final int? expectedTotalCostCents; // null while benchmarks are unavailable
+  final List<RateSuggestion> suggestions;
+  const AllocationResult(this.categories, this.expectedTotalCostCents, this.suggestions);
+}
 ```
 
 No I/O, no clock, no randomness, no network. The ruleset is passed in, already loaded. This is what makes REQ-AE-1 clause 1 testable: call it twice, compare, and the determinism criterion is a unit test rather than a manual observation.
@@ -688,10 +697,7 @@ Keep application code free of Supabase-specific calls outside `sync/transport/` 
 
 ## 8. Open items carried into implementation
 
-1. **Reference cost values.** `reference_costs` exists but is unpopulated, so budget adequacy (REQ-AE-2 clause 3) cannot ship. Every other allocation requirement can. This is now the only item blocking a specific feature.
-2. **Designated driving RSVP status default.** Requirements section 13 item 2 is still open. `invited` remains the safer default.
-3. **Ownership-transfer confirmation expiry.** `lifecycle_confirmations.expires_at` needs a duration. Now applies to ownership transfer only (Decisions 1, 2); defensive removal (REQ-SE-6) is immediate and has no expiry. Seven days matches the invite window.
-4. **Local database encryption.** Not required by any requirement, but the local store holds names, a wedding date, and financial detail. With Flutter/SQLite this means SQLCipher (via `drift`'s encryption support) or platform keystore-backed encryption, worth deciding before launch rather than after.
-5. **RLS policy test suite.** If Supabase is chosen, the plan-isolation policy is the entire security boundary between couples. It needs adversarial tests, not review by inspection.
+1. **Reference cost values.** The `reference_costs` shape is defined but benchmarks are not populated in the bundled ruleset, so budget adequacy (REQ-AE-2 clause 3) cannot render yet. Every other allocation requirement can. This is now the only item blocking a specific feature.
+2. **RLS policy test suite.** Supabase is decided (ADR-16); forced RLS plan isolation is the security boundary between couples. It needs adversarial tests, not review by inspection.
 
-*Resolved since first draft: platform (Flutter + SQLite/`drift`, section 0), monetary representation (Dart `int`, section 1.5), and ruleset config management (bundled JSON asset validated at load, per requirements REQ-AE-1).*
+*Resolved since first draft: platform (Flutter + SQLite/`drift`, section 0), monetary representation (Dart `int`, section 1.5), ruleset config management (bundled JSON asset validated at load, ADR-15), backend (Supabase, ADR-16), local database encryption (SQLCipher with key held in Keychain/Keystore, no cloud auto-backup, ADR-17), driving RSVP default (`invited`), and ownership-transfer confirmation expiry (7 days).*

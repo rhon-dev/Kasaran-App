@@ -1,10 +1,10 @@
 # Kasaran — UX Specification
 
-*Inputs: [requirements.md](./requirements.md), [design.md](./design.md), [mvp-user-stories.md](./mvp-user-stories.md). No visual mockups, no palettes, no code.*
+*Inputs: [decision-log.md](./decision-log.md), [requirements.md](./requirements.md), [design.md](./design.md), [mvp-user-stories.md](./mvp-user-stories.md). No visual mockups, no palettes, no code.*
 
-## 0. Input discrepancies and upstream gaps
+## 0. Inputs and upstream gaps
 
-**`docs/decision-log.md` does not exist.** It was listed as an input; the repository contains only `problem-brief.md`, `project-brief.md`, `mvp-user-stories.md`, `requirements.md`, and `design.md`. I have not inferred its contents. Nothing appears lost — decisions are recorded in requirements.md sections 11–13 and design.md sections 7–8 — but if a separate consolidated log is wanted, it needs writing.
+**`docs/decision-log.md` exists and is the decision authority.** Read it alongside requirements.md and design.md: ADR-15 fixes the bundled ruleset, ADR-16 fixes Supabase, ADR-17 fixes local encryption, ADR-21 (D1) fixes server-assigned sync ordering, and ADR-23/24 fix removal semantics. Open questions there remain open; this spec does not silently resolve them.
 
 **Two items that were open when this spec was first written are now resolved.** Recorded here so the spec reads consistently.
 
@@ -61,9 +61,8 @@ Separated into requirements that are *correctly* non-UI and requirements that ar
 | REQ ID | Gap |
 |---|---|
 | REQ-AE-2 (3) | Budget adequacy has a home on SCR-06 but **cannot render in v1**. `reference_costs` is unpopulated (design.md 4.2; requirements.md 13.1). Specified as an explicit unavailable state in section 4.3, not omitted and not shown as healthy. |
-| REQ-AE-1 (4) | Ruleset publish-time validation that baselines sum to 10000 bp. No UI surface — there is no ruleset authoring screen in v1, so this is a build/deploy-time check. Worth confirming that config is edited outside the app in v1. |
-| REQ-LG-1 (8) | The 2,000-character notes limit has no specified counter or truncation behaviour. Assigned to SCR-08 in section 2; flagged because the requirement states the bound without stating the feedback. |
-| REQ-SE-5 (7) | Ownership-transfer confirmation expiry duration is undefined upstream (requirements.md 13.4). SCR-17 cannot display a countdown for an undefined window. Now scoped to ownership transfer only; defensive removal (REQ-SE-6) is immediate and has no pending window. |
+
+Ruleset asset validation (REQ-AE-1 clause 4) is correctly non-UI: baselines sum to 10000 bp at app load; there is no v1 authoring screen (ADR-15).
 
 ---
 
@@ -82,6 +81,7 @@ Field sources cite entities and derived calculations from design.md sections 1.4
 **Fields:** inviter display name → `users` via `invites.inviter_user_id`; wedding date → `plans`; expiry → `invites.expires_at`.
 **Actions:** Accept → write `plan_members`, then full replay pull from `since_server_ts = 0` (design.md 2.5) → SCR-06. Decline → SCR-01.
 **States of note:** expired, revoked, already accepted — each names the reason (REQ-SE-1 clause 5).
+**Expiry copy:** the invite expires exactly 7 days after issuance; the expired state says so and does not offer acceptance (REQ-SE-1 clauses 4, 5).
 **Nav in:** deep link. **Nav out:** SCR-06, SCR-01.
 
 ### SCR-03 Setup: Budget & Date
@@ -118,13 +118,13 @@ Fully specified in section 4.
 **Regions:** supplier; category picker; pricing mode toggle; amounts; deposit; due date; notes; history link; save/delete.
 **Fields:** all of `ledger_entries` per REQ-LG-1. Category from fixed taxonomy, free text rejected (clause 2). Estimated mandatory; actual optional; deposit defaults 0.
 **Derived, read-only in-form:** effective amount, balance due, payment status.
-**Actions:** toggle per-head requires a rate before accepting the change (REQ-GM-2 clause 4). Setting actual on a per-head entry sets `manually_valued` and stops recomputation, with an inline explanation (REQ-GM-2 clause 5). Deposit above effective shows an overpayment warning and stores the value unclamped (REQ-LG-4 clause 2). Notes counter surfaces the 2,000-character bound — see gap in 1.1.
+**Actions:** toggle per-head requires a rate before accepting the change (REQ-GM-2 clause 4). Setting actual on a per-head entry sets `manually_valued` and stops recomputation, with an inline explanation (REQ-GM-2 clause 5). Deposit above effective shows an overpayment warning and stores the value unclamped (REQ-LG-4 clause 2). Notes show a live `n / 2,000` character counter; input stops at 2,000 characters rather than silently truncating an existing value (REQ-LG-1 clause 8).
 **Nav in:** SCR-07. **Nav out:** SCR-07, SCR-16.
 
 ### SCR-09 Hidden-Fee Editor
 Six typed variants sharing one shell. Per-type field differences in section 5.1.
-**Regions:** type header; component list (repeatable rows); running total; guest-scaling note; save/dismiss.
-**Fields:** `ledger_entries` header plus `fee_components` rows.
+**Regions:** type header; read-only allocation-category label; component list (repeatable rows where applicable); running total; guest-scaling note for crew meals; save/dismiss.
+**Fields:** `ledger_entries` header plus `fee_components` rows. Category is one of the six allocation categories, **not** the fee subtype: crew meals, church aircon, corkage, venue power → Catering & Venue; OOT fees and overtime → Coordination (REQ-HF-2 clause 9; design.md §4.4). SCR-09 displays that category read-only; the fee remains a separate attributable ledger entry.
 **Actions:** add/remove component; save; dismiss whole fee type. Component total = `quantity × unit_rate_cents` when both present, else `amount_cents` (design.md 4.4).
 **Crew meals only:** persistent note that crew meals do not scale with guests (REQ-GM-4 clause 1) and that crew headcount is not a guest count (clause 3).
 **Nav in:** SCR-05, SCR-07, dashboard chip. **Nav out:** originating screen.
@@ -147,7 +147,7 @@ Six typed variants sharing one shell. Per-type field differences in section 5.1.
 ### SCR-12 Guests List
 **Regions:** RSVP × tier summary matrix; driving-status indicator; guest list; crew headcount block; add.
 **Fields:** `guests.name`, `rsvp_status`, `priority_tier`; counts per cell; `crew_headcount.headcount`.
-**Actions:** add guest → defaults `tier_2` (REQ-GM-1 clause 3), RSVP set explicitly with no silent default (clause 4). Edit either axis independently (clause 5). Crew headcount edited in its own block, visually separated (clause 10, REQ-GM-4 clause 3). What-if → SCR-13.
+**Actions:** add guest → defaults `tier_2` (REQ-GM-1 clause 3); the guest's RSVP is set explicitly, never silently confirmed (clause 4). The plan's **driving RSVP status** defaults to `invited` for per-head calculations, visibly indicated here and editable on SCR-18 (REQ-GM-1 clause 6). Edit either guest axis independently (clause 5). Crew headcount edited in its own block, visually separated (clause 10, REQ-GM-4 clause 3). What-if → SCR-13.
 **Displays:** breakdown by tier within the driving RSVP status (clause 8).
 **Nav in:** Guests tab. **Nav out:** SCR-13.
 
@@ -179,12 +179,12 @@ Specified in section 6.
 ### SCR-17 Shared Access
 **Regions:** partner slot with role; invite block; remove-partner action; ownership-transfer block (with pending-confirmation sub-state); delete plan (creator only); active-plan note.
 **Fields:** `plan_members.role`, `invites.expires_at`, `lifecycle_confirmations.*` (ownership transfer only), `plans.is_active`.
-**Actions:** invite → 7-day link (REQ-SE-1 clause 4); revoke invite. **Remove partner → mutual and one-sided: either partner may remove the other, no confirmation from the removed party, effective on their next sync (REQ-SE-6). Requires a typed/deliberate confirmation from the acting partner only, to prevent an accidental tap, and is logged and attributed (REQ-SE-4).** Transfer ownership → opens two-party confirmation, both partners retain full access while pending (REQ-SE-5 clauses 4, 6) — this is the only two-party action. Delete plan → creator only; non-creator sees the action absent and, if reached, a refusal naming creator-only (REQ-SE-5 clauses 1, 2); requires typed confirmation (clause 3).
+**Actions:** invite → link expiring exactly 7 days after issuance (REQ-SE-1 clauses 4, 5); revoke invite. **Remove partner → mutual and one-sided: either partner may remove the other, no confirmation from the removed party, effective on their next sync (REQ-SE-6). Requires a typed/deliberate confirmation from the acting partner only, to prevent an accidental tap, and is logged and attributed (REQ-SE-4).** Transfer ownership → opens two-party confirmation, expiring after 7 days if not completed; both partners retain full access while pending (REQ-SE-5 clauses 4, 6, 7) — this is the only two-party action. Delete plan → creator only; non-creator sees the action absent and, if reached, a refusal naming creator-only (REQ-SE-5 clauses 1, 2); requires typed confirmation (clause 3).
 **Stated on screen:** removing a partner cannot be undone by the removed person and does not delete their existing local copy — server access simply stops (REQ-SE-6 clauses 5, 6). Data access stays fully symmetric; only lifecycle actions are governed here (REQ-SE-5 clause 9). Without this the removal reads as either reversible or a general permission tier.
 **Nav in:** More tab. **Nav out:** SCR-16 for lifecycle history (REQ-SE-5 clause 8, REQ-SE-6 clause 4).
 
 ### SCR-18 Plan Settings
-**Regions:** setup inputs (budget, date, guest cap, region); driving RSVP status picker; ruleset version block; remainder category note.
+**Regions:** setup inputs (budget, date, guest cap, region); driving RSVP status picker (default `invited`); ruleset version block.
 **Actions:** any setup edit → preview before applying when more than one category shifts (REQ-BS-6 clause 3); cancel persists nothing (clause 4); applied edits log (clause 5). Ruleset opt-in → before/after preview, overrides preserved (REQ-AE-3 clauses 3, 4).
 **Stated on screen:** editing setup destroys no entries, pledges, guests, or overrides (REQ-BS-6 clauses 1, 2). Users expect budget changes to wipe work; saying otherwise prevents avoidable fear.
 **Nav in:** More tab. **Nav out:** SCR-03/04 field editors, SCR-10.
@@ -227,7 +227,7 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 | SCR-14 | Zero pledges; gross shown, net equals gross, expected `₱0.00`, exposure `₱0.00` | Grouped list with net, expected, and exposure figures | N/A | Badge | Badge | Banner when a pledge status changed remotely | Read-only | None defined — pledge values cannot be invalid; negative is rejected at entry |
 | SCR-15 | Blank form | Populated | N/A | Badge | Badge | Field stamp | Read-only; save suppressed | Sponsor name empty, negative value, item type without description |
 | SCR-16 | Contains setup entries from the moment a plan exists; never empty | Full feed | Pagination on long histories | Badge; local entries listed as not-yet-synced | Badge | **This is where resolution surfaces** — see 6.4 | Read-only; history retained in full | N/A — log entries are facts, not calculations |
-| SCR-17 | Solo: no partner, invite prompt | Partner present, with mutual remove action available to either partner | N/A | Badge; invite generation and ownership transfer blocked offline, but a queued removal is permitted and takes effect server-side on reconnect | Badge | N/A — membership does not flow through the log (design.md 2.5) | Terminal state for the removed partner: explains removal, offers exit | Ownership-transfer confirmation with no defined expiry — see 1.1 gap. Defensive removal is immediate, so it has no pending state |
+| SCR-17 | Solo: no partner, invite prompt | Partner present, with mutual remove action available to either partner | N/A | Badge; invite generation and ownership transfer blocked offline, but a queued removal is permitted and takes effect server-side on reconnect | Badge | N/A — membership does not flow through the log (design.md 2.5) | Terminal state for the removed partner: explains removal, offers local wipe and exit | Ownership-transfer confirmation expires after 7 days; defensive removal is immediate with no pending state |
 | SCR-18 | Populated from setup; never empty | Same | N/A | Badge; edits available | Badge | Stamp on remotely changed setup fields | Read-only | Invalid budget, past date |
 | SCR-19 | Zero pending, synced | Queue listed | Sync in progress | Primary purpose: queue depth and age | Primary purpose: failure detail and retry | Lists resolved conflicts with link to SCR-16 | Read-only; sync halted, reason stated | N/A |
 
@@ -235,11 +235,11 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 
 REQ-SE-6 governs defensive removal (mutual and one-sided; either partner may remove the other without consent, per Decisions 1 and 2). The removed partner's experience: **the removed partner retains local data in read-only form and is told plainly.**
 
-Reason: their device holds a legitimate local database. Wiping it silently would look like data loss and would contradict the offline guarantee they have been trained to rely on. Sync stops, writes are refused (REQ-SE-6 clauses 3, 6), and the reason is stated once, clearly, at the top of every screen. Because removal is mutual, this same state can be reached by either partner regardless of who created the plan.
+Reason: their device holds a legitimate local database. Wiping it silently would look like data loss and would contradict the offline guarantee they have been trained to rely on. Sync stops, writes are refused (REQ-SE-6 clauses 3, 6), and the reason is stated once, clearly, at the top of every screen. Because removal is mutual, this same state can be reached by either partner regardless of who created the plan. **The removed-state screen SHALL offer a voluntary local wipe on this device**, with a deliberate confirmation; it SHALL NOT claim to remove copies on other or offline devices (REQ-SE-6 clauses 5, 7; OQ-03 leaves force-wipe open, with the current plan using an offer).
 
 Copy: *"You no longer have access to this wedding plan. You can still view your copy, but changes won't be saved or synced."*
 
-Whether the local copy should eventually be purged is a privacy decision, not a UX one, and is not resolved here.
+Automatic or enforceable remote purging remains unresolved (OQ-03); this voluntary local wipe does not resolve that question.
 
 ---
 
@@ -282,7 +282,7 @@ Tiles A and B are adjacent and equal in visual weight because REQ-PL-2 clause 1 
 | A | Total budget | `plans.total_budget_cents` |
 | B | Net out-of-pocket | Derived: gross − **received only** (REQ-PL-2 clause 2, Decision D2). Confirmed-but-unfulfilled pledges do NOT reduce net. |
 | B | Expected pledge support | Derived: Σ of `tentative` + `confirmed` (promised, not yet fulfilled), labelled separately, never summed into net (REQ-PL-3, Decision D2) |
-| C | Budget health | Section 4.3 |
+| C | Budget health | Six defined conditions in §4.3; five can be evaluated, budget adequacy is unavailable pending benchmarks. On the first-run dashboard, the four checks that pass are budget breach, over-allocation, over guest cap, and overdue payments; hidden fees pass too after SCR-05 completes. |
 | D | Buffer remaining | Derived per REQ-AE-6 clauses 1, 2; pesos and percent of original (clause 4) |
 | E | Outstanding exposure | Derived: Σ confirmed-not-received (REQ-PL-4) |
 | F | Per-category allocated / effective / variance | `plan_allocations` + derived variance (REQ-LG-6 clauses 1, 2) |
@@ -292,7 +292,7 @@ Tiles A and B are adjacent and equal in visual weight because REQ-PL-2 clause 1 
 
 ### 4.3 Budget health card — exact inputs, and where I stop
 
-**What is defined upstream.** Six binary conditions, each with an explicit threshold in requirements.md. The card is a checklist of these and nothing more.
+**What is defined upstream.** Six conditions in requirements.md; five are evaluable in v1 and the sixth is unavailable until benchmark data exists. The card is a checklist of these and nothing more, with no aggregate score or invented health band.
 
 | # | Condition | Exact threshold | REQ ID |
 |---|---|---|---|
@@ -303,13 +303,13 @@ Tiles A and B are adjacent and equal in visual weight because REQ-PL-2 clause 1 
 | 5 | Overdue payments | any entry with `balance_due > 0` and `due_date < today` | REQ-LG-5 clause 2 |
 | 6 | Budget adequacy shortfall | `total_budget_cents < expected_total_cost_cents` | REQ-AE-2 clause 3 |
 
-Each renders as met or not met, with the governing number shown. All values come from the rule-based engine and derived calculations in design.md 1.4 and 5.2. No network, no model, no inference.
+Each computable condition renders as met or not met, with the governing number shown. All values come from the rule-based engine and derived calculations in design.md 1.4 and 5.2. No network, no model, no inference.
 
 **Condition 6 cannot render in v1.** `reference_costs` is unpopulated (design.md 4.2; requirements.md 13.1), so `expected_total_cost` is not computable. It renders as **unavailable**, explicitly:
 
 > *"Budget adequacy — not available yet. We don't have regional cost benchmarks for this area."*
 
-It must not be hidden and must not read as met. An unavailable check displayed as passing is worse than an absent one.
+It must not read as met or change the passing-check count. An unavailable check displayed as passing is worse than an absent one.
 
 **Where I stop.** The card cannot present a *graded* health verdict, because nothing upstream defines the bands:
 
@@ -322,15 +322,15 @@ Inventing any of these would put fabricated numbers in front of a couple making 
 
 ### 4.4 First-run dashboard
 
-Immediately post-setup there are allocations but no spending. Every tile renders a real value, not an empty state:
+In the empty-ledger case immediately post-setup (all fee prompts explicitly dismissed, rather than filled with costs), there are allocations but no spending. Every tile renders a real value, not an empty state:
 
 - A: gross `₱0.00` against the budget — accurate, not empty
 - B: net equals gross equals `₱0.00`
-- C: conditions 1, 2, 3, 5 not met; 4 reflects any dismissed-vs-unanswered fees; 6 unavailable
+- C: checks 1 (budget breach), 2 (over-allocation), 3 (over guest cap), and 5 (overdue payments) pass because there are no entries or guests yet. Check 4 (unanswered hidden fees) also passes after the SCR-05 gate has required every prompt to be filled or dismissed; check 6 (adequacy) is unavailable, **not** passing. Five passing, one unavailable. With filled fee entries, recompute all checks from the actual totals.
 - D: buffer remaining equals full buffer allocation, 100%
 - E: `₱0.00` (REQ-PL-4 clause 3)
 - F: six categories with allocated amounts, zero effective, full negative variance
-- G: driving count as entered; zero if no guests added yet
+- G: driving count derived from guests with the `invited` status by default; zero if no guests added yet
 - H: count of unanswered fees, which is 0 immediately after the SCR-05 gate
 
 Only F and G carry a genuine call to action. There is no blank-slate dashboard state, because setup guarantees allocations exist.
@@ -350,23 +350,23 @@ A visible "AI coming soon" affordance is deliberately rejected: it advertises ab
 
 ## 5. Key flows
 
-### 5.1 Adding a hidden-fee item — the four types do differ
+### 5.1 Adding a hidden-fee item — all six types differ
 
-**They differ substantially.** Only one of the four is a single-amount form. Treating them uniformly would defeat REQ-HF-2 clause 1, which forbids reducing them to a generic amount field.
+**They differ substantially.** Only church aircon is a single-amount form. Treating all six uniformly would defeat REQ-HF-2, which forbids reducing them to a generic amount field.
 
-| Field | Crew meals | OOT fees | Church aircon | Corkage |
-|---|---|---|---|---|
-| Repeatable rows | Yes, per supplier | Yes, per supplier | **No — single row** | Yes, per item |
-| Row label | Supplier name | Supplier name | — | Item type picker: cake / wine / liquor / lechon / other |
-| Quantity | Crew headcount | — | — | — |
-| Unit rate | Per-meal rate | — | — | — |
-| Flat amount | — | **Three per row:** travel, lodging, per-diem | Single amount | Amount per item |
-| Row total | `headcount × rate` | travel + lodging + per-diem | amount | amount |
-| Guest scaling | **Never** (REQ-GM-4) | Never | Never | Never |
-| Pre-enabled by region | No | **Yes when destination** (REQ-HF-3) | No | No |
-| Entity shape | `fee_components`: quantity + unit_rate | 3 components per supplier, amount only | 1 component, amount only | 1 component per item, amount only |
+| Field | Crew meals | OOT fees | Church aircon | Corkage | Overtime | Venue power |
+|---|---|---|---|---|---|---|
+| Repeatable rows | Yes, per supplier | Yes, per supplier | **No — single row** | Yes, per item | Yes, per supplier | No — three fixed components |
+| Row label | Supplier name | Supplier name | — | Item type picker: cake / wine / liquor / lechon / other | Supplier name | Generator / surcharge / electrical requirements |
+| Quantity | Crew headcount | — | — | — | Projected hours | — |
+| Unit rate | Per-meal rate | — | — | — | Hourly rate | — |
+| Flat amount | — | **Three per supplier:** travel, lodging, per-diem | Single amount | Amount per item | — | Three separate amounts |
+| Row total | `headcount × rate` | travel + lodging + per-diem | amount | amount | `hours × hourly rate` | generator + surcharge + electrical |
+| Guest scaling | **Never** (REQ-GM-4) | Never | Never | Never | Never | Never |
+| Pre-enabled by region | No | **Yes when `is_destination`** (including Bohol, REQ-HF-3) | No | No | No | No |
+| Entity shape | `fee_components`: quantity + unit_rate | 3 components per supplier, amount only | 1 component, amount only | 1 component per item, amount only | quantity + unit_rate per supplier | 3 fixed components, amount only |
 
-Overtime (`quantity` = hours, `unit_rate` = hourly) and venue power (three fixed components) follow the same pattern; they are outside the four requested but share the shell.
+All six use the same SCR-09 shell, with subtype-specific inputs and a read-only allocation category label (design.md §4.4).
 
 **Flow — crew meals** · REQ-HF-1, REQ-HF-2 (1, 7, 8), REQ-GM-4, REQ-SE-4
 
@@ -379,7 +379,7 @@ Overtime (`quantity` = hours, `unit_rate` = hourly) and venue power (three fixed
 
 **Flow — OOT fees** · REQ-HF-1, REQ-HF-2 (2, 7), REQ-HF-3
 
-1. If region is destination-tier, the OOT card on SCR-05 is already enabled (REQ-HF-3 clause 1). No amount is pre-filled (clause 3).
+1. If the region's `is_destination` flag is true (including Provincial-tier Bohol), the OOT card on SCR-05 is already enabled (REQ-HF-3 clause 1). No amount is pre-filled (clause 3).
 2. Open SCR-09. Each row is one supplier with three separate amount fields.
 3. Enter travel, lodging, per-diem per supplier. Row total is their sum.
 4. Save.
@@ -397,6 +397,18 @@ Overtime (`quantity` = hours, `unit_rate` = hourly) and venue power (three fixed
 2. Either add rows per item type and save, **or** choose Not applicable.
 3. On dismissal, `state` → `dismissed` with `dismissed_at` and `dismissed_by` recorded.
 4. **End state, dismissed:** card reads "Not applicable" with who dismissed it and when; contributes exactly `₱0.00` to gross; no longer counted in tile H; SCR-05 completion no longer blocked by it. The distinction from `prompted_unfilled` remains visible everywhere.
+
+**Flow — overtime** · REQ-HF-1, REQ-HF-2 (5, 7)
+
+1. Open Overtime on SCR-05 or SCR-07. Add a row for each supplier with projected hours and hourly rate.
+2. Each row and the running total compute `projected hours × hourly rate`; save marks the prompt filled.
+3. **End state:** separate ledger line and per-supplier components appear; gross increases by their sum without changing when guest count changes.
+
+**Flow — venue power** · REQ-HF-1, REQ-HF-2 (6, 7)
+
+1. Open Venue power on SCR-05 or SCR-07. Enter separate generator, surcharge, and electrical-requirement amounts.
+2. Running total sums all three; save marks the prompt filled.
+3. **End state:** three components and one attributable ledger line appear; gross increases by their sum without guest scaling.
 
 ### 5.2 Logging a pledge · REQ-PL-1, REQ-PL-2, REQ-PL-3, REQ-PL-4, REQ-SE-4
 
@@ -427,10 +439,10 @@ Overtime (`quantity` = hours, `unit_rate` = hourly) and venue power (three fixed
 1. Partner B goes offline on SCR-08 and sets an entry's actual amount to ₱62,000. Local write commits; queue depth 1.
 2. Partner A, online, sets the **same field** on the same entry to ₱58,000. A's write syncs immediately.
 3. B reconnects. The queued row pushes and the **server assigns its `server_ts` on acceptance** (Decision D1); B's device sequence (`device_monotonic`) is preserved but is not the ordering authority. Because A's write was accepted earlier, A's write carries the earlier `server_ts`.
-4. Both devices order the two log rows by `(server_ts, device_monotonic, device_id)` and independently select the same winner. Under D1 the winner is A's ₱58,000, since it holds the earlier server timestamp — B's later-on-the-wall-clock entry does not win by virtue of B's device clock (REQ-SE-2 clauses 3, 4, 5).
-5. Projections converge. Both devices show the same value, ₱58,000 (REQ-SE-3 clause 2).
+4. Both devices order the two log rows by `(server_ts, device_monotonic, device_id)` and independently select the same winner. Under D1 **B's ₱62,000 wins**, because B's queued write was accepted later and has the later server timestamp, despite having been edited offline earlier (REQ-SE-2 clauses 3–5). Device time does not decide this.
+5. Projections converge. Both devices show the same value, ₱62,000 (REQ-SE-3 clause 2).
 6. **Neither write is discarded.** Both remain in `change_log`; the loser is superseded, computed at read time (design.md 4.6).
-7. The losing device shows a banner naming the field and the winning value, linking to SCR-16.
+7. **A's device** shows a banner naming the field and B's winning value when it next syncs, linking to SCR-16. B's device does not show a losing-write banner.
 8. SCR-16 shows both rows in clock order, the winner marked current and the loser marked superseded with its value intact and its author attributed.
 9. **End state:** one visible current value on both devices; both attempts permanently recoverable in the change log; each attributed; the couple can see a disagreement happened and what the other person intended.
 
@@ -489,20 +501,20 @@ Rules:
 
 **Yes — visible and readable, but not restorable with one tap.**
 
-The value is never lost; design.md 4.6 makes the log append-only and REQ-SE-2 clause 5 forbids discarding an accepted write. SCR-16 shows the superseded value, its author, and its timestamp.
+The value is never lost; design.md 4.6 makes the log append-only and REQ-SE-2 clause 6 forbids discarding an accepted write. SCR-16 shows the superseded value, its author, and its timestamp.
 
 What is deliberately **not** provided is a one-tap Restore. Reason: restoring is just another write, and a Restore button invites a tap-war where each partner reverts the other, generating log noise and no agreement. The couple should read what happened and decide, then type the value they agree on. The value is one screen away and fully legible — that satisfies recoverability without automating a disagreement.
 
-### 6.6 Is "their edit won while you were offline" shown or silent?
+### 6.6 Is a same-field loss shown or silent?
 
 **Shown. Explicitly, and only to the partner whose write lost.**
 
-Silence here would be a betrayal of the offline promise. A partner who spent time entering figures on a plane and returns to different numbers with no explanation will conclude the app lost their work. That is the single most damaging misread available, and REQ-SE-2 clause 5 already requires the losing write to be preserved — so the information exists and withholding it is a choice.
+Silence here would undermine confidence in shared editing. A partner who sees their entered amount replaced by another number with no explanation may conclude the app lost their work. REQ-SE-2 clause 6 requires the losing write to be preserved — so the information exists and withholding it is a choice. In §5.4 it is **A's online write** that loses after B's offline edit syncs; the banner must not imply that A was offline.
 
 Shown on the losing device, once, dismissible:
 
 > **"Your partner also changed this"**
-> *"[Name] changed the [field] on [entry] to ₱58,000.00 while you were offline. Their change is the one being used. Your ₱62,000.00 is saved in the activity log."*
+> *"[B's name] changed the actual amount on [entry] to ₱62,000.00. That amount is now being used. Your ₱58,000.00 is saved in the activity log."*
 
 Rules:
 
@@ -661,7 +673,7 @@ Every numeric tile carries an explicit label. The visual figure alone is insuffi
 |---|---|
 | A | "Gross event total, 350,000 pesos, out of a 350,000 peso budget" |
 | B | "Net out of pocket, 300,000 pesos, counting only fulfilled pledges. Expected pledge support not yet received, 50,000 pesos" |
-| C | "Budget health. 5 of 6 checks passing. Budget adequacy not available" |
+| C | "Budget health. 5 checks passing; budget adequacy not available" (first-run example only; compute count from current state) |
 | D | "Buffer remaining, 58,000 pesos, 82 percent of buffer" |
 | E | "Outstanding pledge exposure, 50,000 pesos" |
 | F row | "Catering and venue. Allocated 140,000 pesos. Spent 152,400 pesos. Over by 12,400 pesos" |
@@ -719,7 +731,7 @@ Names, inputs, and states only.
 | `ExplainSheet` | explanation payload, allocatorKind, rulesetVersion | rule-based, unavailable | SCR-11 |
 | `OverrideRow` | engineCents, overrideCents, categoryCode | engine-value, overridden, over-allocated, read-only | SCR-10 |
 | `BufferGauge` | allocation, overrun, remaining | healthy, breached, full | SCR-06 tile D, SCR-10 |
-| `ChangeLogEntry` | actor, action, entity, field, oldValue, newValue, hlc, superseded, pendingPush | applied, superseded, pending-push, lifecycle | SCR-16, per-entity history |
+| `ChangeLogEntry` | actor, action, entity, field, oldValue, newValue, serverTs, deviceMonotonic, superseded, pendingPush | applied, superseded, pending-push, lifecycle | SCR-16, per-entity history |
 | `ConflictBanner` | field, winningValue, losingValue, actor | single-conflict, multiple-conflicts, dismissed | SCR-06, SCR-19 |
 | `ReadOnlyNotice` | reason | partner-removed, plan-deleted | All SCR-06–19 |
 | `StepIndicator` | current, total, blockedReason | in-progress, blocked, complete | SCR-03, 04, 05 |
@@ -729,15 +741,15 @@ Names, inputs, and states only.
 
 ---
 
-## 11. Open items this spec surfaced
+## 11. Open items and resolved former gaps
 
-Ordered by blocking severity.
+Open items first, then resolved items retained for traceability.
 
-1. **★ Budget health graded bands — deliberately not invented.** Section 4.3. The card currently states six facts. A graded verdict needs caution thresholds, weighting, and severity ranking defined upstream first.
+1. **★ Budget health graded bands — deliberately not invented.** Section 4.3. The card states five computable checks and one unavailable condition. A graded verdict needs caution thresholds, weighting, and severity ranking defined upstream first.
 2. **Reference cost values.** Budget adequacy renders as unavailable until `reference_costs` is populated. Already tracked as requirements.md 13.1; noted because it is now visible in the UI.
-3. **Two-party confirmation expiry duration.** SCR-17 cannot show a countdown for an undefined window (requirements.md 13.4).
-4. **Notes character-limit feedback.** REQ-LG-1 clause 8 sets a 2,000-character bound without specifying counter or truncation behaviour.
-5. **Removed partner's local data retention.** Section 3.3 keeps it readable. Whether it is eventually purged is a privacy decision.
-6. **`decision-log.md`.** Referenced as an input, absent from the repository. Section 0.
+3. **Ownership-transfer expiry — resolved at 7 days (ADR-32).** SCR-17 shows the expiry; a timed-out confirmation leaves the plan unchanged (REQ-SE-5 clause 7).
+4. **Notes limit — resolved (ADR-33).** SCR-08 uses a hard 2,000-character input limit and a live counter (REQ-LG-1 clause 8).
+5. **Removed partner's local data retention.** Section 3.3 retains the local copy and SHALL offer voluntary wipe (ADR-34). Force-wipe is still open (OQ-03).
+6. **Decision log — available.** `docs/decision-log.md` is an input and contains the authoritative ADRs and remaining OQs; its former absence claim is resolved (§0).
 
 *Resolved since first draft: platform (Flutter + SQLite/`drift`), the REQ-GEN-2A constrained-display amendment (section 8.2), and ruleset configuration management (bundled JSON asset validated at app load — REQ-AE-1 clause 4 is now a load-time check, not an authoring screen).*

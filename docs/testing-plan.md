@@ -6,44 +6,28 @@
 
 ---
 
-## 0. Platform conflict — must be resolved before the tooling section is actionable
+## 0. Platform decision
 
-**The request specifies a React Native stack. REQ-PLT-1 mandates Flutter**, and GIV-02 in the decision log records React Native as **SUPERSEDED by ADR-12** (Flutter + SQLite/`drift`). I have not silently switched either way.
+**Flutter on iOS and Android is decided** by ADR-12 and required by REQ-PLT-1. The local store uses SQLite via `drift` or `sqflite` (REQ-PLT-2). The tooling below targets this decided platform only.
 
-This is not a cosmetic conflict — it changes the E2E answer you asked for:
-
-> **Detox is React Native-specific and does not drive Flutter apps.** If the platform is Flutter, "choose Detox or Maestro" has only one valid answer. If the platform is genuinely React Native, Detox becomes available and the whole stack below changes.
-
-So §1 gives the **canonical stack for the locked platform (Flutter)**, plus a **column-for-column React Native mapping** so the plan translates immediately if RN is reinstated. Everything from §2 onward (traceability, fixtures, sync matrix, backend, exit criteria) is platform-independent and holds under either.
-
-**Decision needed:** confirm Flutter (and I delete the RN column), or reinstate RN (and I rewrite §1 and flip REQ-PLT-1 / GIV-02 / ADR-12).
+§1 specifies the Flutter tooling; the traceability, fixtures, sync matrix, backend checks, and exit criteria below apply to both iOS and Android builds.
 
 ---
 
 ## 1. Tooling decision
 
-### 1.1 Canonical stack — Flutter (per REQ-PLT-1, ADR-12)
+### 1.1 Flutter stack (per REQ-PLT-1, ADR-12)
 
 | Layer | Choice | Justification |
 |---|---|---|
 | Unit runner | `flutter_test` (bundled) + `mocktail` for doubles | No third-party runner needed. The `domain/` layer imports neither Flutter nor `drift` (design §1.2), so calculation tests run as plain Dart — fast, no emulator, no DB. This is where every fixture in §3 is asserted. |
 | Component / widget testing | `flutter_test`'s `WidgetTester` + `golden_toolkit` for golden snapshots | Widget tests are the Flutter equivalent of a component testing library. Goldens catch bento-tile layout and money-format regressions (REQ-GEN-2A) that assertions miss. |
 | Integration (in-process) | `integration_test` package | Drives the real widget tree against a real SQLite DB on device/emulator. Covers offline CRUD and sync replay where a unit test cannot. |
-| E2E driver | **Maestro** | Forced and also preferred: Detox does not support Flutter. Independently, Maestro's flows are declarative YAML, run unmodified against iOS simulators and Android emulators, tolerate async UI without explicit waits, and need no in-app instrumentation — which matters because E2E must exercise the shipped binary, not a test build. |
+| E2E driver | **Maestro** | Declarative YAML flows run against iOS simulators and Android emulators without in-app instrumentation; E2E exercises the shipped binary, not a test build. |
 | Static analysis | `dart analyze` + custom lint rule banning `double` in money paths | REQ-GEN-1 forbids floating-point money. That is not observable at runtime once a value is already wrong; it must be caught statically. See TC-GEN-01. |
 | DB migration harness | `drift` schema-version tests with generated fixtures | Forward and backward migration (§7). |
 
-### 1.2 React Native equivalents (if RN is reinstated)
-
-| Layer | Flutter | React Native |
-|---|---|---|
-| Unit runner | `flutter_test` + `mocktail` | Jest + `ts-jest` |
-| Component testing | `WidgetTester`, `golden_toolkit` | React Native Testing Library, `jest-image-snapshot` |
-| Integration | `integration_test` | Jest + `@testing-library/react-native` with an in-memory SQLite adapter |
-| E2E | Maestro | **Detox** (grey-box, RN-aware, faster and less flaky than black-box) **or** Maestro (black-box, simpler, cross-platform). Under RN I would pick Detox for its synchronisation with the RN bridge, accepting the heavier setup. |
-| Money static check | custom `dart analyze` lint | ESLint rule + `BigInt`/branded-type enforcement (harder — JS has no int64, see design §1.5) |
-
-### 1.3 How E2E runs on both platforms
+### 1.2 How E2E runs on iOS and Android
 
 One Maestro flow set, two targets. Flows live in `e2e/flows/` and are parameterised only by platform-specific selectors where unavoidable.
 
@@ -51,7 +35,7 @@ One Maestro flow set, two targets. Flows live in `e2e/flows/` and are parameteri
 - **Android:** Pixel 6 API 34 emulator, on a Linux CI runner.
 - The full MVP scenario (§8) runs on **both** as a required gate. Platform-specific flows (backup exclusion, Keychain vs Keystore) run only where meaningful.
 
-### 1.4 Where each suite runs, and why
+### 1.3 Where each suite runs, and why
 
 | Suite | CI (every PR) | CI (nightly) | Local only | Real device only | Why |
 |---|---|---|---|---|---|
@@ -86,24 +70,24 @@ Every REQ ID in `requirements.md` (54 total) appears. Levels: **U** unit, **I** 
 | REQ-BS-1 | TC-BS-01 | I |
 | REQ-BS-2 | TC-BS-02 | U + I |
 | REQ-BS-3 | TC-BS-03 | I |
-| REQ-BS-4 | TC-BS-04 | U |
+| REQ-BS-4 | TC-BS-04, TC-BS-09 | U + I |
 | REQ-BS-5 | TC-BS-05, TC-GM-06 | U |
 | REQ-BS-6 | TC-BS-06 | I |
-| REQ-LG-1 | TC-LG-01, TC-LG-02 | U + I |
+| REQ-LG-1 | TC-LG-01, TC-LG-02, TC-LG-14 | U + I + widget |
 | REQ-LG-2 | TC-LG-03, TC-LG-04 | I |
 | REQ-LG-3 | TC-LG-05 | U |
 | REQ-LG-4 | TC-LG-06, TC-LG-07 | U |
 | REQ-LG-5 | TC-LG-08, TC-LG-09, TC-LG-10 | U + I |
 | REQ-LG-6 | TC-LG-11, TC-LG-12 | U |
 | REQ-HF-1 | TC-HF-01, TC-HF-02, TC-HF-03, TC-HF-04 | U + I |
-| REQ-HF-2 | TC-HF-05, TC-HF-06 | U |
-| REQ-HF-3 | TC-HF-07, TC-HF-08 | U + I |
+| REQ-HF-2 | TC-HF-05, TC-HF-06, TC-HF-09 | U + widget |
+| REQ-HF-3 | TC-HF-07, TC-HF-08, TC-BS-09 | U + I |
 | REQ-PL-1 | TC-PL-13 | U |
 | REQ-PL-2 | TC-PL-10, TC-PL-11, TC-PL-14 | U |
 | REQ-PL-3 | TC-PL-12, TC-PL-15 | U |
 | REQ-PL-4 | TC-PL-16, TC-PL-17 | U |
 | REQ-PL-5 | TC-PL-18 | U |
-| REQ-GM-1 | TC-GM-01, TC-GM-02, TC-GM-03 | U |
+| REQ-GM-1 | TC-GM-01, TC-GM-02, TC-GM-03, TC-GM-14, TC-GM-15 | U + I |
 | REQ-GM-2 | TC-GM-04, TC-GM-05 | U |
 | REQ-GM-3 | TC-GM-07 | U |
 | REQ-GM-4 | TC-GM-08 | U |
@@ -111,41 +95,41 @@ Every REQ ID in `requirements.md` (54 total) appears. Levels: **U** unit, **I** 
 | REQ-AE-1 | TC-AE-01, TC-AE-02, TC-AE-03, TC-AE-04 | U |
 | REQ-AE-2 | TC-AE-05, TC-AE-06, **TC-AE-07 (BLOCKED)** | U |
 | REQ-AE-3 | TC-AE-08 | U |
-| REQ-AE-4 | TC-AE-09 | U + widget |
+| REQ-AE-4 | TC-AE-09, TC-AE-14 | U + widget |
 | REQ-AE-5 | TC-AE-10, TC-AE-11 | U |
 | REQ-AE-6 | TC-AE-12 | U |
 | REQ-SE-1 | TC-SE-23 | I |
 | REQ-SE-2 | TC-SE-20, TC-SE-21, TC-SE-24 | U + I |
 | REQ-SE-3 | TC-SE-25 | I |
 | REQ-SE-4 | TC-SE-15, TC-SE-26 | I |
-| REQ-SE-5 | TC-SE-16, TC-SE-18 | I |
-| REQ-SE-6 | TC-SE-10, TC-SE-11, TC-SE-12, TC-SE-13, TC-SE-14, TC-SE-17, TC-SE-19, TC-SE-22 | I + E |
+| REQ-SE-5 | TC-SE-16, TC-SE-18, TC-SE-31 | I |
+| REQ-SE-6 | TC-SE-10, TC-SE-11, TC-SE-12, TC-SE-13, TC-SE-14, TC-SE-17, TC-SE-19, TC-SE-22, TC-SE-32 | I + E |
 | REQ-OF-1 | TC-OF-01 … TC-OF-08 | I |
 | REQ-OF-2 | TC-OF-09 | I |
 | REQ-OF-3 | TC-OF-10 | I |
 | REQ-OF-4 | TC-OF-11 | U + I |
-| REQ-OF-5 | TC-OF-12, TC-SE-13 | I |
+| REQ-OF-5 | TC-OF-12, TC-OF-15, TC-OF-18, TC-SE-13 | I |
 | REQ-AI-1 | — | Out of v1 scope (AI phase) |
 | REQ-AI-2 | — | Out of v1 scope (AI phase) |
 | REQ-AI-3 | — | Out of v1 scope (AI phase) |
-| REQ-AI-4 | — | Out of v1 scope (AI phase) |
+| REQ-AI-4 | — | Out of v1 scope (post-launch payments, ADR-28; ID retained) |
 | REQ-AI-5 | — | Out of v1 scope (AI phase) |
 | REQ-EX-1 | TC-EX-01 | M (see §2.1) |
 
-**Coverage:** 48 of 54 REQ IDs have at least one mapped executable test. 5 (REQ-AI-1…5) are deliberately out of v1 scope, not gaps. 1 (REQ-EX-1) is review-verified only. Nine clauses across otherwise-tested requirements are untestable as written — §2.1.
+**Coverage:** 48 of 54 REQ IDs have at least one mapped executable test. 5 (REQ-AI-1…5, including the reclassified post-launch payments REQ-AI-4) are deliberately out of v1 scope, not gaps. 1 (REQ-EX-1) is review-verified only. Five tracked testability limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 are resolved and redirected to executable tests in §2.1.
 
-### 2.1 Untestable-as-written — defects in the requirement, not skipped tests
+### 2.1 Untestable-as-written and resolved testability gaps
 
-Each of these is a flaw in the requirement's wording or an unresolved upstream dependency. None is silently dropped.
+UT-1, UT-2, and UT-7…9 remain static/manual, unresolved, or meta-level limitations. UT-3…6 have been resolved without reusing their IDs and now redirect to executable tests. None is silently dropped.
 
-| # | Requirement | Why it cannot be tested as written | Fix needed |
+| # | Requirement | Limitation or resolution | Verification / next action |
 |---|---|---|---|
 | UT-1 | **REQ-GEN-1** | "SHALL NOT use binary floating-point" is not observable at runtime — by the time a value is wrong, the type is already gone. No behavioural assertion exists. | Reword as a static-analysis obligation. Covered by TC-GEN-01 (lint), which is the only honest verification. |
 | UT-2 | **REQ-AE-2 cl. 3** (budget adequacy indicator) | Depends on `reference_costs`, which is **unpopulated** (OQ-04). Expected total cost is not computable, so no expected value can be asserted. | Populate reference costs per region tier. **TC-AE-07 is authored but BLOCKED with no assertion** — same discipline as ADR-26. |
-| UT-3 | **REQ-LG-1 cl. 8** (notes ≤ 2,000 chars) | States a bound but not the behaviour at the bound — reject? truncate? warn? counter? There is no defined expected result. | Specify the at-limit behaviour, then test. |
-| UT-4 | **REQ-SE-5 cl. 7** (ownership-transfer expiry) | Expiry is required but the duration is undefined (OQ-05). Cannot assert when it expires. | Fix the duration (7 days matches the invite window). |
-| UT-5 | **REQ-GM-1 cl. 6** (designated driving RSVP status) | Requires a designated status but fixes no default, so a fresh plan's behaviour is undefined. | Set the default (`invited` recommended). |
-| UT-6 | **REQ-SE-6 cl. 7** ("MAY offer a local wipe") | Permissive `MAY` with no obligation — nothing to assert either way. | Either make it SHALL, or move it out of the requirement into UX guidance. Interacts with OQ-03. |
+| UT-3 | **REQ-LG-1 cl. 8** | **Resolved (ADR-33).** Hard 2,000-character limit; input stops and live counter displays. | TC-LG-14. |
+| UT-4 | **REQ-SE-5 cl. 7** | **Resolved (ADR-32, OQ-05 closed).** Seven-day expiry. | TC-SE-31. |
+| UT-5 | **REQ-GM-1 cl. 6** | **Resolved (ADR-31).** New plans default the driving RSVP status to `invited`. | TC-GM-14. |
+| UT-6 | **REQ-SE-6 cl. 7** | **Resolved (ADR-34).** Local wipe offer is mandatory on learning of removal; enforceable force-wipe remains open (OQ-03). | TC-SE-32. |
 | UT-7 | **REQ-OF-1 cl. 4** ("IF an operation cannot complete offline, THEN it is a defect") | Meta-statement about the process, not system behaviour. Not a testable assertion. | Move to the testing/defect policy (it now lives in §9). |
 | UT-8 | **REQ-PLT-2 cl. 4** (engine is SQLite via drift/sqflite) | A build fact, not a behaviour. | Verify by dependency inspection (folded into TC-PLT-01). |
 | UT-9 | **REQ-EX-1** (no marketplace/directory/reviews/booking) | Proving the *absence* of a feature cannot be done by automated test; a passing suite proves nothing about what is not there. | TC-EX-01 is a structured code/UI review checklist, explicitly manual. |
@@ -169,7 +153,7 @@ Stated once here, applied identically everywhere (this is the rounding-drift gua
 5. **Net out-of-pocket = gross − received only** (ADR-22 / D2). `tentative` + `confirmed` form the separate *expected* figure and never reduce net. Outstanding exposure = `confirmed` not yet received.
 6. **Crew meals never scale with guest count** (REQ-GM-4). They scale with crew headcount only.
 7. **Buffer remaining** = Buffer allocation − Σ overruns of non-Buffer categories. Under-spend in one category does **not** offset an overrun in another (REQ-AE-6 cl. 3).
-8. **Category mapping of hidden fees:** crew meals, church aircon, corkage, venue power → Catering & Venue. OOT fees, overtime → Coordination.
+8. **Category mapping of hidden fees (REQ-HF-2 cl. 9):** crew meals, church aircon, corkage, venue power → Catering & Venue. OOT fees, overtime → Coordination. Category labels are read-only.
 9. **Expected total cost / budget adequacy is NOT asserted in any fixture** — `reference_costs` is unpopulated (OQ-04, UT-2).
 
 ---
@@ -519,7 +503,7 @@ All run as pure Dart in `domain/` — no widget tree, no database, no network.
 |---|---|
 | TC-GEN-01 | Static analysis: no `double`/`num` in any money path; lint fails the build on violation (REQ-GEN-1, UT-1) |
 | TC-GEN-02 | Format: `₱350,000.00`, `₱0.00`, `−₱1,200.00`; half-centavo rounds away from zero (REQ-GEN-2) |
-| TC-GEN-03 | Constrained bento form: `₱350,000` under ₱1M, `₱1.25M` at/above, truncated toward zero — `₱1,259,000` → `₱1.25M`, never `₱1.26M` (REQ-GEN-2A) |
+| TC-GEN-03 | Constrained bento form: `₱350,000` below ₱1M; exactly two decimals in millions at/above — `₱1,000,000` → `₱1.00M`, `₱1,200,000` → `₱1.20M`, `₱1,259,000` → `₱1.25M` (never `₱1.26M`), and `₱999,999.99` → `₱999,999`. Negative counterparts `−₱1,259,000` → `−₱1.25M` and `−₱999,999.99` → `−₱999,999`; truncation toward zero (REQ-GEN-2A). |
 | TC-GEN-04 | Constrained form never leaks: ledger rows, editors, change log, and every a11y label use the full form (REQ-GEN-2A cl. 4, 6) |
 | TC-GEN-05 | **Drift guard:** summing 1,000 per-head line items then displaying equals displaying the stored total; no cent lost or gained across 1,000 iterations |
 
@@ -536,6 +520,7 @@ All run as pure Dart in `domain/` — no widget tree, no database, no network.
 | TC-AE-07 | **BLOCKED — budget adequacy.** No assertion. `reference_costs` unpopulated (OQ-04, UT-2). Authored so the gap is visible; must not be given a guessed expected value. |
 | TC-AE-08 | Ruleset pinning: publishing a new ruleset leaves existing plans numerically unchanged (REQ-AE-3 cl. 2) |
 | TC-AE-09 | Every allocated figure carries a rule id + inputs; a figure with no explanation payload is not returned at all (REQ-AE-4 cl. 4) |
+| TC-AE-14 | Inspect a default-skew allocation: plain-language explanation gives rule id, input budget, category baseline %, skew 1.0, and resulting amount; regional index is identified as affecting expected cost/rate suggestions, **not** allocation %. Repeat with non-default skew and assert the displayed skew and renormalised share (REQ-AE-4 cl. 2). |
 | TC-AE-10 | Override preserved across recompute; revert restores engine value; reverting one does not affect another |
 | TC-AE-11 | **Overrides not summing to 100%:** if Σ overrides > budget → over-allocation warning naming the excess, **and no override is silently clamped or scaled** (REQ-AE-5 cl. 4). If Σ overrides < budget, non-overridden categories absorb the remainder; if *all* six are overridden and sum < budget, the shortfall is surfaced, not silently added to Buffer |
 | TC-AE-12 | Buffer drawdown incl. the FIX-C negative case; under-spend does not offset overrun |
@@ -550,6 +535,8 @@ All run as pure Dart in `domain/` — no widget tree, no database, no network.
 | TC-GM-08 | Crew meals invariant to guest count; change only via crew headcount or per-meal rate |
 | TC-GM-03 | Crew headcount never appears in any guest tier total |
 | TC-GM-11 | Crew-meal rollup: per-supplier headcounts sum correctly (18 / 22 / 15 across the fixtures); removing a supplier reduces the rollup by exactly that supplier's contribution |
+| TC-GM-14 | Create a plan with invited, confirmed, and tentative guests: driving RSVP status defaults to `invited`, its count drives every derived per-head amount, and the designation is visible; changing the designation recomputes (REQ-GM-1 cl. 6–7, ADR-31). |
+| TC-GM-15 | Tier 1 and Tier 2 invited guests both multiply the same entry's single per-head rate; priority-tier edits do not change derived costs, and no tier-specific rate input exists in v1. A guest-reduction preview removes Tier 2 before Tier 1 (REQ-GM-1 cl. 9, ADR-35). |
 
 ### 4.4 Pledge offset math
 
@@ -586,6 +573,14 @@ Both were explicitly requested as unit-test areas. They cannot be tested because
 | TC-LG-13 | Negative adjustment (credit / refund line) | A negative `actual` is **rejected** (REQ-LG-1 cl. 4 requires ≥ 0). **Finding:** there is therefore no way to record a supplier refund or discount. Flagged as a probable requirement gap — not invented here |
 | TC-AE-13 | All six categories overridden to ₱0 | Σ overrides = 0 < budget; shortfall surfaced; no divide-by-zero in variance percent (REQ-LG-6 cl. 3) |
 
+### 4.6 Setup, notes, and hidden-fee regression cases
+
+| TC ID | Asserts |
+|---|---|
+| TC-BS-09 | Selecting Bohol resolves to Provincial index 0.85 for cost indexing **but** `is_destination = true` enables the unfilled OOT prompt. Boracay/Palawan/Siargao resolve to Destination 1.20 and enable it; NCR 1.00 does not default it. No selection writes a fee amount. Assert the selected index/flag and prompt state, **not** expected total cost while benchmarks remain unpopulated (OQ-04; REQ-BS-4 cl. 4, REQ-HF-3, ADR-29). |
+| TC-LG-14 | Notes live counter advances on every edit, accepts exactly 2,000 characters, refuses the 2,001st typed/pasted character without truncating existing text, and allows editing after deletion. Persisted value is at most 2,000 characters (REQ-LG-1 cl. 8, ADR-33). |
+| TC-HF-09 | Each of six hidden fees maps to its fixed category: crew meals/church aircon/corkage/venue power → Catering & Venue, OOT/overtime → Coordination. Every fee has a read-only category label; attempts to reclassify fail. Entries remain separate attributable lines, not merged into a single category entry (REQ-HF-2 cl. 7, 9). |
+
 ---
 
 ## 5. Sync & conflict tests
@@ -606,6 +601,8 @@ Both were explicitly requested as unit-test areas. They cannot be tested because
 | TC-SE-22 | **Simultaneous mutual removal** (existing) | removes B, server_ts T1 | removes A, server_ts T2 > T1 | both offline | **A survives** — removal with the *earlier* server_ts prevails (REQ-SE-6 cl. 9). Plan never memberless | Losing removal recorded as superseded, actor B preserved |
 | TC-SE-25 | Convergence, order-independent | 20 mixed writes | 20 mixed writes | staggered | Applying the same 40 rows in any arrival order yields identical projections on both devices; re-running sync changes nothing | — |
 | TC-SE-26 | Change-log integrity | — | — | — | Log is append-only: no UI or API path edits or deletes an entry; monetary entries carry prev + new value | — |
+| TC-SE-31 | Ownership-transfer expiry | A requests transfer, A confirms | B confirms just before vs at/after seven-day deadline | — | Before expiry, both confirmations transfer ownership; without both within 7 days of request, pending confirmation expires and ownership/access remain unchanged (REQ-SE-5 cl. 7, ADR-32) | Expired request and any confirmation remain attributed; no transfer event on expiry |
+| TC-SE-32 | Removed partner local wipe offer | A removes B | B reconnects and learns removal | B may have been offline | B's server push/pull are rejected; B retains the existing local copy unless B accepts an offered local wipe. Offer is displayed upon learning removal; no copy claims forced remote deletion (REQ-SE-6 cl. 5–7, ADR-34; OQ-03 open) | Removal attributed to A; no remote-wipe success claim |
 
 ---
 
@@ -633,7 +630,8 @@ Every v1 entity, airplane mode, expected **end state** stated.
 | TC-OF-12 | Queue durability across **app kill** | 12 offline writes; force-quit; relaunch offline → all 12 still queued, count = 12, none duplicated. Reconnect → all 12 apply exactly once |
 | TC-OF-13 | Queue durability across **OS restart** | Same 12 writes; full device reboot; relaunch → queue intact at 12, DB decrypts with the Keystore/Keychain key, no re-auth loss. **Real device only** |
 | TC-OF-14 | Resume on reconnect | No user action required; replay begins on foreground/connectivity (REQ-OF-5 cl. 1). Progress and completion visible |
-| TC-OF-15 | **Partial sync interruption mid-batch** | Push batch of 20; kill network after row 11 accepted. End state: rows 1–11 committed server-side with `server_ts`; rows 12–20 still queued locally. On retry, rows 1–11 are **insert-ignored** (idempotent, REQ-OF-5 cl. 3) and not double-counted; final gross equals the single-pass value exactly |
+| TC-OF-15 | **Partial sync interruption mid-batch** | Push batch of 20; kill network after row 11 accepted. End state: rows 1–11 committed server-side with `server_ts`; rows 12–20 still queued locally. On retry, rows 1–11 are **insert-ignored** (idempotent, REQ-OF-5 cl. 2–3), retain their assigned `server_ts`, and are not double-counted; final gross equals the single-pass value exactly |
+| TC-OF-18 | Offline replay ordering and clock authority | Queue two edits to the same field with increasing `device_monotonic` values and stable `device_id`; replay after a long offline period. The server assigns each newly accepted row `server_ts` at acceptance, never the device edit timestamp. The later accepted conflicting write wins per REQ-SE-2, even if its offline edit happened earlier in wall-clock time; original device order/id survive replay. Re-send an accepted row: same id and `server_ts`, no duplicate log or cost. |
 | TC-OF-16 | Write that cannot be applied | Surfaced to the partner with data intact, never discarded (REQ-OF-5 cl. 4); badge reads "1 change needs attention" (ux-spec §7.2 state 5) |
 | TC-OF-09 | Offline computation parity | Allocation, guest what-if, variance, buffer, gross, net all compute on-device with no network; figures identical to the online result for the same inputs |
 | TC-OF-10 | Offline indicator + pending count | Persistent indicator; exact count; escalates per ux-spec §7.2; **no copy contains "lost", "deleted", "discarded", or "failed to save"** — asserted by string scan |
@@ -692,7 +690,7 @@ Maps to **SEC-07, SEC-09, SEC-22, SEC-23, SEC-24, SEC-25**.
 | TC-SEC-09 | No-passcode device: key item uses `WhenUnlockedThisDeviceOnly` (iOS) / no weakened Keystore fallback (Android); one-time warning shown | SEC-14 |
 | TC-SEC-10 | Log hygiene: scripted scan of a captured log sample finds zero peso amounts tied to a user, zero sponsor/guest names, zero emails, zero token prefixes | SEC-28 |
 
-These five run **only on physical hardware** (§1.4). Simulators do not reproduce real file-protection classes or genuine cloud-backup behaviour, so a simulator pass here is not evidence.
+These five run **only on physical hardware** (§1.3). Simulators do not reproduce real file-protection classes or genuine cloud-backup behaviour, so a simulator pass here is not evidence.
 
 ---
 
@@ -740,11 +738,11 @@ Countable. Every line is pass/fail, no partial.
 
 | # | Criterion | Measure |
 |---|---|---|
-| 1 | REQ coverage | **48/48** testable REQ IDs have a passing mapped test. The 5 AI-phase REQs are out of scope; REQ-EX-1 has a completed manual review |
+| 1 | REQ coverage | **48/48** testable REQ IDs have a passing mapped test. Five deferred REQs are out of v1 (REQ-AI-1…3 and 5 in AI phase; REQ-AI-4 in post-launch payments); REQ-EX-1 has a completed manual review |
 | 2 | Fixtures | **All three fixtures match expected values exactly**, at base and at +25 guests — 8/8 fixture TCs green (TC-FIX-A1…C2, TC-PL-19, TC-AE-05) |
 | 3 | Defects | **Zero open S1. Zero open S2.** |
-| 4 | Sync matrix | **10/10 rows in §5 green on both iOS and Android** |
-| 5 | Offline matrix | **8/8 entity rows + 9/9 durability rows green**; the string scan in TC-OF-10 finds zero prohibited words |
+| 4 | Sync matrix | **12/12 rows in §5 green on both iOS and Android** |
+| 5 | Offline matrix | **8/8 entity rows + 10/10 durability rows green**; the string scan in TC-OF-10 finds zero prohibited words |
 | 6 | Tenant isolation | **TC-SEC-01 green in CI**, plus TC-SEC-04…06 green. Non-negotiable |
 | 7 | SEC gate — beta tier | **All security-plan §7 items marked PASS for internal beta are PASS.** Any unverifiable item counts as FAIL |
 | 7b | Device at-rest security | TC-SEC-03, TC-SEC-07…10 green **on physical hardware** — simulator results do not count |

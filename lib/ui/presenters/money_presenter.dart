@@ -5,14 +5,12 @@
 ///               two decimals, half-up rounding away from zero, leading
 ///               minus inside the format (e.g. `−₱1,200.00`).
 /// REQ-GEN-2A — constrained bento form: drop centavos below ₱1 000 000;
-///               one-decimal millions shorthand at or above (e.g. `₱1.3M`);
+///               two-decimal millions shorthand at or above (e.g. `₱1.25M`);
 ///               truncate toward zero so a tile never overstates.
 ///              cl. 6: accessibility label is always the full form.
 ///
 /// **No [double] appears here.** All arithmetic stays in [int] centavos;
-/// the [double] conversion used for the millions shorthand is isolated to
-/// the final display-string step and is applied only after the truncation
-/// policy is enforced.
+/// millions shorthand uses integer division to truncate toward zero.
 
 library;
 
@@ -62,7 +60,7 @@ String fullForm(int centavos) {
 /// Rules:
 /// - Below ₱1 000 000: drop centavos, show only the peso integer with
 ///   comma separators (e.g. `₱350,999`).
-/// - At or above ₱1 000 000: millions shorthand with one decimal digit,
+/// - At or above ₱1 000 000: millions shorthand with two decimal digits,
 ///   truncated toward zero so the displayed figure never overstates
 ///   (e.g. `₱1.25M` for ₱1 259 000.00, not ₱1.3M).
 /// - Negative: leading `−` prefix, then `₱`, then digits
@@ -74,7 +72,7 @@ String fullForm(int centavos) {
 /// Examples:
 /// ```
 /// constrainedForm(35000000)   → '₱350,000'
-/// constrainedForm(125900000)  → '₱1.2M'   (truncated toward zero)
+/// constrainedForm(125900000)  → '₱1.25M'  (truncated toward zero)
 /// constrainedForm(-120000)    → '−₱1,200'
 /// ```
 String constrainedForm(int centavos) {
@@ -84,15 +82,11 @@ String constrainedForm(int centavos) {
   final String digits;
 
   if (abs >= _millionCentavos) {
-    // Millions shorthand: truncate toward zero to avoid overstating.
-    // ₱1M = 100,000,000 centavos. One decimal place = units of 0.1M.
-    // 0.1M = 10,000,000 centavos.
-    // abs ~/ 10_000_000 gives us integer tenths-of-a-million, truncated.
-    // Example: 125_900_000 ~/ 10_000_000 = 12 → 1.2M  (not 1.3M)
-    final tenthsOfMillion = abs ~/ 10000000; // e.g. 12 for ₱1.2M
-    final wholePart = tenthsOfMillion ~/ 10; // e.g. 1
-    final fracPart = tenthsOfMillion % 10;   // e.g. 2
-    digits = '$wholePart.${fracPart}M';
+    // 0.01M = 1,000,000 centavos. Truncate before splitting the digits.
+    final hundredthsOfMillion = abs ~/ 1000000;
+    final wholePart = hundredthsOfMillion ~/ 100;
+    final fracPart = hundredthsOfMillion % 100;
+    digits = '$wholePart.${fracPart.toString().padLeft(2, '0')}M';
   } else {
     // Below ₱1M: drop centavos, show peso integer with separators.
     final pesoInt = abs ~/ 100;
