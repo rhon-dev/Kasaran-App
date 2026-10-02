@@ -21,11 +21,11 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 11. **The dashboard shows the gross event total**, including all filled hidden fees, and the variance against the ₱350,000 budget.
 12. **B logs a pledge**: Ninong Ramon, principal sponsor, ₱50,000 cash, status *tentative*. B's device and A's device both show it.
 13. **The dashboard shows gross and net side by side.** The tentative pledge does **not** reduce net out-of-pocket; it appears separately in the expected-pledge figure. Net still equals the full gross at this point (Decision D2).
-14. **B marks the pledge confirmed, then received.** Confirming leaves net unchanged and adds the ₱50,000 to outstanding exposure (promised, not yet fulfilled). Only when B marks it **received** does net out-of-pocket drop by ₱50,000; gross is unchanged throughout (Decision D2).
+14. **B confirms the pledge, then records a ₱50,000 receipt.** Confirming leaves net unchanged and adds ₱50,000 to outstanding exposure; recording the receipt reduces net by ₱50,000 and derives `received`, without changing gross (ADR-22/37). A partial receipt would reduce net immediately by its own amount.
 15. **A runs a guest what-if**, changing 150 guests to 180, and sees a **preview** of the impact before committing anything.
 16. **Every per-head cost recomputes in the preview** — catering, favors, invitations, seating. Crew meals do **not** change, because crew headcount is tracked separately from guest headcount.
 17. **A commits the what-if.** The dashboard updates gross, net, per-category variance, and the over/under-budget state consistently. B's device reflects the same figures.
-18. **B goes fully offline** (airplane mode) and keeps working: edits a supplier's actual amount, adds a new ledger entry, and marks a payment. All writes succeed locally.
+18. **B goes fully offline** (airplane mode) and keeps working: edits a supplier's actual amount, adds a new ledger entry, and records a separate payment row. All writes succeed locally.
 19. **A, still online, edits a different field on the same ledger entry B is editing.** Both edits are retained.
 20. **B reconnects.** Sync converges both devices to identical figures; the change history preserves and attributes each edit. For a same-field conflict, field-level LWW selects the later server-assigned `server_ts` (ADR-08/21), and the superseded write remains visible in history.
 
@@ -154,7 +154,7 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 *As a partner, I want to record what our Ninongs, Ninangs, and family have promised, so that it lives in the budget instead of in group chats.*
 
 1. A pledge SHALL support: pledger name, role (Ninong, Ninang, family, other), pledge type (cash amount or a specific item/category), value, and status.
-2. Status SHALL be one of *tentative*, *confirmed*, or *received*.
+2. Editable lifecycle status SHALL be one of *tentative*, *confirmed*, or *withdrawn*; *received* is derived from distinct receipt rows reaching pledge value (ADR-37/38).
 3. Both partners SHALL be able to create, edit, and delete pledges.
 4. An item-type pledge SHALL be linkable to a ledger category or entry.
 
@@ -162,15 +162,15 @@ The MVP is "done" when the following scenario runs start to finish, on real devi
 *As a partner, I want to see both what the wedding costs and what we personally pay, so that we can plan our own cash instead of guessing.*
 
 1. The dashboard SHALL display gross event total and net couple out-of-pocket as two distinct, simultaneously visible figures.
-2. Net out-of-pocket SHALL equal gross total minus the sum of *received* (fulfilled) pledges only (Decision D2). *(Was "confirmed and received"; amended so only fulfillment reduces net.)*
-3. *Tentative* and *confirmed* (promised, not yet fulfilled) pledges SHALL NOT reduce net out-of-pocket, and SHALL be shown separately as an expected-pledge figure (Decision D2).
-4. Changing a pledge status SHALL recompute the displayed figures immediately; net changes only when a pledge enters or leaves `received` (REQ-PL-2, ADR-22).
+2. Net out-of-pocket SHALL equal gross total minus eligible recorded pledge receipts, including partial support (ADR-22/37, REQ-PL-2).
+3. The unreceived remainder of *tentative* and *confirmed* pledges SHALL NOT reduce net out-of-pocket and SHALL appear separately as expected support; withdrawn pledges exclude their unreceived remainder (ADR-38).
+4. Recording, correcting, or deleting a receipt SHALL recompute net immediately; status changes alone do not make money arrive or undo historical receipts (REQ-PL-2, ADR-37/38).
 5. The system SHALL let a partner see which pledges are reducing net, and by how much.
 
 **PL-3 [v1] — Outstanding pledge exposure**
 *As a partner, I want to know which promised money has not actually arrived, so that we are not counting on cash we do not have.*
 
-1. The system SHALL compute outstanding pledge exposure as the sum of pledges that are *confirmed* but not *received*.
+1. The system SHALL compute outstanding pledge exposure as the remaining unreceived portion of active *confirmed* pledges, excluding withdrawn pledges.
 2. Outstanding exposure SHALL be displayed distinctly from both gross and net.
 3. The system SHALL list the individual unfulfilled pledges making up that figure.
 

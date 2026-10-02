@@ -22,22 +22,23 @@
 | SCR-01 | Sign In / Sign Up | Authenticate; create account | Cold start, unauthenticated | REQ-SE-1 |
 | SCR-02 | Invite Acceptance | Partner B joins a plan via deep link | Invite deep link | REQ-SE-1 (3,4,5,6) |
 | SCR-03 | Setup: Budget & Date | Capture total budget, wedding date | After sign-up; SCR-18 | REQ-BS-1, REQ-BS-2, REQ-BS-3, REQ-GEN-2 |
-| SCR-04 | Setup: Guest Cap & Region | Capture guest cap, region | SCR-03 next | REQ-BS-1, REQ-BS-4, REQ-BS-5 |
+| SCR-04 | Setup: Guest Cap, Region & Types | Capture required cap/region and optional ceremony/venue hints | SCR-03 next | REQ-BS-1, REQ-BS-4, REQ-BS-5, REQ-HF-1 |
 | SCR-05 | Setup: Hidden-Fee Prompts | Force a decision on all six fees; gate completion | SCR-04 next | REQ-HF-1, REQ-HF-2, REQ-HF-3 |
-| SCR-06 | Dashboard | Bento overview: budget, countdown, categories, health | Post-setup default tab | REQ-PL-2, REQ-PL-3, REQ-PL-4, REQ-AE-6, REQ-AE-2 (3), REQ-BS-5 (2), REQ-HF-1 (5), REQ-LG-6, REQ-OF-3 |
-| SCR-07 | Ledger List | Browse, filter, and triage all cost lines | Ledger tab; dashboard category tap | REQ-LG-1, REQ-LG-2, REQ-LG-3, REQ-LG-5, REQ-LG-6 |
-| SCR-08 | Expense Editor | Create/edit a standard ledger entry | SCR-07 add or row tap | REQ-LG-1, REQ-LG-2, REQ-LG-3, REQ-LG-4, REQ-GM-2 |
+| SCR-06 | Dashboard | Bento overview plus due-soon list and post-gift figure | Post-setup default tab | REQ-PL-2, REQ-PL-3, REQ-PL-4, REQ-AE-6, REQ-AE-2 (3), REQ-BS-5 (2), REQ-HF-1 (5), REQ-LG-5, REQ-LG-6, REQ-LG-9, REQ-GF-1, REQ-OF-3 |
+| SCR-07 | Ledger List | Browse/filter costs and due-soon schedule items | Ledger tab; dashboard due-soon/category tap | REQ-LG-1…9 |
+| SCR-08 | Expense Editor | Create/edit entry and its schedule/payment/refund history | SCR-07 add or row tap | REQ-LG-1…8, REQ-GM-2, REQ-PL-7 |
 | SCR-09 | Hidden-Fee Editor | Create/edit one of six typed fee entries | SCR-05, SCR-07, dashboard outstanding-fee chip | REQ-HF-1, REQ-HF-2, REQ-HF-3, REQ-GM-4 |
 | SCR-10 | Allocations & Overrides | Review engine allocations; override; revert | Dashboard category breakdown; SCR-18 | REQ-AE-1, REQ-AE-4, REQ-AE-5, REQ-AE-6 |
 | SCR-11 | Explain Figure | Show rule, inputs, modifier behind any engine number | Tap any engine-derived figure | REQ-AE-4, REQ-AE-2 (1) |
 | SCR-12 | Guests List | Manage guests across RSVP status and priority tier | Guests tab | REQ-GM-1, REQ-GM-4 |
 | SCR-13 | Guest What-If | Model a headcount change before committing | SCR-12 action; dashboard guest tile | REQ-GM-2, REQ-GM-3, REQ-GM-5, REQ-BS-5 (2) |
-| SCR-14 | Pledges List | Track sponsor pledges and exposure | Pledges tab; dashboard net tile | REQ-PL-1, REQ-PL-3, REQ-PL-4, REQ-PL-5 |
-| SCR-15 | Pledge Editor | Create/edit a pledge; change status | SCR-14 add or row tap | REQ-PL-1, REQ-PL-2, REQ-PL-3 |
+| SCR-14 | Pledges List | Track remaining sponsor support, partial receipts, withdrawn history | Pledges tab; dashboard net tile | REQ-PL-1…7 |
+| SCR-15 | Pledge Editor | Create/edit pledge; record receipts and direct supplier payments; withdraw | SCR-14 add or row tap | REQ-PL-1…7, REQ-LG-8 |
 | SCR-16 | Change Log / Activity | Plan-wide and per-entity history with attribution | More tab; per-entity history affordance | REQ-SE-2 (5), REQ-SE-3, REQ-SE-4, REQ-OF-5 (4) |
 | SCR-17 | Shared Access | Partner status, invite, mutual defensive removal, ownership, delete plan | More tab | REQ-SE-1, REQ-SE-5, REQ-SE-6, REQ-PLT-3 |
-| SCR-18 | Plan Settings | Edit setup inputs; driving RSVP status; ruleset opt-in | More tab | REQ-BS-2, REQ-BS-6, REQ-GM-1 (6), REQ-AE-3, REQ-PLT-3 |
+| SCR-18 | Plan Settings | Edit setup inputs, RSVP, ruleset and local due-date reminders | More tab | REQ-BS-1, REQ-BS-2, REQ-BS-6, REQ-GM-1 (6), REQ-AE-3, REQ-LG-9, REQ-PLT-3 |
 | SCR-19 | Sync Detail | Pending-write queue, last sync, failure detail, retry | Tap sync badge anywhere | REQ-OF-3, REQ-OF-5, REQ-SE-3 |
+| SCR-20 | Post-Wedding Reconciliation | Record cash gifts and compare gifts to remaining supplier balances | More tab; dashboard gifts action; Pledges tab | REQ-GF-1, REQ-GF-2, REQ-LG-4, REQ-PL-7 |
 
 ### 1.1 Requirements no screen satisfies
 
@@ -91,16 +92,16 @@ Field sources cite entities and derived calculations from design.md sections 1.4
 **Notably absent:** no block on budgets under ₱30,000 or over ₱500,000 (REQ-BS-1 clause 3).
 **Nav in:** post sign-up; SCR-18. **Nav out:** SCR-04.
 
-### SCR-04 Setup: Guest Cap & Region
-**Regions:** step indicator (2 of 3); guest cap field; region picker grouped by cost tier; tier note; next/back.
-**Fields:** `plans.guest_cap`, `plans.region_code` → `regions`, `cost_tiers`.
-**Actions:** Next → allocation runs (REQ-AE-1) → SCR-05. Region selection writes no ledger entry (REQ-BS-4 clause 5) and sets the OOT prompt default when `is_destination` (REQ-HF-3).
+### SCR-04 Setup: Guest Cap, Region & Types
+**Regions:** step indicator (2 of 3); guest cap; region grouped by cost tier; optional ceremony and venue pickers, each including “Not sure yet”; tier note; next/back.
+**Fields:** `plans.guest_cap`, `plans.region_code` → `regions`, `cost_tiers`; nullable `plans.ceremony_type` and `plans.venue_type` (null = Not sure yet). Ceremony choices: church, civil, other religious, garden/beach officiant, other. Venue choices: hotel, garden, beach/resort, restaurant, events place, other.
+**Actions:** Next → allocation runs (REQ-AE-1) → SCR-05, even if both optional types remain unset. Region selection writes no ledger entry (REQ-BS-4 clause 5) and sets OOT default when `is_destination` (REQ-HF-3). Types change only contextual fee-card hint text (e.g. civil: “Church aircon usually doesn't apply”; garden/beach: “Venue power is often needed”), never amounts, fee state, or whether the partner must decide on all six (REQ-HF-1).
 **Copy:** tier note reads *"Destination weddings usually carry supplier travel costs. We'll ask about that next."* It states the consequence without asserting an amount.
 **Nav in:** SCR-03. **Nav out:** SCR-05, back to SCR-03.
 
 ### SCR-05 Setup: Hidden-Fee Prompts
 **Regions:** step indicator (3 of 3); six fee cards each showing state badge; per-card fill/dismiss; blocked-completion slot; finish.
-**Fields:** `hidden_fee_prompts.state` per fee type; totals from `ledger_entries` + `fee_components`.
+**Fields:** `hidden_fee_prompts.state` per fee type; totals from `ledger_entries` + `fee_components`; hint copy from optional ceremony/venue type, never a pre-filled amount.
 **Actions:** Fill → SCR-09 for that type. Dismiss → records `dismissed_at`, `dismissed_by` (REQ-HF-1 clause 4). Finish → blocked while any card is `prompted_unfilled`, naming each untouched card (REQ-HF-1 clause 6).
 **Critical distinction:** `prompted_unfilled` renders as *"Not answered yet"*, never as ₱0.00 (REQ-HF-1 clause 2). A dismissed card renders *"Not applicable"* and contributes exactly 0 (clause 7).
 **Nav in:** SCR-04. **Nav out:** SCR-06 on finish; SCR-09 per card.
@@ -109,22 +110,22 @@ Field sources cite entities and derived calculations from design.md sections 1.4
 Fully specified in section 4.
 
 ### SCR-07 Ledger List
-**Regions:** header with gross total; filter bar (category, derived status, entry type); grouped list; add FAB; sync badge.
-**Fields per row:** supplier name, category, **effective amount** (derived: `actual_cents ?? estimated_cents`), **balance due** (derived: `effective − deposit_paid`, floored at 0), **payment status** (derived: paid / pending / overdue per REQ-LG-5), due date, per-head or flat marker, estimate-differs-from-actual marker (REQ-LG-3 clause 5).
-**Actions:** row tap → SCR-08 or SCR-09 by `entry_type`; filter; add → type chooser; swipe delete → confirm (REQ-LG-2 clause 3), removes from totals immediately (clause 4).
+**Regions:** header with gross total; Due soon list of outstanding dated schedule items (within the plan's configured window, 7 days by default, plus separate overdue items); filter bar (category, derived entry/item status, entry type); grouped entries; add FAB; sync badge.
+**Fields per row:** supplier, category, effective amount, derived net paid (`Σ payments − Σ refunds`), balance due (`max(0, effective − net paid)`), entry status (`paid` / `pending` / `due soon` / `overdue`) with independent partial indicator, next unpaid scheduled due date or “Undated balance”, per-head/flat marker, actual/estimate difference. Due-soon rows show item label, full amount remaining and absolute date. A virtual undated balance never appears as overdue or in Due soon (REQ-LG-5/7).
+**Actions:** due-soon or entry tap → SCR-08 or SCR-09 by `entry_type`; filter; add → type chooser; swipe delete → confirm (REQ-LG-2 clause 3), removes from totals immediately (clause 4) while retaining linked history for reconciliation (REQ-PL-7).
 **Nav in:** Ledger tab; dashboard category tap. **Nav out:** SCR-08, SCR-09, SCR-16 per-entity history.
 
 ### SCR-08 Expense Editor
-**Regions:** supplier; category picker; pricing mode toggle; amounts; deposit; due date; notes; history link; save/delete.
-**Fields:** all of `ledger_entries` per REQ-LG-1. Category from fixed taxonomy, free text rejected (clause 2). Estimated mandatory; actual optional; deposit defaults 0.
-**Derived, read-only in-form:** effective amount, balance due, payment status.
-**Actions:** toggle per-head requires a rate before accepting the change (REQ-GM-2 clause 4). Setting actual on a per-head entry sets `manually_valued` and stops recomputation, with an inline explanation (REQ-GM-2 clause 5). Deposit above effective shows an overpayment warning and stores the value unclamped (REQ-LG-4 clause 2). Notes show a live `n / 2,000` character counter; input stops at 2,000 characters rather than silently truncating an existing value (REQ-LG-1 clause 8).
+**Regions:** supplier; category picker; pricing mode; estimated/actual price; schedule list; payment/refund history; notes; history link; save/delete. The same schedule/payment sections are available on a hidden-fee entry via SCR-09.
+**Fields:** `ledger_entries` core per REQ-LG-1; schedule item kind (reservation/downpayment/installment/balance/custom), label, amount, due date and order; payment/refund amount > 0, paid-on date, method (cash/bank transfer/GCash/Maya/check/other), optional schedule-item attribution, optional note and sponsor attribution. A payment method **records** what happened; saving cannot transfer money. Unattributed payment is from the couple; sponsor direct payment is initiated from SCR-15 and writes its matching receipt in the same local transaction.
+**Derived, read-only in-form:** effective amount, `Σ payment − Σ refund`, balance due and overpayment warning, each item's allocated/remaining amount and paid/partial/due-soon/overdue state, entry paid/pending/due-soon/overdue status. No schedule → one virtual undated balance; explicit schedule below effective → a virtual undated residual. An edit that makes the schedule sum exceed effective is refused with a schedule-over-total validation error; payment history is preserved. Dated items allocate net paid by due date, sort order and ID, virtual residual last; optional `schedule_item_id` labels attribution only, **never** changes allocation order. Refund can reopen an item; all statuses recalculate locally.
+**Actions:** add/edit/remove independent schedule rows and payment/refund events with confirmation before tombstoning; show payment history and sponsor/receipt link; toggle per-head requires rate; actual on per-head sets `manually_valued` (REQ-GM-2). Discounted actual lowers effective cost subject to schedule validation; payment over effective is stored, warned and not clamped. Notes show live `n / 2,000`; stop input at limit (REQ-LG-1 clause 8). Two offline partners add distinct UUID events, never edit a cumulative deposit field (ADR-21, REQ-LG-8).
 **Nav in:** SCR-07. **Nav out:** SCR-07, SCR-16.
 
 ### SCR-09 Hidden-Fee Editor
 Six typed variants sharing one shell. Per-type field differences in section 5.1.
 **Regions:** type header; read-only allocation-category label; component list (repeatable rows where applicable); running total; guest-scaling note for crew meals; save/dismiss.
-**Fields:** `ledger_entries` header plus `fee_components` rows. Category is one of the six allocation categories, **not** the fee subtype: crew meals, church aircon, corkage, venue power → Catering & Venue; OOT fees and overtime → Coordination (REQ-HF-2 clause 9; design.md §4.4). SCR-09 displays that category read-only; the fee remains a separate attributable ledger entry.
+**Fields:** `ledger_entries` header plus `fee_components` rows and the same independent schedule/payment sections as SCR-08. Category is one of the six allocation categories, **not** the fee subtype: crew meals, church aircon, corkage, venue power → Catering & Venue; OOT fees and overtime → Coordination (REQ-HF-2 clause 9; design.md §4.4). SCR-09 displays that category read-only; the fee remains a separate attributable ledger entry.
 **Actions:** add/remove component; save; dismiss whole fee type. Component total = `quantity × unit_rate_cents` when both present, else `amount_cents` (design.md 4.4).
 **Crew meals only:** persistent note that crew meals do not scale with guests (REQ-GM-4 clause 1) and that crew headcount is not a guest count (clause 3).
 **Nav in:** SCR-05, SCR-07, dashboard chip. **Nav out:** originating screen.
@@ -160,16 +161,16 @@ Six typed variants sharing one shell. Per-type field differences in section 5.1.
 **Nav in:** SCR-12, dashboard guest tile. **Nav out:** SCR-12 or SCR-06.
 
 ### SCR-14 Pledges List
-**Regions:** gross/net pair; expected-pledge figure; outstanding exposure with contributing list; pledge list grouped by status; add.
-**Fields:** `pledges.*`; **net** (derived: gross − **received only**, REQ-PL-2 clause 2, Decision D2); **expected pledge support** (derived: Σ `tentative` + `confirmed`, REQ-PL-3); **outstanding exposure** (derived: Σ confirmed-not-received, REQ-PL-4).
-**Actions:** row tap → SCR-15; status change inline. Tap net → breakdown of contributing pledges summing exactly to gross − net, containing only `received` pledges (REQ-PL-5 clause 3).
-**Displays:** exposure renders `₱0.00`, never blank, when nothing is confirmed-not-received (REQ-PL-4 clause 3). The expected figure carries a label making clear it is not yet realized money (REQ-PL-3 clause 5).
-**Nav in:** Pledges tab; dashboard net tile. **Nav out:** SCR-15.
+**Regions:** gross/net pair; expected remaining figure; confirmed outstanding exposure and contributor list; pledges grouped tentative/confirmed/partially received/received/withdrawn; gifts and reconciliation link; add.
+**Fields:** `pledges.*` and receipt aggregates; **net** = gross − eligible *actual receipts* (including partial and historical receipts on a withdrawn pledge); all item pledges linked to the same live entry share its effective-amount cap, applied by receipt date/UUID order; **expected remaining** = Σ max(0, value − receipts) for tentative/confirmed; **exposure** = same remainder for confirmed only. Withdrawn pledges have no remaining expectation/exposure; item support for a deleted linked entry is orphaned and excluded from live net (ADR-37–39).
+**Actions:** row → SCR-15; withdraw with explicit confirmation; tap net → receipt-by-receipt breakdown that sums exactly to gross − net; gifts/reconciliation → SCR-20. A cash gift is never a pledge receipt.
+**Displays:** exposure `₱0.00` when none. Label expected amounts as promised *but not yet received*. Show partial progress as “received X of Y”, explicitly mark withdrawn history and orphan support rather than making them vanish. Net can be negative, without a zero floor.
+**Nav in:** Pledges tab; dashboard net tile. **Nav out:** SCR-15, SCR-20.
 
 ### SCR-15 Pledge Editor
-**Regions:** sponsor name; role picker; type toggle; item description (item type only); value; status; link to category or entry; save/delete.
-**Fields:** all of `pledges` per REQ-PL-1.
-**Actions:** status change updates net, expected, and exposure in the same operation (REQ-PL-2 clause 6). Moving tentative → confirmed leaves **net unchanged** and moves the value within the expected figure (still promised, not fulfilled). Confirmed → received **decreases net** by the pledge value and decreases both expected and exposure (REQ-PL-2 clause 3, REQ-PL-4 clause 1, Decision D2) — stated inline, because fulfillment, not confirmation, is the point at which the couple's real cost drops.
+**Regions:** sponsor name; role picker plus candle/veil/cord sub-role for secondary sponsor; cash/item toggle and item description; value; tentative/confirmed/withdrawn state; category/entry link; receipt history and add-receipt/direct-payment action; save/delete.
+**Fields:** `pledges` and independent `pledge_receipts` rows (`amount_cents > 0`, `received_on`, note; optional unique `payment_id`). A cash receipt has no payment link. `received` is read-only and derived only once **at least one** live receipt exists and its total reaches value; it is **not** a manual state toggle (ADR-37). A zero-value pledge with no receipt remains tentative/confirmed. Withdrawal is explicitly editable and does not erase past receipts (ADR-38). If both links are set, entry takes precedence; a deleted linked entry leaves orphan history and removes item support from live net (ADR-39).
+**Actions:** adding a partial receipt decreases net only by eligible applied support and decreases expected remaining/exposure by the recorded receipt amount; confirming a promise without receipt leaves net unchanged. A direct supplier payment requires a linked live entry and captures method, date and amount; save creates a payment with `paid_by_pledge_id` and an equal receipt with unique `payment_id` atomically in the offline local store, one receipt per payment. This reduces both net and supplier balance **once**, not twice; the UI shows both linked records. All in-kind pledges for the linked entry share its effective-amount cap; gross does not change. Withdraw with confirmation removes remaining expected/exposure but keeps historical received support in net; even a fully received pledge may be explicitly withdrawn, but withdrawal does not replace a receipt correction/refund (ADR-38). Monetary row correction tombstones the old row and inserts a new event, retaining attributed history.
 **Copy:** role picker uses **Ninong** and **Ninang** untranslated (section 8.4).
 **Nav in:** SCR-14. **Nav out:** SCR-14.
 
@@ -184,8 +185,8 @@ Specified in section 6.
 **Nav in:** More tab. **Nav out:** SCR-16 for lifecycle history (REQ-SE-5 clause 8, REQ-SE-6 clause 4).
 
 ### SCR-18 Plan Settings
-**Regions:** setup inputs (budget, date, guest cap, region); driving RSVP status picker (default `invited`); ruleset version block.
-**Actions:** any setup edit → preview before applying when more than one category shifts (REQ-BS-6 clause 3); cancel persists nothing (clause 4); applied edits log (clause 5). Ruleset opt-in → before/after preview, overrides preserved (REQ-AE-3 clauses 3, 4).
+**Regions:** setup inputs (budget, date, guest cap, region, optional ceremony/venue types); driving RSVP status picker (default `invited`); ruleset version block; **Due-date reminders** section with on/off, independent Due soon window (default 7 days), notification before-due offsets (defaults 7 and 1 days), overdue toggle and OS notification-permission explanation.
+**Actions:** any setup edit → preview before applying when more than one category shifts (REQ-BS-6 clause 3); cancel persists nothing (clause 4); applied edits log (clause 5). Ruleset opt-in → before/after preview, overrides preserved (REQ-AE-3 clauses 3, 4). Reminder edits sync plan-level preferences, reschedule this device's live unpaid dated items immediately even offline; permission denial and off switch leave financial records untouched and no reminder delivered. **Off does not hide Due soon** (the configured window still drives it). Do not include names or amounts in lock-screen text; “A supplier payment is due in 7 days” is the default. No partner-edit push.
 **Stated on screen:** editing setup destroys no entries, pledges, guests, or overrides (REQ-BS-6 clauses 1, 2). Users expect budget changes to wipe work; saying otherwise prevents avoidable fear.
 **Nav in:** More tab. **Nav out:** SCR-03/04 field editors, SCR-10.
 
@@ -194,6 +195,12 @@ Specified in section 6.
 **Fields:** `sync_state.last_pushed_server_ts`, `last_pulled_server_ts`; local queue depth.
 **Actions:** retry. Replay is automatic and requires no action here (REQ-OF-5 clauses 1, 2) — the button exists for reassurance, and the screen says so.
 **Nav in:** sync badge, any screen. **Nav out:** dismiss.
+
+### SCR-20 Post-Wedding Reconciliation
+**Regions:** gifts received list with add/inspect/tombstone; gifts total; gross/net pair; net after gifts; remaining supplier balances; signed gift-versus-balance difference; orphaned in-kind support needing review.
+**Fields:** each `gifts_received` event has source (sobre / money dance / cash / bank transfer / other), amount > 0, received-on date, optional giver name and note. The giver name is third-party personal data, so keep it optional and never put it in notifications. Derived gifts total = Σ live gifts; net after gifts = net out-of-pocket − gifts total **only when at least one gift exists**; balance total = Σ live entry balances; signed difference = gifts total − balance total (REQ-GF-1/2). Net remains the eligible-receipt-only figure of REQ-PL-2 (partial receipts included), never silently reduced by gifts.
+**Actions:** add, inspect, or soft-delete gift events offline with distinct UUIDs and change-log attribution; an amount correction tombstones the old row and inserts a replacement UUID event, never overwrites a cumulative total. Tap a gift/remaining-balance/orphan row for detail; link to SCR-08 to record an actual supplier payment. Recording gifts never pays a supplier automatically. Review an item pledge linked to a deleted entry without folding its receipt into live net; preserve the payment/receipt history for correction.
+**Nav in:** More tab, SCR-06 post-gift action, SCR-14. **Nav out:** SCR-08, SCR-14, SCR-16.
 
 ---
 
@@ -214,22 +221,23 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 | SCR-01 | Default state | N/A — no plan data | Auth request in flight | Sign-in blocked; message states connection needed and no data is at risk | Auth failure, distinct from sync | N/A — pre-plan | N/A | N/A |
 | SCR-02 | Default state | N/A | Replay progress with row count | Accept blocked; invite requires connection; token retained | Replay interrupted; resumes from cursor, partial data retained | N/A — no local writes yet | Invite already revoked; names reason | Expired invite (REQ-SE-1 clause 5) |
 | SCR-03 | Default state | Pre-filled when reached from SCR-18 | N/A — local only | Badge only; setup fully available (REQ-OF-1) | Badge only; no blocking | N/A — single-partner phase | N/A | Invalid budget per REQ-BS-2; past date per REQ-BS-3 |
-| SCR-04 | Default state | Pre-filled from SCR-18 | N/A | Badge only | Badge only | N/A | N/A | None defined — cap and region cannot be invalid |
-| SCR-05 | All six `prompted_unfilled` | Mixed filled/dismissed | N/A | Badge only | Badge only | N/A | N/A | Finish blocked while any untouched (REQ-HF-1 clause 6) |
-| SCR-06 | Post-setup: zero entries, zero pledges — see 4.4 | Full bento | Cold-start skeleton only | Badge in header; every tile live and accurate | Badge escalates; figures unaffected | Banner naming affected figure, link to SCR-16 | Read-only notice; plan data retained | Breach, over-cap, over-allocation, unfilled fees — see 4.3 |
-| SCR-07 | Empty with add affordance and hidden-fee shortcut | Grouped list | N/A | Badge; local rows indistinguishable in accuracy | Badge | Row-level attribution stamp on changed rows | Read-only; add and edit suppressed | Rows with `overdue` status; deposit-exceeds-effective rows |
-| SCR-08 | New-entry blank form | Populated form | N/A | Badge; save fully available | Badge | Field-level stamp on remotely changed fields; see 6.3 | Read-only; save suppressed | Category missing, estimated missing, per-head without rate, deposit above effective |
-| SCR-09 | Type-appropriate blank component list | Populated components | N/A | Badge; save available | Badge | Component-level stamp | Read-only | Component with neither rate-pair nor amount |
+| SCR-04 | Default cap/region; both optional types “Not sure yet” | Pre-filled from SCR-18 | N/A | Badge only; hints local | Badge only | Changed type attributed | N/A | Invalid required cap/region; optional unset never blocks |
+| SCR-05 | All six `prompted_unfilled`; contextual hints only | Mixed filled/dismissed; hints may change | N/A | Badge only | Badge only | Hint/type edits do not change fee states | N/A | Finish blocked while any untouched regardless of type (REQ-HF-1 clause 6) |
+| SCR-06 | Zero entries/pledges/gifts, no due soon — see 4.4 | Bento + due soon + net after gifts only after gifts exist | N/A — local read, see §3.1 | Badge; all tiles/lists computed locally | Badge; figures unaffected | Banner naming affected figure, link SCR-16 | Read-only; local data retained | Breach, overdue scheduled item, orphan support — see 4.3 |
+| SCR-07 | Empty with add and fee shortcut; due-soon empty | Grouped list and upcoming dated items | N/A | Badge; local rows fully usable | Badge | Row stamp; distinct UUID payments both visible | Read-only | Overdue/partial/refund-reopened, overpayment and schedule mismatch |
+| SCR-08 | Blank entry; no schedule → virtual undated balance | Schedule and payment/refund history with derived allocations | N/A | Badge; distinct row writes available | Badge; queued events retained | Field stamp for changed row; concurrent new events both shown | Read-only | Required fields/rate, nonpositive item/payment, mismatched attribution, overpayment or schedule excess warning |
+| SCR-09 | Typed blank components; virtual undated balance | Components plus schedule/payment history | N/A | Badge; save available | Badge | Component/payment-row stamps | Read-only | Component incomplete; schedule mismatch or payment over effective warned |
 | SCR-10 | Allocations present immediately post-setup; never truly empty | Six rows with variance | N/A | Badge | Badge | Stamp on remotely overridden category | Read-only; override suppressed | Over-allocation (REQ-AE-5 clause 4); negative buffer remaining (REQ-AE-6 clause 5) |
 | SCR-11 | N/A — only reachable from an existing figure | Explanation shown | N/A | Badge; explanation is local | Badge | N/A — explanation is derived, not user-written | Read-only, still viewable | Missing explanation payload → figure is not rendered upstream, so this screen is unreachable (REQ-AE-4 clause 4) |
 | SCR-12 | Zero guests; crew block still shown | Matrix and list | N/A | Badge | Badge | Stamp on changed guest rows | Read-only; add suppressed | Driving count above guest cap (REQ-BS-5 clause 2) |
 | SCR-13 | N/A — requires a plan; runs with zero guests and reports zero deltas | Before/after comparison | N/A | Badge; computes fully offline (REQ-OF-2 clause 2) | Badge; preview unaffected as it is local-only | **N/A — a preview is never synced (REQ-GM-5 clause 8), so no remote write can touch it** | Read-only; commit suppressed, preview still viewable | Over-cap with full calculation still returned (REQ-GM-5 clause 4) |
-| SCR-14 | Zero pledges; gross shown, net equals gross, expected `₱0.00`, exposure `₱0.00` | Grouped list with net, expected, and exposure figures | N/A | Badge | Badge | Banner when a pledge status changed remotely | Read-only | None defined — pledge values cannot be invalid; negative is rejected at entry |
-| SCR-15 | Blank form | Populated | N/A | Badge | Badge | Field stamp | Read-only; save suppressed | Sponsor name empty, negative value, item type without description |
+| SCR-14 | Zero pledges; gross = net, expected/exposure `₱0.00` | Partial/received/withdrawn groups with remaining exposure | N/A | Badge; receipts visible immediately | Badge | Receipt row additions both retained; status field winner attributed | Read-only | Orphan item support surfaced; negative net legitimate |
+| SCR-15 | Blank form, zero receipts | Pledge plus receipt and direct-payment links | N/A | Badge; atomic direct-payment + receipt available | Badge; paired rows retained for retry | Separate receipt rows preserved; same-field status LWW attributed | Read-only | Missing sponsor/item detail, nonpositive receipt, invalid direct-payment link or unequal payment/receipt blocked |
 | SCR-16 | Contains setup entries from the moment a plan exists; never empty | Full feed | Pagination on long histories | Badge; local entries listed as not-yet-synced | Badge | **This is where resolution surfaces** — see 6.4 | Read-only; history retained in full | N/A — log entries are facts, not calculations |
 | SCR-17 | Solo: no partner, invite prompt | Partner present, with mutual remove action available to either partner | N/A | Badge; invite generation and ownership transfer blocked offline, but a queued removal is permitted and takes effect server-side on reconnect | Badge | N/A — membership does not flow through the log (design.md 2.5) | Terminal state for the removed partner: explains removal, offers local wipe and exit | Ownership-transfer confirmation expires after 7 days; defensive removal is immediate with no pending state |
-| SCR-18 | Populated from setup; never empty | Same | N/A | Badge; edits available | Badge | Stamp on remotely changed setup fields | Read-only | Invalid budget, past date |
+| SCR-18 | Setup populated; reminder defaults on, 7-day Due soon, 7/1 delivery plus overdue | Edited preferences; permission status explained | N/A | Badge; reminders rescheduled locally | Badge; local schedule remains | Preference fields attributed; reschedule after sync | Read-only; no scheduling writes | Invalid budget, past date, invalid reminder offset/window; permission denied explained |
 | SCR-19 | Zero pending, synced | Queue listed | Sync in progress | Primary purpose: queue depth and age | Primary purpose: failure detail and retry | Lists resolved conflicts with link to SCR-16 | Read-only; sync halted, reason stated | N/A |
+| SCR-20 | No gifts: `₱0.00` gifts, actual supplier balances still shown; no net-after-gifts tile; invitation to add | Gifts, signed comparison, balances and orphan list | N/A — local read | Badge; add gift and reconcile offline | Badge; all local totals still visible | Both new UUID gift rows retained, attributed | Read-only history, no add/edit | Negative difference/net valid; orphan item support flagged, never silently counted |
 
 ### 3.3 Partner-removed state, stated precisely
 
@@ -266,6 +274,10 @@ Regions in source order, which is also screen-reader order. Sizes are relative u
 │ G  GUESTS             │ H  OUTSTANDING      │  2 cols, medium
 │    driving count      │    HIDDEN FEES      │
 ├───────────────────────┴─────────────────────┤
+│ J  DUE SOON  upcoming dated payment items   │  full width, list
+├─────────────────────────────────────────────┤
+│ K  NET AFTER GIFTS  → SCR-20                 │  full width; only once gifts exist
+├─────────────────────────────────────────────┤
 │ I  AI INSIGHTS  — inert placeholder, v1     │  full width, fixed 1 unit
 └─────────────────────────────────────────────┘
 ```
@@ -280,14 +292,16 @@ Tiles A and B are adjacent and equal in visual weight because REQ-PL-2 clause 1 
 | Header | Sync badge | Local queue depth, connection state (section 7) |
 | A | Gross event total | Derived: Σ effective across `ledger_entries` incl. hidden fees |
 | A | Total budget | `plans.total_budget_cents` |
-| B | Net out-of-pocket | Derived: gross − **received only** (REQ-PL-2 clause 2, Decision D2). Confirmed-but-unfulfilled pledges do NOT reduce net. |
-| B | Expected pledge support | Derived: Σ of `tentative` + `confirmed` (promised, not yet fulfilled), labelled separately, never summed into net (REQ-PL-3, Decision D2) |
+| B | Net out-of-pocket | Derived: gross − eligible *recorded receipts*, including partial and historically received amounts on withdrawn pledges. Live linked in-kind support capped at entry effective amount; orphaned item support excluded. Promises and gifts do NOT reduce this figure (ADR-22, ADR-37–39). |
+| B | Expected remaining pledge support | Derived: Σ `max(0, value − receipts)` for tentative/confirmed pledges only; label as unrealized support, never merge with net (REQ-PL-3). |
 | C | Budget health | Six defined conditions in §4.3; five can be evaluated, budget adequacy is unavailable pending benchmarks. On the first-run dashboard, the four checks that pass are budget breach, over-allocation, over guest cap, and overdue payments; hidden fees pass too after SCR-05 completes. |
 | D | Buffer remaining | Derived per REQ-AE-6 clauses 1, 2; pesos and percent of original (clause 4) |
-| E | Outstanding exposure | Derived: Σ confirmed-not-received (REQ-PL-4) |
+| E | Outstanding exposure | Derived: Σ remaining (`max(0, value − receipts)`) for confirmed, non-withdrawn pledges (REQ-PL-4) |
 | F | Per-category allocated / effective / variance | `plan_allocations` + derived variance (REQ-LG-6 clauses 1, 2) |
 | G | Driving guest count and tier split | `guests` filtered by `plans.driving_rsvp_status` (REQ-GM-1 clauses 6, 8) |
 | H | Unanswered fee count | `hidden_fee_prompts` where state = `prompted_unfilled` (REQ-HF-1 clause 5) |
+| J | Due soon | Outstanding explicit schedule items due within the configured window (7 days by default), with full label, remaining amount and absolute date; overdue items shown separately. Tap → SCR-08/09; virtual undated balances absent, notification off does not hide list (REQ-LG-7/9). |
+| K | Net after gifts | `net_out_of_pocket − Σ gifts_received.amount_cents`; appears only when at least one live gift exists and points to SCR-20. Does not replace tile B (REQ-GF-1/2). |
 | I | Nothing | Section 4.5 |
 
 ### 4.3 Budget health card — exact inputs, and where I stop
@@ -300,7 +314,7 @@ Tiles A and B are adjacent and equal in visual weight because REQ-PL-2 clause 1 
 | 2 | Over-allocation | `Σ override_cents > total_budget_cents` | REQ-AE-5 clause 4 |
 | 3 | Over guest cap | `driving_guest_count > guest_cap` | REQ-BS-5 clause 2 |
 | 4 | Unanswered hidden fees | any `hidden_fee_prompts.state = 'prompted_unfilled'` | REQ-HF-1 clause 5 |
-| 5 | Overdue payments | any entry with `balance_due > 0` and `due_date < today` | REQ-LG-5 clause 2 |
+| 5 | Overdue payments | any live dated schedule item with outstanding allocated balance and `due_date < device-local today` | REQ-LG-5 clause 2, REQ-LG-7 |
 | 6 | Budget adequacy shortfall | `total_budget_cents < expected_total_cost_cents` | REQ-AE-2 clause 3 |
 
 Each computable condition renders as met or not met, with the governing number shown. All values come from the rule-based engine and derived calculations in design.md 1.4 and 5.2. No network, no model, no inference.
@@ -332,12 +346,14 @@ In the empty-ledger case immediately post-setup (all fee prompts explicitly dism
 - F: six categories with allocated amounts, zero effective, full negative variance
 - G: driving count derived from guests with the `invited` status by default; zero if no guests added yet
 - H: count of unanswered fees, which is 0 immediately after the SCR-05 gate
+- J: “No supplier payments due soon”; no virtual undated item is treated as a deadline
+- K: absent until a live gift exists; tile B remains the full net figure
 
 Only F and G carry a genuine call to action. There is no blank-slate dashboard state, because setup guarantees allocations exist.
 
 ### 4.5 AI insights placeholder (tile I)
 
-- **Position:** last region, full width, below all v1 content.
+- **Position:** last region, full width, below all v1 content including J and conditional K.
 - **Dimensions:** fixed height of 1 layout unit — the same height as a compact tile such as H. It does not grow, does not scroll, and does not reflow when adjacent tiles change.
 - **Renders in v1:** nothing. No text, no icon, no skeleton, no animation, no tap target.
 - **Label:** the region is labelled in code and in the layout spec as `ai_insights_placeholder`. The label is not user-visible in v1.
@@ -410,16 +426,15 @@ All six use the same SCR-09 shell, with subtype-specific inputs and a read-only 
 2. Running total sums all three; save marks the prompt filled.
 3. **End state:** three components and one attributable ledger line appear; gross increases by their sum without guest scaling.
 
-### 5.2 Logging a pledge · REQ-PL-1, REQ-PL-2, REQ-PL-3, REQ-PL-4, REQ-SE-4
+### 5.2 Pledge receipt, withdrawal and direct payment · REQ-PL-1…7, REQ-LG-8, REQ-SE-4
 
-1. From SCR-14, add. SCR-15 opens.
-2. Enter sponsor name; pick role — **Ninong**, **Ninang**, family, friend, other.
-3. Choose cash or item. Item reveals a description field and optional link to a category or entry.
-4. Enter value. Set status: tentative, confirmed, or received.
-5. Save.
-6. **End state, tentative:** pledge listed under Tentative; net **unchanged**; value appears in the expected figure; exposure unchanged. Inline copy explains that promised pledges do not reduce what the couple pays until the money is actually received (Decision D2).
-7. **End state, confirmed:** net still **unchanged**; value remains in the expected figure and now also in outstanding exposure (confirmed-but-unfulfilled). The pledge does not appear in the net breakdown, because it has not reduced net. Inline copy: confirming a pledge is a promise, not yet cash.
-8. **End state, received:** net **decreases** by exactly the value; the expected figure and outstanding exposure both decrease by the value; the pledge now appears in the net breakdown on tile B. This is the only status at which net moves (Decision D2).
+1. From SCR-14, add. SCR-15 captures sponsor name, role (including secondary sponsor with candle/veil/cord), cash or item, value, tentative/confirmed, and optional category/entry link. The entry link takes precedence if both are present.
+2. **Tentative/confirmed with no receipt:** net unchanged (ADR-22); expected remaining includes the pledge value, and confirmed also adds that amount to exposure.
+3. Add a partial receipt with positive amount and received-on date; its own UUID row appears in history. Net falls by eligible receipt-backed support, while expected remaining and confirmed exposure fall by the receipt amount, not the entire pledge face value. Another partner can independently record another receipt offline without overwriting the first.
+4. **Fully received:** when at least one live receipt exists and their sum reaches/exceeds pledge value, SCR-15 displays `received` automatically; there is no editable Received status. Over-receipts remain visible and can drive negative net; for multiple item pledges linked to one live entry, applied support shares its effective-amount cap in receipt-date/UUID order.
+5. **Direct-to-supplier item support:** choose a live linked entry and record amount/date/method; saving writes one `payments` row with `paid_by_pledge_id`, plus one equal `pledge_receipts` row with nullable-unique `payment_id` pointing at that payment, in one local offline transaction. The receipt lowers net; the payment lowers the supplier balance. Do not enter the same event as a second cash receipt. A supplier refund reverses payment coverage and requires correction of linked receipt support.
+6. **Withdrawn:** explicit withdraw action removes only the *unreceived remainder* from expected/exposure, not historical received support from net; the pledge and receipts remain visible under Withdrawn. Deleting an entry linked to item support removes that support from live net and flags orphaned history on SCR-20 instead of moving it to the category.
+7. **End state:** SCR-14 net breakdown sums actual eligible receipt-backed support; gift rows are excluded. SCR-08 shows payment and refund history, SCR-20 shows gifts separately. No step authorises or transfers funds.
 
 ### 5.3 Guest what-if, commit or discard · REQ-GM-2, REQ-GM-3, REQ-GM-5, REQ-BS-5
 
@@ -446,15 +461,33 @@ All six use the same SCR-09 shell, with subtype-specific inputs and a read-only 
 8. SCR-16 shows both rows in clock order, the winner marked current and the loser marked superseded with its value intact and its author attributed.
 9. **End state:** one visible current value on both devices; both attempts permanently recoverable in the change log; each attributed; the couple can see a disagreement happened and what the other person intended.
 
+### 5.5 Scheduling a balance, refund and reminder · REQ-LG-4/5/7/8/9
+
+1. Open SCR-08 (or SCR-09 for a hidden fee). Until a schedule is added, its effective amount appears as a **virtual undated balance**: payable, but neither overdue nor eligible for reminders.
+2. Add reservation, downpayment and balance rows, each with its own amount, label and date. If their sum is below effective, show an extra virtual undated residual; if above, **refuse the edit** with a schedule-over-total validation error (including a discounted actual-price edit), without deleting existing payment history.
+3. Record a positive payment, date and method. Optionally attribute it to a schedule item for history only; allocate net paid across items by due date, sort order and UUID regardless of attribution. No account is charged. Add another offline payment from a second device: both distinct UUID rows survive sync (ADR-21), with net paid derived from both.
+4. Add a positive **refund** row, not a negative payment. Net paid falls; the balance and schedule-item coverage recompute. A fully paid item can reopen as partial or overdue. A discount on actual price lowers effective, not the payment history, subject to schedule validation.
+5. SCR-06/07 show unpaid dated items due within the plan's configured window (7 days by default) in Due soon and past-date items as overdue. SCR-18 defaults local notification delivery to 7 days, 1 day and overdue, with a plan-level off switch; each device schedules from local data, cancels paid/deleted items and never sends partner-edit push. Turning delivery off does not hide Due soon. Default lock-screen copy contains neither supplier nor amount.
+6. **End state:** entry `paid` only at zero remaining balance; `overdue` if any unpaid dated item is overdue, `due soon` if none overdue and any is due within the configured window, otherwise `pending`; partial coverage is indicated independently. No due date, status, allocation or running deposit is stored on the entry.
+
+### 5.6 Gifts and post-wedding reconciliation · REQ-GF-1/2
+
+1. Open SCR-20. Add a gift with source (sobre, money dance, cash, bank transfer or other), positive amount, received-on date and optional giver name/note. Another partner's separately added gift is another UUID row, not a competing total.
+2. Once a gift exists, show gifts total and a separate “Net after gifts” beside the unchanged net out-of-pocket; show supplier balances due with absolute dates, and signed `gifts total − remaining balances`. A negative difference means gifts do not cover the balance, not an invalid calculation.
+3. Show any item sponsorship orphaned by deletion of its linked entry with its payment/receipt history intact; exclude that support from live net and provide a link to review. Neither gifts nor orphan history automatically marks a supplier paid.
+4. Tap a balance to open SCR-08/09 and record an actual payment; return to SCR-20 to see recomputed remaining balance and difference. Giver names stay out of lock-screen reminders.
+
 ---
 
 ## 6. Shared-editing UI
 
 ### 6.1 Notification model — position taken
 
-**In-app only. No push notifications for partner edits in v1.**
+**Partner edits: in-app only; no server push in v1. Supplier due dates: local device notifications permitted (REQ-LG-9).**
 
 Justification: two partners planning one wedding are usually co-located and often editing together. Pushing "your partner changed the flowers estimate" for every field edit produces notification fatigue fast, and the change log already provides a complete record on demand. Nothing upstream requires push, and design.md 2.6 deliberately omits realtime transport, so a push would need infrastructure that does not exist.
+
+**Separate reminder channel:** each device schedules its own alerts from local dated, unpaid `payment_schedule_items`, with plan-level settings on SCR-18 (default 7 and 1 days before, plus overdue; off switch; independent 7-day Due soon window). Reminders work offline, do not require a server push or tell the other partner about an edit, and cancel after the item is paid/deleted. Turning off notifications does not hide Due soon. Permission denial is explained, not a budget blocker. By default lock-screen copy and accessibility announcement contain no supplier names, amounts, sponsor or giver names: “A supplier payment is due in 7 days.” Undated virtual balances never notify.
 
 What is surfaced instead, in ascending intrusiveness:
 
@@ -473,8 +506,8 @@ Displayed as **display name + relative timestamp**. No avatar in v1: with exactl
 
 ### 6.3 Field-level attribution placement
 
-- **SCR-07, SCR-12, SCR-14 rows:** one stamp per row, reflecting the most recent change to any field on that entity.
-- **SCR-08, SCR-09, SCR-15 forms:** stamp beneath each field changed remotely since this user last opened the record. Not on every field — only genuinely remote ones, or the form becomes unreadable.
+- **SCR-07, SCR-12, SCR-14, SCR-20 rows:** one stamp per row, reflecting the most recent change to that entity; distinct new payment, receipt and gift events have their own attribution rather than a cumulative-field conflict.
+- **SCR-08, SCR-09, SCR-15 forms:** stamp beneath each field changed remotely since this user last opened the record; event rows also show their own author. Not on every field — only genuinely remote ones, or the form becomes unreadable.
 - **SCR-06 tiles:** no per-tile stamps. Derived figures have no single author. This is why the banner in 6.1 item 3 exists.
 - **SCR-10:** stamp on any category overridden by the other partner, since an override is a judgement call worth attributing.
 
@@ -530,7 +563,7 @@ Rules:
 
 ### 7.1 Indicator placement
 
-A single **sync badge** in the header of every SCR-06 through SCR-19, always in the same position. One component, one location, four states. Tapping it opens SCR-19.
+A single **sync badge** in the header of every SCR-06 through SCR-20, always in the same position. One component, one location, four states. Tapping it opens SCR-19.
 
 Deliberately never a full-screen block or a modal. REQ-OF-1 clause 3 forbids degrading any feature while offline; a modal degrades all of them.
 
@@ -613,7 +646,7 @@ Implementation note: this behaviour lives entirely in the `MoneyDisplay` present
 
 **English UI with Filipino domain terms kept untranslated.**
 
-Never translated, and never glossed in body copy: **Ninong**, **Ninang**, **OOT**, **corkage**, **lechon**, **HMUA**, **entourage**, **pakimkim** if introduced later.
+Never translated, and never glossed in body copy: **Ninong**, **Ninang**, **OOT**, **corkage**, **lechon**, **HMUA**, **entourage**, **sobre** (day-of envelope gifts).
 
 Justification: these are the words the audience uses when planning. "Principal sponsor (male)" is technically accurate and reads as a translation of their own life. Filipino couples searching for corkage policies use the word corkage. Substituting a Western equivalent would recreate the localisation failure the problem brief identifies in generic Western apps.
 
@@ -672,13 +705,15 @@ Every numeric tile carries an explicit label. The visual figure alone is insuffi
 | Tile | Spoken label |
 |---|---|
 | A | "Gross event total, 350,000 pesos, out of a 350,000 peso budget" |
-| B | "Net out of pocket, 300,000 pesos, counting only fulfilled pledges. Expected pledge support not yet received, 50,000 pesos" |
+| B | "Net out of pocket, 300,000 pesos, subtracting support actually received, including partial receipts. Expected pledge support not yet received, 50,000 pesos" |
 | C | "Budget health. 5 checks passing; budget adequacy not available" (first-run example only; compute count from current state) |
 | D | "Buffer remaining, 58,000 pesos, 82 percent of buffer" |
 | E | "Outstanding pledge exposure, 50,000 pesos" |
 | F row | "Catering and venue. Allocated 140,000 pesos. Spent 152,400 pesos. Over by 12,400 pesos" |
 | G | "Driving guest count, 150 confirmed guests. 40 tier 1, 110 tier 2" |
 | H | "2 hidden fees not answered: overtime, venue power" |
+| J | "Due soon. Supplier balance due 6 Oct 2026, 10,000 pesos remaining" (example; announce item and absolute due date) |
+| K | "Net after gifts, 250,000 pesos. Gifts received, 50,000 pesos. Net out of pocket before gifts, 300,000 pesos" (only when gifts exist) |
 | I | Excluded from the accessibility tree |
 
 Rules:
@@ -711,19 +746,26 @@ Names, inputs, and states only.
 
 | Component | Inputs | States | Used on |
 |---|---|---|---|
-| `MoneyField` | value in centavos, label, required, min, max, allowNegative | empty, focused, valid, invalid, over-limit warning, read-only | SCR-03, 08, 09, 10, 15 |
+| `MoneyField` | value in centavos, label, required, min, max, allowNegative | empty, focused, valid, invalid, over-limit warning, read-only | SCR-03, 08, 09, 10, 15, 20 |
 | `MoneyDisplay` | centavos, size variant, constrained mode, tappable | standard, constrained, negative, zero, unavailable | Everywhere |
 | `CategoryPicker` | selected code, taxonomy, suggestion order | unselected, selected, invalid, read-only | SCR-08, 15 |
 | `PricingModeToggle` | mode, perHeadRate | flat, per-head, per-head-missing-rate, manually-valued-locked, read-only | SCR-08 |
-| `SyncBadge` | connection state, pending count, oldest age, failure flag | synced, offline, offline-with-pending, stale, sync-problem, needs-attention | Header of SCR-06–19 |
-| `AttributionStamp` | actor, timestamp, isCurrentUser, superseded | own, partner, superseded, pending-push | SCR-07–16 |
+| `SyncBadge` | connection state, pending count, oldest age, failure flag | synced, offline, offline-with-pending, stale, sync-problem, needs-attention | Header of SCR-06–20 |
+| `AttributionStamp` | actor, timestamp, isCurrentUser, superseded | own, partner, superseded, pending-push | SCR-07–16, 20 |
 | `BentoTile` | span, height unit, label, content, a11yLabel, tappable | populated, zero-value, unavailable, inert | SCR-06 |
 | `BudgetHealthCheck` | condition id, met, governing value, reqRef | met, not-met, unavailable | SCR-06 tile C |
 | `VarianceIndicator` | allocated, effective, showPercent | under, over, exact, percent-suppressed | SCR-06 tile F, SCR-07, SCR-10 |
 | `FeeComponentRow` | componentType, label, quantity, unitRate, amount | quantity-rate mode, amount mode, incomplete, read-only | SCR-09 |
 | `FeePromptCard` | feeType, state, total, dismissedBy, dismissedAt | prompted-unfilled, filled, dismissed, region-defaulted | SCR-05, SCR-06 tile H |
-| `PledgeStatusControl` | status, value | tentative, confirmed, received, read-only | SCR-14, 15 |
-| `GrossNetPair` | gross, net (fulfilled only), expectedPledgeSupport | equal, net-reduced, zero-state | SCR-06 tiles A/B, SCR-14 |
+| `PledgeStatusControl` | explicit state, derived receipt total, value, withdrawn | tentative, confirmed, partially received, derived received, withdrawn, read-only | SCR-14, 15 |
+| `GrossNetPair` | gross, net (actual eligible receipts only), expectedRemaining | equal, net-reduced, negative-net, zero-state | SCR-06 tiles A/B, SCR-14, SCR-20 |
+| `ScheduleItemEditor` | UUID, kind, label, dueDate, amount, sortOrder | blank, valid, invalid, deleted, read-only | SCR-08, 09 |
+| `ScheduledBalanceRow` | item or virtual residual, allocated, remaining, dueDate, derived status | paid, partial, due-soon, overdue, pending, undated-virtual, mismatch | SCR-06 tile J, SCR-07–09, SCR-20 |
+| `PaymentEventEditor` | UUID, entry, schedule attribution, kind, positive amount, paidOn, method, sponsor, note | payment, refund, sponsor-direct, invalid, deleted, read-only | SCR-08, 09, 15 |
+| `ReceiptEventRow` | UUID, pledge, amount, receivedOn, paymentId, note | cash, sponsor-direct-linked, tombstoned, read-only | SCR-14, 15, 20 |
+| `ReminderSettings` | enabled, dueSoonWindowDays, dayOffsets, overdueEnabled, permissionState | default-window-7-delivery-7-1-overdue, customised, off, permission-denied, read-only | SCR-18 |
+| `GiftEventEditor` | UUID, source, positive amount, receivedOn, optional giverName/note | blank, valid, invalid, deleted, read-only | SCR-20 |
+| `ReconciliationSummary` | giftsTotal, net, netAfterGifts, remainingBalance, orphanSupport | zero-gifts, covered, shortfall, negative-net, orphan-review, read-only | SCR-20, SCR-06 tile K |
 | `RsvpTierMatrix` | counts by status and tier, drivingStatus | populated, empty, driving-highlighted | SCR-12 |
 | `CrewHeadcountBlock` | headcount | zero, populated, read-only | SCR-12, SCR-09 crew variant |
 | `WhatIfComparison` | before, after, affectedCategories, excludedItems | neutral, increase, decrease, over-cap | SCR-13 |
@@ -733,10 +775,11 @@ Names, inputs, and states only.
 | `BufferGauge` | allocation, overrun, remaining | healthy, breached, full | SCR-06 tile D, SCR-10 |
 | `ChangeLogEntry` | actor, action, entity, field, oldValue, newValue, serverTs, deviceMonotonic, superseded, pendingPush | applied, superseded, pending-push, lifecycle | SCR-16, per-entity history |
 | `ConflictBanner` | field, winningValue, losingValue, actor | single-conflict, multiple-conflicts, dismissed | SCR-06, SCR-19 |
-| `ReadOnlyNotice` | reason | partner-removed, plan-deleted | All SCR-06–19 |
+| `ReadOnlyNotice` | reason | partner-removed, plan-deleted | All SCR-06–20 |
 | `StepIndicator` | current, total, blockedReason | in-progress, blocked, complete | SCR-03, 04, 05 |
-| `DateField` | value, allowPast | empty, valid, past-confirmed, invalid | SCR-03, 08 |
+| `DateField` | value, allowPast | empty, valid, past-confirmed, invalid | SCR-03, 08, 09, 15, 20 |
 | `RegionPicker` | selected, taxonomy grouped by tier | unselected, selected, destination-selected | SCR-04, 18 |
+| `OptionalTypePicker` | ceremony/venue taxonomy, nullable selection, hint | not-sure-yet, selected, read-only | SCR-04, 18; hint on SCR-05 |
 | `TwoPartyConfirmation` | action, initiator, confirmedBy, expiresAt | awaiting-you, awaiting-partner, expired, complete | SCR-17 |
 
 ---

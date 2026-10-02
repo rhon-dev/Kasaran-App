@@ -143,9 +143,15 @@ Kasaran collects **personal data** (names, emails) and **financial and event dat
 | Wedding date | Core function (countdown, adequacy) | Yes | No | Supabase |
 | Budget, allocations, ledger amounts | Core function | Yes | No | Supabase |
 | Supplier names | Core function | Yes | No | Supabase |
-| Sponsor names & roles (Ninong/Ninang) | Core function (pledges) | Yes | No | Supabase |
+| Payment schedule dates, amounts, and labels | Supplier payment planning; locally scheduled reminders | Yes | No | Supabase; OS notification scheduler holds due-date triggers on each device, not supplier names or amounts in default lock-screen copy |
+| Recorded payment/refund dates, amounts, method, and notes | Ledger and reconciliation only; no in-app money movement or payment-rail credentials | Yes | No | Supabase |
+| Sponsor names, roles (including secondary sponsor and candle/veil/cord sub-role), pledge amounts, receipts, dates, and notes | Core function (pledges and partial fulfillment) | Yes | No | Supabase |
+| Gift source, amount, date, and notes | Day-of gifts and post-wedding reconciliation, separate from pledges | Yes | No | Supabase |
+| Optional gift giver name | Third-party personal data supplied by a partner; identify a gift if provided | Yes (linked to the couple's plan, not necessarily a giver account) | No | Supabase |
 | Guest names, RSVP, tier | Core function (guest math) | Yes | No | Supabase |
 | Region / wedding location | Core function (regional cost) | Yes (coarse) | No | Supabase |
+| Optional ceremony and venue type | Contextual hidden-fee hints; never an amount | Yes (linked to plan) | No | Supabase |
+| Reminder enabled/offset settings | Schedule local reminders per plan; no server push for partner edits | Yes | No | Supabase; on-device notification scheduler |
 | Device sync metadata (`server_ts`, `device_monotonic`, `device_id`) | Sync integrity | Yes | No | Supabase |
 
 **No advertising SDKs, no analytics-for-tracking, no data brokers.** Supabase is a processor under instruction, not an independent controller or an advertising third party. If any analytics is added later, this table and both store labels must be revised before that build ships.
@@ -156,7 +162,7 @@ Kasaran collects **personal data** (names, emails) and **financial and event dat
 |---|---|---|---|
 | Contact Info (email, name) | Yes | Yes | No |
 | Financial Info (budget, pledges, amounts) | Yes | Yes | No |
-| User Content (supplier/sponsor/guest names, notes) | Yes | Yes | No |
+| User Content (supplier/sponsor/guest/gift-giver names, notes, self-selected ceremony/venue type) | Yes | Yes | No |
 | Identifiers (account/user id) | Yes | Yes | No |
 | Usage Data | No in v1 | — | — |
 | Location | Coarse region only, self-selected, not device GPS — declare as User Content region, **not** Location. | Yes | No |
@@ -165,7 +171,7 @@ Kasaran collects **personal data** (names, emails) and **financial and event dat
 
 | Play question | Answer |
 |---|---|
-| Data collected | Personal (name, email), Financial (budget/pledge info), other user content (guest/sponsor names) |
+| Data collected | Personal (name, email), Financial (budget, payment records, pledges/receipts, gifts), other user content (guest/sponsor/gift-giver names, notes, self-selected ceremony/venue type) |
 | Data shared with third parties | No third-party *sharing* in the Play sense; Supabase is processing on the developer's behalf |
 | Encrypted in transit | Yes (SEC-17) |
 | Encrypted at rest (device) | Yes (SEC-12) |

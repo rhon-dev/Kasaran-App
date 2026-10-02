@@ -59,16 +59,16 @@ platform/
 (invite)
   accept/[token]              deep link, 7-day expiry per REQ-SE-1
 (onboarding)                  setup wizard, REQ-BS-1
-  budget-and-date → guest-cap-and-region → hidden-fees   (SCR-03 → SCR-04 → SCR-05)
+  budget-and-date → guest-cap-region-and-optional-types → hidden-fees   (SCR-03 → SCR-04 → SCR-05)
   hidden-fees blocks completion until all six touched (REQ-HF-1 clause 6)
 (app)                         tabs
-  dashboard                   gross, net, exposure, buffer, adequacy, outstanding fees
-  ledger                      list, filter by derived status
+  dashboard                   gross, net, exposure, buffer, adequacy, due soon, outstanding fees
+  ledger                      list, due soon, filter by derived status; entry schedules/payments
   guests                      RSVP × tier matrix
-  pledges                     list, status transitions
-  more                        change log, allocations, settings, plan lifecycle
+  pledges                     list, receipt history, withdrawal, gifts received
+  more                        reconciliation, change log, allocations, reminder settings, plan lifecycle
 modals
-  entry-editor, fee-editor, pledge-editor, guest-editor,
+  entry-editor, schedule-editor, payment-editor, fee-editor, pledge-editor, receipt-editor, gift-editor, guest-editor,
   what-if-preview, allocation-override, explain-figure
 ```
 
@@ -78,7 +78,9 @@ The setup wizard is a distinct stack rather than tabs because REQ-HF-1 clause 6 
 
 REQ-LG-5 clause 6 forbids persisting payment status. The same reasoning extends to every computed figure: two devices that disagree would generate a sync conflict on a value that is not actually user input.
 
-**Computed on read, never in a table:** payment status, balance due, gross event total, net out-of-pocket, outstanding pledge exposure, buffer remaining, category variance, per-head derived amounts, budget adequacy.
+**Computed on read, never in a table:** entry effective amount (including actual-price discounts and per-head rules); per-entry deposit/net paid (`Σ active payment rows − Σ active refund rows`), plan deposits/net payments, per-entry balance due (`max(0, effective − net paid)`), plan balance due, and overpayment; schedule-item allocated paid and residual, item states (`paid`, `partially paid`, `due soon`, `overdue`, otherwise pending), entry payment status (`paid`, `pending`, `due soon`, `overdue`) and separately indicated partial coverage; gross event total, net received pledge support (including receipt-derived `received` status), expected remaining pledge support, outstanding confirmed pledge exposure, net out-of-pocket (gross minus received support), gifts total, net after gifts (net out-of-pocket minus gifts total), post-wedding reconciliation of gifts against remaining balances and any orphan support; buffer remaining, category variance, per-head derived amounts, and budget adequacy. Do not persist a running payment, receipt, or gift total. Negative net and net-after-gifts values remain negative, not floored (ADR-37/40). Details and attribution rules are in §4.4–4.5.
+
+For an entry without explicit schedule items, render **one virtual undated balance** for its effective amount; it has no row, no date, no reminder, and cannot become overdue. When an explicit schedule exists, allocate its dated items first, then render a virtual undated residual only for any remaining effective amount not covered by the items (ADR-36). All payment allocations, item states and reminders derive locally on read from the active rows and the device's calendar date; they are not synced as status writes (REQ-OF-4). A refund can reopen a paid item or entry.
 
 Cheap because SQLite is local — these are millisecond aggregates over hundreds of rows, not thousands.
 
@@ -142,7 +144,7 @@ Each log row carries an ordering key `(server_ts, device_monotonic, device_id)`,
 
 **Client-generated UUIDv7 primary keys, everywhere.** Offline creation is required by REQ-OF-1, so the client must mint IDs without asking the server. Server-side autoincrement makes offline creates impossible. UUIDv7 sorts by creation time, which keeps index locality reasonable.
 
-**Soft deletes via `deleted_at`.** A hard delete cannot propagate — the row simply vanishes locally, and the next pull from a peer that has not yet seen the delete resurrects it. Deletion is a field change like any other, so it flows through the log and resolves under the same LWW rule.
+**Soft deletes via `deleted_at`.** A hard delete cannot propagate — the row simply vanishes locally, and the next pull from a peer that has not yet seen the delete resurrects it. Deletion is a field change like any other, so it flows through the log and resolves under the same LWW rule. Schedule items, payments, receipts and gifts have independent UUID rows and tombstones: two partners recording different events offline insert different IDs instead of overwriting one cumulative field. Monetary event corrections tombstone the old row and insert a new UUID event, rather than overwrite its amount. Other changed fields on an existing row still follow ADR-21 server-timestamp LWW, with the immutable log retaining losing writes; dates such as `paid_on` and `received_on` are domain dates, never ordering clocks.
 
 Both are expensive to reverse. See sections 7.3 and 7.4.
 
@@ -179,7 +181,7 @@ Bootstrapping a long-lived plan means replaying every field change ever made. Fo
 
 ### 2.6 What is deliberately not built
 
-- **No realtime push.** Sync on app foreground, on reconnect, and after a debounce following local writes. Two users who are usually in the same room do not need websockets, and REQ-SE-3 only demands convergence, not immediacy.
+- **No realtime push or partner-edit push notifications.** Sync on app foreground, on reconnect, and after a debounce following local writes. Each device may schedule its own due-date **local notifications** from its local schedule and plan reminder settings, including offline; these are not a remote sync transport (§4.4, REQ-LG-9).
 - **No CRDTs.** The requirements specify LWW. A CRDT would be a heavier mechanism satisfying a guarantee nobody asked for. Noted in section 7.2 as the reversal path if LWW proves insufficient.
 - **No operational transform.** No collaborative text editing here.
 
@@ -245,6 +247,14 @@ plans (
   total_budget_cents   bigint not null check (total_budget_cents > 0),
   guest_cap            integer not null check (guest_cap >= 0),
   region_code          text not null,                    -- with ruleset_version: composite FK to regions
+  ceremony_type        text check (ceremony_type in
+                         ('church','civil','other_religious','garden_beach_officiant','other')),
+  venue_type           text check (venue_type in
+                         ('hotel','garden','beach_resort','restaurant','events_place','other')),
+  reminder_enabled     boolean not null default true,
+  reminder_window_days integer not null default 7 check (reminder_window_days >= 0),
+  reminder_days_before jsonb not null default '[7,1]', -- distinct nonnegative integer offsets
+  reminder_overdue     boolean not null default true,
   ruleset_version      text not null,            -- pinned, REQ-AE-3
   driving_rsvp_status  text not null,            -- REQ-GM-1 clause 6
   is_active            boolean not null default true,   -- REQ-PLT-3
@@ -253,6 +263,10 @@ plans (
   deleted_at           timestamptz,              -- soft delete, creator only
   foreign key (ruleset_version, region_code) references regions (ruleset_version, code)
 )
+-- Null ceremony_type or venue_type = "Not sure yet"; these optional fields
+-- select fee-card hint copy only. They do not create entries or decide any of
+-- the six mandatory hidden-fee prompts (REQ-BS-1, REQ-HF-1, ADR-42).
+-- Reminder preferences sync per plan; delivered notifications stay device-local.
 
 plan_members (
   plan_id   uuid references plans,
@@ -386,8 +400,6 @@ ledger_entries (
   supplier_name      text not null,
   estimated_cents    bigint not null check (estimated_cents >= 0),
   actual_cents       bigint check (actual_cents >= 0),      -- nullable
-  deposit_paid_cents bigint not null default 0,
-  due_date           date,
   pricing_mode       text not null check (pricing_mode in ('per_head','flat')),
   per_head_rate_cents bigint,           -- required when per_head
   manually_valued    boolean not null default false,        -- REQ-GM-2 clause 5
@@ -397,7 +409,37 @@ ledger_entries (
 )
 -- entry_type in ('standard','crew_meals','oot_fees','church_aircon',
 --                'corkage','overtime','venue_power')
--- NOT stored: payment_status, balance_due, effective_amount. All derived.
+-- NOT stored: deposit_paid, entry due_date, payment_status, balance_due,
+-- effective_amount. These are derived or separately recorded below.
+
+payment_schedule_items (                     -- REQ-LG-7; explicit schedule only
+  id            uuid pk,
+  entry_id      uuid not null references ledger_entries,
+  kind          text not null check (kind in
+                  ('reservation','downpayment','installment','balance','custom')),
+  label         text not null,
+  due_date      date not null,
+  amount_cents  bigint not null check (amount_cents > 0),
+  sort_order    integer not null,
+  deleted_at    timestamptz
+)
+
+payments (                                  -- REQ-LG-8; records, not payment rails
+  id                 uuid pk,
+  entry_id           uuid not null references ledger_entries,
+  schedule_item_id   uuid references payment_schedule_items, -- nullable
+  kind               text not null check (kind in ('payment','refund')),
+  amount_cents       bigint not null check (amount_cents > 0),
+  paid_on            date not null,
+  method             text not null check (method in
+                       ('cash','bank_transfer','gcash','maya','check','other')),
+  paid_by_pledge_id  uuid references pledges,       -- null = couple paid
+  note               text,
+  deleted_at         timestamptz
+)
+-- Validate schedule_item_id belongs to entry_id; sponsor payments reference
+-- an active item pledge in the same plan. The pledges FK is declared forward
+-- here; resolve table creation order in the initial schema, not a migration.
 
 fee_components (
   id             uuid pk,
@@ -413,6 +455,10 @@ fee_components (
 ```
 
 Each hidden fee remains a `ledger_entries` line with a category from the six-category allocation taxonomy (REQ-LG-1 clause 1); `entry_type` is a separate subtype, **not** a seventh allocation category. The fixed subtype-to-category mapping is: crew meals → Catering & Venue; OOT fees → Coordination; church aircon → Catering & Venue; corkage → Catering & Venue; overtime → Coordination; venue power → Catering & Venue. The fee editor shows the mapped category read-only (REQ-HF-2 clause 9). Totals and variance accrue to that category while the fee remains its own attributable ledger line (REQ-HF-2 clause 7). No category is inferred from a component amount.
+
+**Schedule and allocation (ADR-36, REQ-LG-5/7/8).** Without live schedule rows, display a single virtual undated balance for the effective amount. With explicit rows, a virtual undated residual covers `max(0, effective − Σ live scheduled amounts)`; refuse an edit that makes the scheduled sum exceed effective, showing a schedule-over-total validation error (including on actual-cost edits) without deleting payment history. Sort explicit obligations by `(due_date, sort_order, id)`, virtual residual last. Allocate the **aggregate net paid** to obligations in that chronological order; `schedule_item_id` records attribution only and does not override allocation order (REQ-LG-5 clause 8). Refunds reverse net paid and can reopen obligations; recalculate from all live events rather than persisting allocations. Cap allocated coverage at effective amount, retaining any overpayment with a warning, never creating phantom obligations. Effective amount uses actual when present (including discounts); schedule rows do not override it. A dated obligation fully covered is `paid`; if outstanding, `overdue` when due before the device-local today, `due soon` when due within `reminder_window_days` inclusive, `partially paid` when > 0 is allocated and neither urgent condition holds, otherwise pending. Show a partial-coverage sublabel even for an urgent item. An entry is `paid` if balance is zero, otherwise `overdue` if any item is overdue, `due soon` if any is due soon, otherwise `pending`, with partial indicator independent of status. No virtual undated obligation becomes overdue or due soon. These are derived local reads, not ADR-21 conflict fields.
+
+**Local reminders (REQ-LG-9, ADR-41).** Each device schedules from its own local projection and plan `reminder_enabled`, `reminder_window_days` (default 7 for Due soon, independent of delivery), `reminder_days_before` (default 7 and 1) and `reminder_overdue` (default on). Notify only for live dated items with remaining amount, at the configured day offsets and once after overdue; dedupe by `(plan_id, schedule_item_id, offset_or_overdue)` and cancel/reschedule on payment, refund, date change, row deletion, configuration change or sync. The Due soon list/status still uses the configured window even when notifications are off. Never notify for undated virtual balances or paid items. With reminders off or OS permission denied, budgeting still works offline. Default lock-screen text is generic, e.g. “A supplier payment is due in 7 days”; no supplier, amount, sponsor or giver names. This is not partner-edit push or funds transfer.
 
 One generic `fee_components` table covers all six hidden-fee shapes from REQ-HF-2 rather than six subtype tables:
 
@@ -438,7 +484,7 @@ hidden_fee_prompts (                       -- REQ-HF-1
 )
 ```
 
-A separate table because REQ-HF-1 clause 2 requires `prompted_unfilled` to be distinguishable from a filled zero. Absence of a ledger entry cannot express that, and clause 6 needs to name untouched categories to block setup completion. Clause 4 needs the dismissing partner and timestamp.
+A separate table because REQ-HF-1 clause 2 requires `prompted_unfilled` to be distinguishable from a filled zero. Absence of a ledger entry cannot express that, and clause 6 needs to name untouched categories to block setup completion. Clause 4 needs the dismissing partner and timestamp. Optional `plans.ceremony_type`/`venue_type` select **copy only**: civil can hint that church aircon usually does not apply; garden/beach context can hint that venue power is often needed. “Not sure yet” (null) retains neutral hints. No choice fills, dismisses, waives, or assigns an amount to any of the six prompts (ADR-42).
 
 ### 4.5 Guests and pledges
 
@@ -464,19 +510,52 @@ pledges (
   plan_id            uuid not null references plans,
   sponsor_name       text not null,
   sponsor_role       text not null check (sponsor_role in
-                       ('ninong','ninang','family','friend','other')),
+                       ('ninong','ninang','family','friend','secondary_sponsor','other')),
+  secondary_subrole  text check (secondary_subrole in ('candle','veil','cord')),
+  check ((sponsor_role = 'secondary_sponsor' and secondary_subrole is not null)
+      or (sponsor_role <> 'secondary_sponsor' and secondary_subrole is null)),
   pledge_type        text not null check (pledge_type in ('cash','item')),
   item_description   text,
   value_cents        bigint not null check (value_cents >= 0),
-  status             text not null check (status in ('tentative','confirmed','received')),
+  status             text not null check (status in ('tentative','confirmed','withdrawn')),
+  -- "received" needs >= 1 live receipt AND sum(receipts) >= value; never stored.
   linked_category_code text references allocation_categories,
   linked_entry_id    uuid references ledger_entries,
   created_at         timestamptz not null,
   deleted_at         timestamptz
 )
+pledge_receipts (                           -- REQ-PL-6; independent insert-only events
+  id            uuid pk,
+  pledge_id     uuid not null references pledges,
+  amount_cents  bigint not null check (amount_cents > 0),
+  received_on   date not null,
+  note          text,
+  payment_id    uuid unique references payments,       -- null for cash receipt
+  deleted_at    timestamptz
+)
+-- For direct supplier payments, payment_id is unique and non-null, its
+-- payment.paid_by_pledge_id equals pledge_id, and amounts match exactly.
+-- One receipt per direct payment, created atomically in one local transaction.
+-- A cash receipt has payment_id null. Tombstones propagate offline deletion.
+
+gifts_received (                            -- REQ-GF-1; third-party names optional
+  id            uuid pk,
+  plan_id       uuid not null references plans,
+  source        text not null check (source in
+                  ('sobre','money_dance','cash','bank_transfer','other')),
+  amount_cents  bigint not null check (amount_cents > 0),
+  received_on   date not null,
+  giver_name    text,
+  note          text,
+  deleted_at    timestamptz
+)
 ```
 
 Two orthogonal columns on `guests`, per REQ-GM-1 clauses 1, 2, and 5. `crew_headcount` is a separate table specifically so no query can accidentally sweep crew into a guest count.
+
+**Pledge accounting (ADR-37–39, REQ-PL-2–7).** Every receipt is a distinct UUID event; two offline receipts do not overwrite a cumulative `received` amount. A live pledge derives `received` only when **at least one** live receipt exists and `Σ live receipt amounts ≥ value_cents`; otherwise it keeps its explicitly selected tentative/confirmed state. `withdrawn` is an explicit display-status override even after full receipt: it is absent from expected remaining and exposure, but historical live receipts still reduce net. Withdrawal never substitutes for a refund/correction. For each non-withdrawn pledge, expected remaining = `max(0, value − Σ receipts)` if tentative or confirmed; confirmed exposure is the same remainder only when confirmed. Net support uses **recorded live receipts**, not promises or the full face value, including partial receipts, and must not double-count direct supplier payments. For a cash pledge, use received receipts; for item pledges linked to a live entry, **all** such pledges share a single cap equal to that entry's effective amount, consumed by eligible receipts in `(received_on, receipt_id)` order (ADR-39), and never separately capped per pledge. The entry link wins if both entry and category links exist. An item with only a category link uses its receipt-backed value, not an inferred category discount. If a linked entry is tombstoned, exclude its item support from live net and flag the preserved pledge/receipt/payment history as orphaned on reconciliation rather than silently reassigning the link. A sponsor's direct supplier payment creates both a `payments` row with `paid_by_pledge_id` and a `pledge_receipts` row whose unique `payment_id` references it, amounts equal, in **one offline local transaction** (both rows and their change-log writes enqueue together, and the server accepts/rejects the pair atomically as a unit even if a larger sync batch is interrupted). Validate same pledge/plan/linked entry and equal amount; replay the pair idempotently, and if a second offline writer tries to bind a different receipt to the same payment, count at most one pair and show a reconciliation conflict. The receipt reduces net once; the payment reduces the linked entry balance once. If supplier refunds sponsor-paid coverage, correct/tombstone its linked receipt in the same local transaction so support is not counted after return. A cash gift has no pledge link and never masquerades as a receipt. Gross remains the full entry cost; no amount in the ledger or pledge is mutated by a derived net figure. Net may be negative (ADR-37).
+
+**Gifts and reconciliation (REQ-GF-1/2).** Sum live gift rows independently. `net_after_gifts = net_out_of_pocket − gifts_total` is an additional figure once gifts exist; never change the meaning of net or legacy fixture outputs. Reconciliation compares gifts total, plan remaining supplier balances, net received pledge support and any orphan in-kind support, with explicit detail and a difference (`gifts_total − remaining_balances`, signed). It does not create a payment or automatically apply gifts to balances: recording how a gift was spent requires a separate payment event. Both partners can record these offline, with UUID identity, soft deletion, change-log attribution and server-assigned ordering per ADR-21.
 
 ### 4.6 Change log and sync state
 
@@ -637,9 +716,9 @@ Three hard constraints:
 
 **Privacy, flagged deliberately.** A plan snapshot contains sponsor names, guest names, a wedding date, and a location. Sending it to a third-party model is personal-data egress, and personal data of Philippine residents is covered by the Data Privacy Act of 2012. This needs explicit opt-in consent, a documented processor, and ideally field-level redaction of names before egress. It is a legal question as much as an architectural one, and it should be settled before the AI phase begins rather than during it.
 
-### 6.4 Payments → REQ-AI-4
+### 6.4 Payment rails → REQ-AI-4 (post-launch, not v1)
 
-Not designed here beyond one boundary: v1's `deposit_paid_cents` records that money moved, per REQ-LG-4 clause 5. A future payment integration would write to a **separate** `payment_transactions` table with its own reconciliation, and update `deposit_paid_cents` only as a consequence of a settled transaction. The ledger stays the system of record for intent; the payment table becomes the system of record for movement. Do not overload `deposit_paid_cents` to mean both.
+In v1, `payments` and `pledge_receipts` are manual **records of external events**, never instructions to move money; `method` records cash, bank transfer, GCash, Maya, check or other. REQ-AI-4 is a separate post-launch payment-rail phase per ADR-28. A future integration can use a separate `payment_transactions` reconciliation table and create an idempotent `payments` event **only after settlement**, using the existing UUID row and atomic receipt link for sponsor-direct settlement. Do not update a cumulative `deposit_paid_cents` field: it does not exist. Ledger payment events remain the system of record for recorded coverage; rail transactions are the external settlement record. No v1 notification or schedule event authorises a payment.
 
 ---
 

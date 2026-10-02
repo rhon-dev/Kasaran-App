@@ -27,12 +27,12 @@ These terms are used with exactly these meanings throughout. Ambiguity in any re
 | **Estimated amount** | The expected cost of a ledger entry, before the real invoice is known. |
 | **Actual amount** | The confirmed cost of a ledger entry. Nullable until known. |
 | **Effective amount** | `actual_amount` if non-null, otherwise `estimated_amount`. All totals use effective amount. |
-| **Deposit paid** | Cumulative amount already handed to the supplier for an entry. Defaults to 0. |
-| **Balance due** | `effective_amount − deposit_paid`, floored at 0. |
+| **Deposit paid** | Derived `Σ payment rows − Σ refund rows` for a live entry, including sponsor-paid supplier payments; never a cumulative stored field. |
+| **Balance due** | `max(0, effective_amount − deposit_paid)` for a live entry. Overpayment is shown separately, not silently discarded. |
 | **Gross event total** | Sum of `effective_amount` across all ledger entries, including hidden-fee entries. What the wedding costs. |
-| **Net out-of-pocket** | `gross_event_total − sum of received pledges`. Only fulfilled pledges reduce what the couple personally pays (ADR-22). |
-| **Expected pledge support** | Sum of pledge values with status `tentative` or `confirmed`; shown separately and never subtracted from net (ADR-22). |
-| **Outstanding pledge exposure** | Sum of pledge values with status `confirmed` and not yet `received`. Promised but not in hand. |
+| **Net out-of-pocket** | Gross minus recorded pledge receipts (cash and eligible in-kind support, capped per linked entry), never minus gifts or sponsor-paid supplier payments a second time; may be negative (ADR-22). |
+| **Expected pledge support** | Sum of `max(0, value − received support)` for active tentative or confirmed pledges; withdrawn pledges excluded. Never subtracted from net. |
+| **Outstanding pledge exposure** | Sum of the unreceived portion of active confirmed pledges; withdrawn pledges excluded. |
 | **Driving guest count** | The count of guests in the designated RSVP status (`invited` by default), regardless of priority tier; drives per-head cost calculations. |
 | **Crew headcount** | Total supplier crew requiring meals. Tracked separately; never part of any guest count. |
 | **Per-head entry** | A ledger entry whose effective amount is `per_head_rate × driving_guest_count`. |
@@ -124,6 +124,9 @@ WHEN a partner creates a plan, THE SYSTEM SHALL require a total budget, a weddin
 5. Guest cap accepts any integer ≥ 0.
 6. Region is selected from the taxonomy in REQ-BS-4; free-text region is rejected.
 7. On completion the system produces a category allocation per REQ-AE-1 and routes the partner to the hidden-fee prompts per REQ-HF-1.
+8. WHERE the partner supplies a ceremony type, THE SYSTEM SHALL accept exactly {church, civil, other religious, garden/beach officiant, other}; `Not sure yet` leaves the optional type unset and does not block setup.
+9. WHERE the partner supplies a venue type, THE SYSTEM SHALL accept exactly {hotel, garden, beach/resort, restaurant, events place, other}; `Not sure yet` leaves the optional type unset and does not block setup.
+10. WHEN either optional type is chosen or changed, THE SYSTEM SHALL change only relevant hidden-fee hint copy (for example civil: church aircon usually does not apply; garden/beach: venue power is often needed), SHALL NOT write an amount or dismiss a fee, and SHALL still require decisions on all six prompts under REQ-HF-1.
 
 **REQ-BS-2 [v1] — Rejection of invalid setup input**
 IF a partner submits a total budget that is non-numeric, zero, or negative, THEN THE SYSTEM SHALL reject the submission, retain all other entered values, and display an inline message naming the offending field and the reason.
@@ -181,14 +184,14 @@ WHEN a partner changes any setup input after completion, THE SYSTEM SHALL recomp
 ## 2. Expense ledger
 
 **REQ-LG-1 [v1] — Ledger entry fields**
-THE SYSTEM SHALL provide each ledger entry with a category, supplier name, estimated amount, actual amount, deposit paid, due date, entry type, and notes.
+THE SYSTEM SHALL provide each ledger entry with a category, supplier name, estimated amount, optional actual amount, entry type, and notes; schedule items and payments SHALL be separate records.
 
 1. Category is selected from the fixed taxonomy; free-text category values are rejected.
 2. Supplier name accepts any non-empty string up to 200 characters.
 3. Estimated amount is mandatory and ≥ 0.
 4. Actual amount is optional and, when set, is ≥ 0.
-5. Deposit paid defaults to 0 and is ≥ 0.
-6. Due date is optional.
+5. Deposit paid SHALL NOT be stored on an entry; it is derived from the separate payment and refund records per REQ-LG-4.
+6. Due date SHALL NOT be stored on an entry; dated obligations belong to REQ-LG-7 schedule items, and entries without a schedule have a virtual undated balance.
 7. Entry type is exactly one of: standard, or one of the six hidden-fee subtypes in REQ-HF-2.
 8. WHEN a partner enters notes, THE SYSTEM SHALL show a live character counter, accept at most 2,000 characters, and stop accepting input at the limit without silently truncating existing text (ADR-33).
 
@@ -209,25 +212,26 @@ THE SYSTEM SHALL use effective amount for every total, and SHALL display estimat
 4. Entry detail views show both values, labelled, without requiring navigation.
 5. An entry where actual differs from estimated is visually marked, using a cue that is not colour alone.
 
-**REQ-LG-4 [v1] — Deposits and balance**
-WHEN a partner records a deposit paid on an entry, THE SYSTEM SHALL recompute that entry's balance due and the plan's paid and outstanding totals.
+**REQ-LG-4 [v1] — Derived deposits and balance**
+WHEN a partner inserts a payment or refund record on an entry, THE SYSTEM SHALL recompute that entry's deposit paid, balance due, and the plan's paid and outstanding totals.
 
-1. Balance due equals effective amount minus deposit paid, floored at 0.
-2. IF deposit paid exceeds effective amount, THEN the system displays an overpayment warning naming both amounts, and stores the value without clamping it.
-3. The plan reports total deposits paid and total balance due across all entries.
-4. Deposit paid never alters estimated amount, actual amount, or gross event total.
-5. Recording a deposit never initiates, authorises, or transfers funds.
+1. Deposit paid SHALL equal the sum of positive `payment` amounts minus the sum of positive `refund` amounts on non-deleted records for each live entry; no cumulative deposit field is persisted.
+2. Balance due SHALL equal `max(0, effective amount − deposit paid)`; IF deposit paid exceeds effective amount, THEN THE SYSTEM SHALL display an overpayment warning naming both amounts without clamping the derived deposit paid.
+3. The plan SHALL report summed derived deposits paid and summed balance due across live entries, recomputed after each relevant insert, refund, actual-cost edit, or deletion.
+4. Recording a payment or refund SHALL NOT alter estimated amount, actual amount, or gross event total; a discount SHALL be recorded by lowering actual amount, not by a negative actual or negative payment.
+5. Recording a payment, refund, or method SHALL NOT initiate, authorise, or transfer funds (REQ-AI-4 remains post-launch).
 
 **REQ-LG-5 [v1] — Derived payment status**
-THE SYSTEM SHALL derive each entry's payment status as exactly one of `paid`, `pending`, or `overdue`, and SHALL NOT store payment status as a directly editable field.
+THE SYSTEM SHALL derive each entry's payment status as exactly one of `paid`, `pending`, `due soon`, or `overdue`, and SHALL NOT store payment status as a directly editable field.
 
 1. Status is `paid` when balance due equals 0.
-2. Status is `overdue` when balance due is greater than 0 and due date is non-null and earlier than the current date.
-3. Status is `pending` in all other cases.
-4. An entry with balance due greater than 0 and deposit paid greater than 0 reports status `pending` with an additional partially-paid indicator.
+2. Status SHALL be `overdue` when balance due is greater than 0 and any unpaid schedule item has a due date earlier than the device's current local date; this takes precedence over `due soon`.
+3. Status SHALL be `due soon` when balance due is greater than 0, none is overdue, and an unpaid schedule item is due from today through the plan's configured reminder window inclusive; otherwise it SHALL be `pending`.
+4. An entry with positive deposit paid and positive balance due SHALL display an additional partially-paid indicator regardless of whether its status is pending, due soon, or overdue.
 5. No user interface permits setting status directly; status changes only as a consequence of amount or date changes.
 6. Status is recomputed on every read and is never persisted as authoritative state, so that two devices with different clocks cannot produce a sync conflict on status.
-7. Status recomputation uses the device's local current date while offline, per REQ-OF-4.
+7. Status recomputation SHALL use the device's local current date while offline, per REQ-OF-4; a virtual undated obligation alone SHALL remain pending rather than overdue or due soon.
+8. THE SYSTEM SHALL allocate net paid amounts to schedule items by due date ascending, then sort_order ascending, then id ascending (undated items after dated items), and derive each item's paid, partially paid, due soon, or overdue state from its allocated balance; `schedule_item_id` is attribution only and SHALL NOT override this allocation order.
 
 **REQ-LG-6 [v1] — Planned versus actual variance**
 THE SYSTEM SHALL display variance between allocated and effective amounts per category and for the plan total, in both peso amount and percentage.
@@ -237,6 +241,30 @@ THE SYSTEM SHALL display variance between allocated and effective amounts per ca
 3. IF allocated amount is 0 and effective amount is greater than 0, THEN the system displays the peso variance and suppresses the percentage rather than dividing by zero.
 4. Over-allocation and under-allocation are distinguished by a cue that is not colour alone.
 5. Variance updates within the same operation as any change to an allocation, estimated amount, or actual amount.
+
+**REQ-LG-7 [v1] — Payment schedules**
+WHERE a partner plans instalments, THE SYSTEM SHALL keep separate schedule items for a ledger entry rather than an entry-level due date.
+
+1. Each item SHALL have a client-generated id, entry_id, kind in {reservation, downpayment, installment, balance, custom}, label, due_date, positive amount_cents, sort_order, and optional deleted_at; either partner SHALL be able to add, edit, and soft-delete items offline.
+2. WHEN an entry has no live schedule items, THE SYSTEM SHALL derive one virtual undated balance of its effective amount; it SHALL NOT persist an implicit item or assign a due date (ADR-36).
+3. WHEN live schedule items sum to less than the effective amount, THE SYSTEM SHALL derive a virtual undated residual for the difference, without persisting it; IF they sum above the effective amount, THEN THE SYSTEM SHALL show a schedule-over-total validation error and refuse the edit.
+4. A virtual balance or residual SHALL participate in payment allocation after dated schedule items and SHALL NOT generate dated reminders; editing actual amount SHALL recompute the residual and validate the schedule without deleting payment history.
+
+**REQ-LG-8 [v1] — Payment and refund records**
+WHEN a partner records supplier money movement, THE SYSTEM SHALL insert a distinct payment record and SHALL NOT overwrite a cumulative amount.
+
+1. Each record SHALL have client-generated id, entry_id, nullable schedule_item_id, kind in {payment, refund}, amount_cents > 0, paid_on, method in {cash, bank_transfer, gcash, maya, check, other}, nullable paid_by_pledge_id (null means couple-paid), note, and optional deleted_at.
+2. A refund SHALL be a positive-amount record of kind `refund`, subtract from derived deposit paid, and be capable of reopening balance and changing status; negative amounts and negative actuals SHALL be rejected.
+3. WHEN two partners insert different payments while offline, THE SYSTEM SHALL retain both distinct IDs on reconciliation and count each once (including idempotent replay), with attribution and audit history; no last-write-wins cumulative deposit SHALL replace either.
+4. WHERE schedule_item_id is set, THE SYSTEM SHALL require that item to belong to the same entry; the reference attributes the transaction but SHALL NOT change the due-date allocation of REQ-LG-5 clause 8.
+
+**REQ-LG-9 [v1] — Local due-date reminders**
+WHERE a plan has dated schedule items, THE SYSTEM SHALL schedule due-date notifications locally on each device from its own local data, including while offline, and SHALL NOT use server push for reminders or partner edits.
+
+1. For each unpaid dated item, default reminders SHALL be 7 and 1 calendar days before due date and one overdue reminder after it; a device SHALL not deliver a reminder for a fully paid or deleted item.
+2. THE SYSTEM SHALL permit a per-plan configurable reminder window and reminder timing, including an off switch; changing settings or payments SHALL reschedule or cancel affected local notifications on that device.
+3. Lock-screen notification copy SHALL default to generic wording without supplier names or amounts (for example, “A supplier payment is due in 7 days”); no names or amounts SHALL appear in default notifications or accessibility announcement text.
+4. The ledger and dashboard SHALL expose a Due soon list of unpaid items within the configured window, with entry detail navigation; disabling notifications SHALL not conceal due-soon status or list items.
 
 ---
 
@@ -282,45 +310,82 @@ WHERE the selected region carries a destination flag, THE SYSTEM SHALL default t
 THE SYSTEM SHALL provide each pledge with a sponsor name, sponsor role, pledge type, value, status, and an optional link to a ledger category or entry.
 
 1. Sponsor name accepts any non-empty string up to 200 characters.
-2. Sponsor role is one of {Ninong, Ninang, family, friend, other}.
+2. Sponsor role is one of {Ninong, Ninang, secondary_sponsor, family, friend, other}; WHERE secondary_sponsor is selected, THE SYSTEM SHALL require a sub-role in {candle, veil, cord}, and SHALL reject that sub-role for all other roles.
 3. Pledge type is either `cash` or `item`.
 4. An `item` pledge records the item sponsored as free text up to 200 characters, and may link to a ledger category or a specific entry.
 5. Value is an integer centavo amount ≥ 0.
-6. Status is exactly one of {tentative, confirmed, received}.
+6. Editable lifecycle status is exactly one of {tentative, confirmed, withdrawn}; `received` is derived only when at least one live receipt exists AND cumulative live receipts reach or exceed pledged value, and is not manually selectable (ADR-37). An explicit `withdrawn` takes precedence in the displayed status even if that receipt threshold was reached; historical receipts remain credited (ADR-38).
 7. Both partners can create, read, update, and delete any pledge.
+8. WHERE both linked_entry_id and linked_category_code are present, THE SYSTEM SHALL use the entry link as the authoritative support target and its category, not apply the receipt twice; a deleted linked entry SHALL retain historical receipts but exclude linked support from live net and flag reconciliation (ADR-39).
 
 **REQ-PL-2 [v1] — Gross and net displayed together; net reduced only on fulfillment**
-THE SYSTEM SHALL display gross event total and net out-of-pocket simultaneously, and SHALL compute net as gross minus the sum of **fulfilled (`received`) pledge values only**. *(Amended per Decision D2: a pledge reduces the couple's real out-of-pocket total only on fulfillment. Promised-but-unfulfilled pledges never reduce net.)*
+THE SYSTEM SHALL display gross event total and net out-of-pocket simultaneously, and SHALL compute net as gross minus eligible recorded pledge receipts; a partial receipt counts immediately under D2, not only when the pledge is fully received.
 
 1. Both figures are visible on the dashboard without navigation or scrolling past a fold.
-2. Net equals gross when no pledge has status `received`.
-3. A `received` pledge of ₱50,000 against a gross of ₱350,000 yields a net of ₱300,000.
-4. A `confirmed` (promised, not yet fulfilled) pledge of ₱50,000 leaves net **unchanged** at ₱350,000; it appears only in the expected figure of REQ-PL-3.
-5. Gross never changes as a consequence of any pledge status change.
-6. WHEN a pledge status changes to or from `received`, both figures update within the same operation.
+2. Net SHALL equal gross when no eligible receipt exists; an unfunded confirmed pledge SHALL leave net unchanged.
+3. WHEN ₱25,000 is received against a ₱50,000 pledge and ₱350,000 gross, THE SYSTEM SHALL show ₱325,000 net immediately; a further ₱25,000 receipt SHALL produce ₱300,000 net and derived `received` status.
+4. A confirmed but unreceived ₱50,000 pledge SHALL leave ₱350,000 gross and net unchanged and contribute ₱50,000 to expected support under REQ-PL-3.
+5. Gross SHALL never change as a consequence of pledge status, receipt, or gift changes.
+6. WHEN a receipt is added or a linked entry is deleted, THE SYSTEM SHALL recompute gross, net, expected support, and exposure from live data in the same operation; sponsor-paid payments SHALL NOT be subtracted again from net.
+7. Net SHALL NOT be floored at zero; IF eligible receipts exceed gross, THEN THE SYSTEM SHALL display the negative amount per REQ-GEN-2.
 
 **REQ-PL-3 [v1] — Expected pledges shown distinctly and excluded from net**
-THE SYSTEM SHALL compute an **expected pledge** figure as the summed value of pledges that are promised but not yet fulfilled (status `tentative` or `confirmed`), SHALL display it as a separate line distinct from net, and SHALL exclude it from the net out-of-pocket calculation. *(Amended per Decision D2: expected vs fulfilled are shown as two distinct figures; only fulfilled reduces the real number.)*
+THE SYSTEM SHALL compute expected support as the remaining unreceived portion of each live tentative or confirmed pledge, display it distinctly from net, and exclude it from net.
 
-1. A `tentative` or `confirmed` pledge of ₱50,000 leaves net unchanged and adds ₱50,000 to the expected figure.
+1. A `tentative` or `confirmed` pledge of ₱50,000 with no receipts SHALL leave net unchanged and add ₱50,000 to expected support.
 2. The expected figure is displayed under a label that distinguishes it from net (e.g. "expected pledge support"), never merged into net.
-3. WHEN a pledge changes to `received`, net decreases by exactly that pledge's value and the expected figure decreases by the same value in the same operation.
+3. WHEN a ₱50,000 pledge receives ₱20,000, expected support SHALL decrease to ₱30,000 and net SHALL decrease by ₱20,000 immediately; additional receipts SHALL reduce expected support no lower than zero.
 4. The expected figure and net are never summed into a single displayed figure.
 5. THE SYSTEM SHALL make clear in the display that the expected figure is not yet realized money.
+6. WHEN a pledge is explicitly withdrawn, THE SYSTEM SHALL exclude its remaining unreceived portion from expected support while preserving its historical receipts as eligible net support (subject to REQ-PL-7).
 
 **REQ-PL-4 [v1] — Outstanding (confirmed-but-unfulfilled) exposure**
-THE SYSTEM SHALL compute outstanding pledge exposure as the summed value of pledges with status `confirmed` (promised and accepted but not yet fulfilled), and SHALL display it distinctly from gross, net, and the total expected figure.
+THE SYSTEM SHALL compute outstanding pledge exposure as the summed unreceived portion of active confirmed pledges, and SHALL display it distinctly from gross, net, and expected support.
 
-1. A pledge moved from `confirmed` to `received` decreases outstanding exposure by its value **and decreases net by the same value** (fulfillment is the point at which net moves, per REQ-PL-2).
-2. The system lists the individual pledges comprising outstanding exposure, each with sponsor name and value.
+1. WHEN a confirmed ₱50,000 pledge receives ₱20,000, exposure SHALL decrease to ₱30,000 and net SHALL decrease by ₱20,000; at ₱50,000 cumulative receipts exposure SHALL be zero.
+2. The system SHALL list individual active confirmed pledges with their remaining unreceived amounts; a withdrawn pledge SHALL be absent from the exposure list, without deleting history or undoing prior receipts.
 3. Outstanding exposure displays as ₱0.00, not blank, when no pledge is confirmed-not-received.
 
 **REQ-PL-5 [v1] — Pledge traceability**
 WHEN a partner inspects net out-of-pocket, THE SYSTEM SHALL show which pledges reduced it and by how much.
 
-1. The breakdown lists each contributing pledge with sponsor name, status, and value.
-2. The listed values sum exactly to the difference between gross and net.
-3. Only `received` pledges appear in this breakdown; `tentative` and `confirmed` pledges are absent because they do not reduce net (Decision D2).
+1. The breakdown SHALL list each contributing pledge with sponsor name, current/derived status, each eligible receipt and its applied value, including partially fulfilled and withdrawn pledges with historical receipts.
+2. The listed eligible applied values SHALL sum exactly to gross minus net, including negative-net cases; a gift and a sponsor-paid supplier payment SHALL not add another subtraction.
+3. An unreceived tentative, confirmed, or withdrawn pledge SHALL be absent; a received portion of any non-deleted pledge SHALL be present, except support linked to a deleted entry, which SHALL be shown separately as needing reconciliation.
+
+**REQ-PL-6 [v1] — Insert-only pledge receipts**
+WHEN support actually arrives, THE SYSTEM SHALL record a distinct receipt rather than overwrite a cumulative received amount.
+
+1. Each receipt SHALL have a client-generated id, pledge_id, amount_cents > 0, received_on, optional note, optional deleted_at, and nullable `payment_id` UNIQUE foreign key to `payments.id`; cash receipts SHALL have null payment_id.
+2. WHEN at least one non-deleted receipt exists AND their sum reaches or exceeds pledge value, THE SYSTEM SHALL derive `received` from their sum (never persist or manually set it); a zero-value pledge with no receipt SHALL remain tentative or confirmed, and partial receipts SHALL reduce net immediately (ADR-37).
+3. WHEN two partners add distinct offline receipts, THE SYSTEM SHALL retain both IDs on sync and count each exactly once on replay; no cumulative received value SHALL be last-write-wins overwritten.
+4. WHEN a pledge is withdrawn, THE SYSTEM SHALL preserve its receipts and their net effects while excluding the remaining unreceived portion from expected support and exposure (ADR-38).
+
+**REQ-PL-7 [v1] — In-kind and supplier-direct support**
+WHERE a pledge sponsors an item or supplier payment, THE SYSTEM SHALL keep gross cost attributable to the ledger entry and apply received support to net at most once.
+
+1. For item pledges linked to the same entry, THE SYSTEM SHALL cap their combined eligible in-kind receipt contribution to net at that entry's effective amount (allocate cap by received_on then receipt id for deterministic attribution); support exceeding the shared cap SHALL remain visible in history but SHALL NOT reduce net further through that link.
+2. WHEN a sponsor directly pays a supplier, THE SYSTEM SHALL atomically create one positive pledge receipt and one positive supplier payment of equal amount, with `receipt.payment_id` referencing that payment and `payment.paid_by_pledge_id` referencing that pledge; an incomplete pair SHALL NOT commit (ADR-39).
+3. THE SYSTEM SHALL enforce unique receipt.payment_id and matching pledge, entry, and amount on the pair; duplicate replay or a second partner's conflicting offline attempt to pair the same payment SHALL yield one eligible pair and an explicit reconciliation conflict, not a duplicate net deduction or payment.
+4. A sponsor-paid supplier payment SHALL reduce the entry's balance due, while the matching receipt SHALL reduce net once; the payment SHALL NOT independently reduce net.
+5. WHERE both entry and category links exist, THE SYSTEM SHALL apply the entry link first and never count the category link additionally; WHEN the linked entry is deleted, THE SYSTEM SHALL exclude its linked support from live net, preserve receipts and payment history, and flag the orphan for reconciliation (ADR-39).
+
+---
+
+## 4A. Day-of gifts
+
+**REQ-GF-1 [v1] — Received gifts**
+WHEN a partner records a day-of gift (sobre/envelope, money dance, cash, or bank transfer), THE SYSTEM SHALL create a separate gift record rather than a pledge or supplier payment.
+
+1. Each `gifts_received` row SHALL have a client-generated id, source in {sobre, money_dance, cash, bank_transfer, other}, positive amount_cents, received_on, optional giver name, optional note, and optional deleted_at; both partners SHALL be able to add, inspect, and soft-delete gifts offline.
+2. Gifts SHALL NOT change gross, net out-of-pocket, pledge expected support, or pledge exposure; WHEN at least one live gift exists, THE SYSTEM SHALL display a separate `net after gifts = net out-of-pocket − Σ live gifts` figure, which may be negative (ADR-40).
+3. WHEN two devices add different offline gift rows, THE SYSTEM SHALL retain both and sum each exactly once after idempotent sync; an absent or deleted gift SHALL not trigger the extra figure.
+
+**REQ-GF-2 [v1] — Post-wedding reconciliation**
+WHEN a partner opens the post-wedding reconcile view, THE SYSTEM SHALL compare recorded gifts against supplier balances without moving money.
+
+1. THE SYSTEM SHALL display total live gifts, total outstanding balance due across live entries, and their difference (`gift total − outstanding balances`) with full PHP formatting; a shortfall and a surplus SHALL be distinguishable without colour alone.
+2. WHEN payments, refunds, gifts, or effective amounts change, THE SYSTEM SHALL recalculate the comparison on read; it SHALL NOT persist the derived totals or imply a bank balance or payout.
 
 ---
 
@@ -521,13 +586,13 @@ THE SYSTEM SHALL permit either paired partner to unilaterally revoke the other p
 **REQ-OF-1 [v1] — Full offline CRUD**
 WHILE the device has no network connectivity, THE SYSTEM SHALL permit create, read, update, and delete on every v1 data type, and SHALL persist those changes locally across app termination.
 
-1. Offline CRUD succeeds for: plan setup inputs, ledger entries, all six hidden-fee subtypes, pledges, guest tiers, crew headcount, and allocation overrides.
+1. Offline CRUD succeeds for: plan setup inputs and reminder configuration, ledger entries, schedule items, supplier payment/refund rows, all six hidden-fee subtypes, pledges and receipt rows, gifts, guest tiers, crew headcount, and allocation overrides; insert-only money rows are corrected by tombstone plus new row rather than amount overwrite.
 2. A write made offline survives a force-quit and a device restart.
 3. No v1 feature is disabled, hidden, or degraded solely because the device is offline.
 4. IF a v1 operation cannot complete offline, THEN that operation is a defect against this requirement.
 
 **REQ-OF-2 [v1] — Offline computation**
-WHILE the device has no network connectivity, THE SYSTEM SHALL compute the allocation engine, guest math, what-if previews, variance, gross, net, and outstanding exposure entirely on-device.
+WHILE the device has no network connectivity, THE SYSTEM SHALL compute the allocation engine, guest math, what-if previews, variance, gross, net, remaining expected support, outstanding exposure, balances, schedule status, net after gifts, and post-wedding reconciliation entirely on-device.
 
 1. Allocation runs offline and returns figures identical to those the same inputs produce online.
 2. A guest what-if preview runs fully offline.
@@ -577,9 +642,10 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 | Platform | REQ-PLT-1 … 3 | Cross-cutting |
 | Monetary base | REQ-GEN-1 … 2A | Cross-cutting |
 | Budget setup | REQ-BS-1 … 6 | BS-1, BS-2 |
-| Expense ledger | REQ-LG-1 … 6 | LG-1, LG-2, LG-3 |
+| Expense ledger, schedules, payments, reminders | REQ-LG-1 … 9 | LG-1, LG-2, LG-3 |
 | Hidden fees | REQ-HF-1 … 3 | HF-1, HF-2 |
-| Pledges | REQ-PL-1 … 5 | PL-1, PL-2, PL-3 |
+| Pledges and receipts | REQ-PL-1 … 7 | PL-1, PL-2, PL-3 |
+| Day-of gifts and reconciliation | REQ-GF-1 … 2 | Prompt 2 day-of gifts |
 | Guest math | REQ-GM-1 … 5 | GM-1, GM-2, GM-3 |
 | Allocation engine | REQ-AE-1 … 6 | AE-1, AE-2, AE-3 |
 | Shared editing | REQ-SE-1 … 6 | SE-1, SE-2, SE-3 |
@@ -594,7 +660,7 @@ The decisions in this section are resolved. Remaining open questions and formerl
 
 | # | Decision | Requirements |
 |---|---|---|
-| 1 | Payment states are `paid` / `pending` / `overdue`, derived not editable, with deposits modelled separately and partial payment as an indicator on `pending`. | REQ-LG-4, REQ-LG-5 |
+| 1 | Payment states are derived `paid` / `pending` / `due soon` / `overdue`; deposits derive from insert-only payments less refunds, with partial payment indicated independently of status (ADR-36). | REQ-LG-4, REQ-LG-5, REQ-LG-7 … 9 |
 | 2 | Sync conflicts resolve by field-level last-write-wins ordered by a **server-assigned timestamp** applied at sync time (device wall-clocks never authoritative), with a device monotonic counter + stable device id as tiebreaker, and an immutable change log preserving superseded writes. *(D1)* | REQ-SE-2, REQ-SE-4 |
 | 3 | Region is a first-class setup input on three cost tiers: Metro 1.00, Provincial 0.85, Destination 1.20. Destination flags control OOT independently; Bohol is Provincial at 0.85 and destination-flagged (ADR-29). | REQ-BS-4, REQ-HF-3 |
 | 4 | Baseline allocations are Catering & Venue 40%, Photo & Video 15%, Attire & Styling 10%, Coordination 10%, Entourage & Miscellaneous 5%, Buffer 20%. | REQ-AE-1 |
@@ -607,7 +673,7 @@ The decisions in this section are resolved. Remaining open questions and formerl
 | 11 | One active plan per account. | REQ-PLT-3 |
 | 12 | Bento tiles may use a constrained monetary form (centavos dropped below ₱1M, exactly two decimal places in millions shorthand at/above ₱1M, truncated toward zero; ADR-30 refines ADR-14); full two-decimal form is mandatory everywhere else and in every screen-reader label. | REQ-GEN-2, REQ-GEN-2A |
 | 13 | Ruleset config is a JSON asset bundled in the app binary for v1, validated at app load. No web authoring dashboard. | REQ-AE-1 |
-| 14 | A pledge reduces the couple's out-of-pocket total ONLY on fulfillment (`received`). Promised-but-unfulfilled pledges (`tentative`, `confirmed`) show as a separate "expected" figure and never reduce net. Both figures shown distinctly. *(D2)* | REQ-PL-2, REQ-PL-3, REQ-PL-4 |
+| 14 | Pledge receipts reduce net immediately when support arrives, including partially fulfilled and withdrawn pledges' historical receipts; remaining promise is expected, not net (ADR-22 refined by ADR-37/38). | REQ-PL-2 … 7 |
 | 15 | Retired or merged requirement IDs are recorded in the retired-IDs appendix (§14), never left as hollow live "reserved" clauses. *(D5)* | §14 |
 
 ## 12. Two decisions I adjusted, and why

@@ -57,7 +57,7 @@ One Maestro flow set, two targets. Flows live in `e2e/flows/` and are parameteri
 
 ## 2. Traceability matrix
 
-Every REQ ID in `requirements.md` (54 total) appears. Levels: **U** unit, **I** integration, **E** E2E, **M** manual/review, **S** static analysis.
+Every REQ ID in `requirements.md` (61 total) appears. Levels: **U** unit, **I** integration, **E** E2E, **M** manual/review, **S** static analysis. Test cases below are planned assertions, not executed results.
 
 | REQ ID | Test IDs | Level |
 |---|---|---|
@@ -67,26 +67,33 @@ Every REQ ID in `requirements.md` (54 total) appears. Levels: **U** unit, **I** 
 | REQ-GEN-1 | TC-GEN-01 | S (see §2.1 — runtime-untestable) |
 | REQ-GEN-2 | TC-GEN-02 | U |
 | REQ-GEN-2A | TC-GEN-03, TC-GEN-04 | U + widget |
-| REQ-BS-1 | TC-BS-01 | I |
+| REQ-BS-1 | TC-BS-01, TC-BS-10, TC-BS-11, TC-BS-12 | I + widget |
 | REQ-BS-2 | TC-BS-02 | U + I |
 | REQ-BS-3 | TC-BS-03 | I |
 | REQ-BS-4 | TC-BS-04, TC-BS-09 | U + I |
 | REQ-BS-5 | TC-BS-05, TC-GM-06 | U |
 | REQ-BS-6 | TC-BS-06 | I |
-| REQ-LG-1 | TC-LG-01, TC-LG-02, TC-LG-14 | U + I + widget |
+| REQ-LG-1 | TC-LG-01, TC-LG-02, TC-LG-14, TC-LG-15 | U + I + widget |
 | REQ-LG-2 | TC-LG-03, TC-LG-04 | I |
 | REQ-LG-3 | TC-LG-05 | U |
-| REQ-LG-4 | TC-LG-06, TC-LG-07 | U |
-| REQ-LG-5 | TC-LG-08, TC-LG-09, TC-LG-10 | U + I |
+| REQ-LG-4 | TC-LG-06, TC-LG-07, TC-LG-16 … TC-LG-20 | U + I |
+| REQ-LG-5 | TC-LG-08, TC-LG-09, TC-LG-10, TC-LG-21 … TC-LG-28 | U + I |
 | REQ-LG-6 | TC-LG-11, TC-LG-12 | U |
+| REQ-LG-7 | TC-LG-29 … TC-LG-32 | U + I |
+| REQ-LG-8 | TC-LG-13, TC-LG-33 … TC-LG-36 | U + I |
+| REQ-LG-9 | TC-LG-37 … TC-LG-40 | I + widget |
 | REQ-HF-1 | TC-HF-01, TC-HF-02, TC-HF-03, TC-HF-04 | U + I |
 | REQ-HF-2 | TC-HF-05, TC-HF-06, TC-HF-09 | U + widget |
 | REQ-HF-3 | TC-HF-07, TC-HF-08, TC-BS-09 | U + I |
-| REQ-PL-1 | TC-PL-13 | U |
-| REQ-PL-2 | TC-PL-10, TC-PL-11, TC-PL-14 | U |
-| REQ-PL-3 | TC-PL-12, TC-PL-15 | U |
-| REQ-PL-4 | TC-PL-16, TC-PL-17 | U |
-| REQ-PL-5 | TC-PL-18 | U |
+| REQ-PL-1 | TC-PL-13, TC-PL-21, TC-PL-22 | U + I |
+| REQ-PL-2 | TC-PL-10, TC-PL-11, TC-PL-14, TC-PL-20, TC-PL-23 … TC-PL-29 | U |
+| REQ-PL-3 | TC-PL-12, TC-PL-15, TC-PL-30 … TC-PL-35 | U |
+| REQ-PL-4 | TC-PL-16, TC-PL-17, TC-PL-36 … TC-PL-38 | U |
+| REQ-PL-5 | TC-PL-18, TC-PL-39 … TC-PL-41 | U + widget |
+| REQ-PL-6 | TC-PL-42 … TC-PL-45 | U + I |
+| REQ-PL-7 | TC-PL-46 … TC-PL-50 | U + I |
+| REQ-GF-1 | TC-GF-01 … TC-GF-03 | U + I |
+| REQ-GF-2 | TC-GF-04, TC-GF-05 | U + widget |
 | REQ-GM-1 | TC-GM-01, TC-GM-02, TC-GM-03, TC-GM-14, TC-GM-15 | U + I |
 | REQ-GM-2 | TC-GM-04, TC-GM-05 | U |
 | REQ-GM-3 | TC-GM-07 | U |
@@ -104,7 +111,7 @@ Every REQ ID in `requirements.md` (54 total) appears. Levels: **U** unit, **I** 
 | REQ-SE-4 | TC-SE-15, TC-SE-26 | I |
 | REQ-SE-5 | TC-SE-16, TC-SE-18, TC-SE-31 | I |
 | REQ-SE-6 | TC-SE-10, TC-SE-11, TC-SE-12, TC-SE-13, TC-SE-14, TC-SE-17, TC-SE-19, TC-SE-22, TC-SE-32 | I + E |
-| REQ-OF-1 | TC-OF-01 … TC-OF-08 | I |
+| REQ-OF-1 | TC-OF-01 … TC-OF-08, TC-OF-19 … TC-OF-21 | I |
 | REQ-OF-2 | TC-OF-09 | I |
 | REQ-OF-3 | TC-OF-10 | I |
 | REQ-OF-4 | TC-OF-11 | U + I |
@@ -116,11 +123,11 @@ Every REQ ID in `requirements.md` (54 total) appears. Levels: **U** unit, **I** 
 | REQ-AI-5 | — | Out of v1 scope (AI phase) |
 | REQ-EX-1 | TC-EX-01 | M (see §2.1) |
 
-**Coverage:** 48 of 54 REQ IDs have at least one mapped executable test. 5 (REQ-AI-1…5, including the reclassified post-launch payments REQ-AI-4) are deliberately out of v1 scope, not gaps. 1 (REQ-EX-1) is review-verified only. Five tracked testability limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 are resolved and redirected to executable tests in §2.1.
+**Coverage:** 55 of 61 REQ IDs have at least one mapped executable test specification. 5 (REQ-AI-1…5, including reclassified post-launch payments REQ-AI-4) are deliberately out of v1 scope; 1 (REQ-EX-1) is review-verified only. Five tracked testability limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 and UT-10…11 have executable redirects. Authored cases are not passing implementation tests until code exists.
 
 ### 2.1 Untestable-as-written and resolved testability gaps
 
-UT-1, UT-2, and UT-7…9 remain static/manual, unresolved, or meta-level limitations. UT-3…6 have been resolved without reusing their IDs and now redirect to executable tests. None is silently dropped.
+UT-1, UT-2, and UT-7…9 remain static/manual, unresolved, or meta-level limitations. UT-3…6 and UT-10…11 have been resolved without reusing their IDs and now redirect to executable tests (UT-10…11 in §4.4/§4.7). None is silently dropped.
 
 | # | Requirement | Limitation or resolution | Verification / next action |
 |---|---|---|---|
@@ -140,21 +147,22 @@ UT-1, UT-2, and UT-7…9 remain static/manual, unresolved, or meta-level limitat
 
 **These are the authority for expected values.** Tests assert against these hand-computed numbers, never against whatever the implementation returns.
 
-**Committed as data.** Each fixture lives at `test/fixtures/FIX-A.json`, `FIX-B.json`, `FIX-C.json` — version-controlled, human-readable, loaded by the domain unit tests. **Changing any expected value requires an explicit justification in the PR description**, naming the requirement or ADR that changed. A PR that adjusts a fixture to make a failing test pass, without that justification, is rejected on review. The fixtures are the specification; the code conforms to them.
+**Specified here, not yet committed as test data.** In phase 07, implement `test/fixtures/FIX-A.json` through `FIX-D.json` as version-controlled, human-readable inputs for the domain tests. No JSON fixture or test code is created by this spec-only revision. **Changing any FIX-A/B/C expected value requires an explicit justification in the PR description**, naming the requirement or ADR that changed. The figures in this document are the authority; code conforms to them.
 
-### 3.0 Rules applied to all three fixtures
+### 3.0 Rules applied to all four fixtures
 
 Stated once here, applied identically everywhere (this is the rounding-drift guard of §4):
 
 1. **Storage:** all money as integer centavos (REQ-GEN-1). ₱2,400.00 → `240000`.
 2. **Rounding:** half-up to 2 dp, applied **only at display** (REQ-GEN-2). Intermediate arithmetic never rounds.
 3. **Allocation:** baseline percentages from ADR-10 — Catering & Venue 40, Photo & Video 15, Attire & Styling 10, Coordination 10, Entourage & Misc 5, Buffer 20. Rounding remainder → Buffer (REQ-AE-1 cl. 6).
-4. **Regional index does NOT change allocation shares** (ADR-11, REQ-AE-2 cl. 1). Metro 1.00 / Provincial 0.85 / Destination 1.20 affect *expected total cost* and *rate suggestions* only. Per-category skew defaults to 1.0, so **all three fixtures produce identical allocation percentages despite different regions.** A naive implementation that scales shares by the index will fail TC-AE-05 — that is the point.
-5. **Net out-of-pocket = gross − received only** (ADR-22 / D2). `tentative` + `confirmed` form the separate *expected* figure and never reduce net. Outstanding exposure = `confirmed` not yet received.
+4. **Regional index does NOT change allocation shares** (ADR-11, REQ-AE-2 cl. 1). Metro 1.00 / Provincial 0.85 / Destination 1.20 affect *expected total cost* and *rate suggestions* only. Per-category skew defaults to 1.0, so **all four fixtures produce identical allocation percentages despite different regions.** A naive implementation that scales shares by the index will fail TC-AE-05 — that is the point.
+5. **Net out-of-pocket = gross − eligible receipt amounts** (ADR-22 / D2, ADR-37–39); partial and withdrawn pledges' received portions count. The unreceived remainder of active tentative/confirmed pledges is *expected*; confirmed remaining is exposure. Gifts reduce only the separate net-after-gifts figure.
 6. **Crew meals never scale with guest count** (REQ-GM-4). They scale with crew headcount only.
 7. **Buffer remaining** = Buffer allocation − Σ overruns of non-Buffer categories. Under-spend in one category does **not** offset an overrun in another (REQ-AE-6 cl. 3).
 8. **Category mapping of hidden fees (REQ-HF-2 cl. 9):** crew meals, church aircon, corkage, venue power → Catering & Venue. OOT fees, overtime → Coordination. Category labels are read-only.
 9. **Expected total cost / budget adequacy is NOT asserted in any fixture** — `reference_costs` is unpopulated (OQ-04, UT-2).
+10. Earlier fixtures' displayed `received` statuses are interpreted as exactly one receipt of the listed value, not an editable status; they contain no schedule and therefore use a virtual undated balance. If old fixture data includes a deposit, translate it to one payment row of the same amount. Their numeric expected outputs stay unchanged. Ceremony and venue labels are optional hints only.
 
 ---
 
@@ -208,7 +216,7 @@ Stated once here, applied identically everywhere (this is the rounding-drift gua
 
 | Sponsor | Role | Amount | State |
 |---|---|---|---|
-| Ninong Ramon | Ninong | ₱50,000.00 | **received** |
+| Ninong Ramon | Ninong | ₱50,000.00 | **received** (one ₱50,000 receipt) |
 | Ninang Cora | Ninang | ₱30,000.00 | confirmed |
 | Tita Mila | family | ₱20,000.00 | tentative |
 
@@ -372,9 +380,9 @@ PER-HEAD COST (display metric)
 
 | Sponsor | Role | Amount | State |
 |---|---|---|---|
-| Ninong Eduardo | Ninong | ₱150,000.00 | **received** |
+| Ninong Eduardo | Ninong | ₱150,000.00 | **received** (one ₱150,000 receipt) |
 | Ninang Rosa | Ninang | ₱100,000.00 | confirmed |
-| Groom's parents | family | ₱200,000.00 | **received** |
+| Groom's parents | family | ₱200,000.00 | **received** (one ₱200,000 receipt) |
 
 **Expected outputs — FIX-B**
 
@@ -436,11 +444,11 @@ Category actuals @ 80: Catering & Venue ₱543,000 (under 17,000) · Photo & Vid
 
 | Sponsor | Role | Amount | State |
 |---|---|---|---|
-| Ninong Pedro | Ninong | ₱80,000.00 | **received** |
+| Ninong Pedro | Ninong | ₱80,000.00 | **received** (one ₱80,000 receipt) |
 | Ninong Andres | Ninong | ₱60,000.00 | confirmed |
-| Ninang Luz | Ninang | ₱50,000.00 | **received** |
+| Ninang Luz | Ninang | ₱50,000.00 | **received** (one ₱50,000 receipt) |
 | Ninang Baby | Ninang | ₱40,000.00 | tentative |
-| Bride's uncle | family | ₱30,000.00 | **received** |
+| Bride's uncle | family | ₱30,000.00 | **received** (one ₱30,000 receipt) |
 | Groom's aunt | family | ₱25,000.00 | confirmed |
 | Cousin (item: mobile bar) | family | ₱20,000.00 | tentative |
 
@@ -474,7 +482,70 @@ A ₱145,000 spread between the correct answer and the pre-D2 answer. If TC-PL-1
 
 **FIX-C also exercises the budget-breach path.** Overruns @ 300: Catering & Venue +94,750, Attire & Styling +3,000, Coordination +5,000, Entourage & Misc +13,000 = 115,750 against a ₱100,000 buffer → buffer remaining **−₱15,750**, so REQ-AE-6 cl. 5 breach indicator must fire. It is the only fixture with a negative buffer.
 
-### 3.4 Fixture test IDs
+### 3.4 FIX-D — Batangas garden wedding; money-flow regression
+
+**All prices below are couple-supplied illustrative fixture inputs, not regional benchmarks or app recommendations.** Fixed evaluation date **2026-10-02**; budget ₱350,000.00; Batangas / Provincial 0.85; garden/beach officiant and garden venue supply hint copy only. All six fee prompts explicitly dismissed in this fixture (zero gross contribution). Guest count 100; cap 120. No cost-adequacy assertion (OQ-04).
+
+| Category | Allocated (₱350,000 × baseline) | Live ledger entries and effective cost |
+|---|---:|---|
+| Catering & Venue | ₱140,000.00 | Garden venue ₱120,000.00; catering ₱80,000.00 |
+| Photo & Video | ₱52,500.00 | Photo ₱50,000.00 |
+| Attire & Styling | ₱35,000.00 | Attire ₱40,000.00 |
+| Coordination | ₱35,000.00 | Coordination ₱15,000.00 |
+| Entourage & Misc | ₱17,500.00 | Favors ₱5,000.00 |
+| Buffer | ₱70,000.00 | No entry |
+
+The **garden venue** estimate is ₱125,000.00, actual ₱120,000.00 after a ₱5,000.00 discount; the actual, not a negative ledger adjustment, sets effective cost. Three dated schedule items total its effective ₱120,000.00:
+
+| Item (due-date allocation order) | Due | Scheduled | Allocated from net venue payment ₱60,000 | Derived item state @ 2026-10-02 |
+|---|---:|---:|---:|---|
+| Reservation | 2026-07-01 | ₱20,000.00 | ₱20,000.00 | Paid |
+| Downpayment | 2026-08-01 | ₱40,000.00 | ₱40,000.00 | Paid |
+| Balance | 2026-09-01 | ₱60,000.00 | ₱0.00 | Overdue (₱60,000 outstanding) |
+
+Venue payment rows: partner A pays ₱30,000.00 on July 1 (attributed to reservation); partner B pays ₱35,000.00 on August 1 (attributed to balance, **but allocation still follows due-date order**); a ₱5,000.00 positive `refund` row on August 15 reverses paid amount. Separate attire entry ₱40,000.00 is paid directly by its sponsor on September 1 through **one atomic ₱40,000 receipt + ₱40,000 payment pair**; receipt.payment_id uniquely identifies the payment, which also has paid_by_pledge_id. Other entries have no schedule and a virtual undated balance.
+
+Pledges: confirmed cash ₱50,000.00 with one ₱20,000.00 cash receipt (partial); withdrawn cash ₱30,000.00 with one earlier ₱10,000.00 cash receipt (history retained, ₱20,000.00 promise excluded); confirmed in-kind attire ₱40,000.00 with one linked ₱40,000.00 sponsor-direct receipt/payment pair, derived received. Day-of gifts: sobre ₱25,000.00 and money dance ₱15,000.00, separate from pledges.
+
+**Expected outputs (integer-centavo arithmetic, shown here as whole pesos with .00):**
+
+| Figure | Expected |
+|---|---:|
+| Gross | **₱310,000.00** |
+| Derived deposits paid (all entries) | **₱100,000.00** |
+| Outstanding balance due | **₱210,000.00** |
+| Net out-of-pocket | **₱240,000.00** |
+| Remaining expected pledge support | **₱30,000.00** |
+| Outstanding confirmed exposure | **₱30,000.00** |
+| Gifts total | **₱40,000.00** |
+| Net after gifts | **₱200,000.00** |
+| Gift total less outstanding balances | **−₱170,000.00** (shortfall) |
+| Buffer remaining | **₱5,000.00** (₱65,000 non-Buffer overruns) |
+| Budget position | **₱40,000.00 under** |
+
+```
+Allocation: 350,000 × (40%, 15%, 10%, 10%, 5%, 20%)
+          = 140,000 + 52,500 + 35,000 + 35,000 + 17,500 + 70,000 = 350,000.
+Gross: (120,000 + 80,000) + 50,000 + 40,000 + 15,000 + 5,000 = 310,000.
+Venue deposit paid: 30,000 + 35,000 − 5,000 refund = 60,000;
+  20,000 reservation + 40,000 downpayment paid; 60,000 balance overdue.
+Sponsor-paid attire: 40,000 payment reduces attire balance to zero;
+  paired 40,000 receipt reduces net once; it is NOT another 40,000 net subtraction.
+All deposit paid: 60,000 venue + 40,000 attire = 100,000.
+Balance due: (120,000 − 60,000) + 80,000 + 50,000 + (40,000 − 40,000)
+           + 15,000 + 5,000 = 210,000.
+Eligible pledge receipts: 20,000 partial cash + 10,000 withdrawn-history cash
+                        + 40,000 in-kind = 70,000.
+Net: 310,000 − 70,000 = 240,000 (not 200,000 by double-subtracting sponsor payment).
+Expected/exposure: (50,000 − 20,000) + 0 withdrawn + (40,000 − 40,000) = 30,000.
+Gifts: 25,000 + 15,000 = 40,000; net after gifts = 240,000 − 40,000 = 200,000.
+Reconcile: 40,000 gifts − 210,000 remaining balances = −170,000 (shortfall).
+Buffer: 70,000 − max(0, 200,000 − 140,000) − max(0, 40,000 − 35,000)
+        = 70,000 − 60,000 − 5,000 = 5,000.
+Budget headroom: 350,000 − 310,000 = 40,000.
+```
+
+### 3.5 Fixture test IDs
 
 | TC ID | Asserts | Level |
 |---|---|---|
@@ -484,8 +555,9 @@ A ₱145,000 spread between the correct answer and the pre-D2 answer. If TC-PL-1
 | TC-FIX-B2 | FIX-B @ 105, incl. OOT and crew meals unchanged | U |
 | TC-FIX-C1 | FIX-C @ 300: all figures, incl. negative buffer / breach | U |
 | TC-FIX-C2 | FIX-C @ 325, incl. over-budget and over-cap | U |
+| TC-FIX-D1 | FIX-D all expected figures, three schedule allocations, refund, overdue balance, partial/withdrawn/in-kind receipts, and gifts at the fixed evaluation date | U |
 | TC-PL-19 | FIX-C net = ₱335,750.00 exactly; explicitly not 250,750 or 190,750 | U |
-| TC-AE-05 | FIX-A / FIX-B / FIX-C allocation percentages are identical | U |
+| TC-AE-05 | FIX-A / FIX-B / FIX-C / FIX-D allocation percentages are identical | U |
 
 ---
 
@@ -543,22 +615,22 @@ All run as pure Dart in `domain/` — no widget tree, no database, no network.
 | TC ID | Asserts |
 |---|---|
 | TC-PL-10 | Confirmed pledge leaves net unchanged, appears in expected figure (existing) |
-| TC-PL-11 | confirmed → received decreases net and expected by the same amount (existing) |
-| TC-PL-12 | Tentative behaves as expected-only, absent from net breakdown (existing) |
+| TC-PL-11 | Confirmed pledge with one full-value receipt derives received and reduces net and expected by the receipt amount (existing ID, updated assertion) |
+| TC-PL-12 | Tentative pledge with no receipts is expected-only and absent from net breakdown (existing ID) |
 | TC-PL-14 | Gross never changes on any pledge status change |
-| TC-PL-16 | Exposure = confirmed-not-received; TC-PL-17 renders ₱0.00 not blank |
-| TC-PL-18 | Net breakdown sums exactly to gross − net and contains only `received` |
+| TC-PL-16 | Exposure = confirmed pledge's remaining unreceived portion; TC-PL-17 renders ₱0.00 not blank |
+| TC-PL-18 | Net breakdown sums exactly to gross − net and contains eligible receipt rows, including partial support |
 | TC-PL-19 | FIX-C net = ₱335,750.00 (D2 regression, §3.3) |
-| TC-PL-20 | Pledges **exceeding total budget**: 3 received pledges totalling ₱600,000 against a ₱500,000 gross → net = **−₱100,000.00**, displayed as `−₱100,000.00` (REQ-GEN-2 cl. 4). Net is *not* floored at zero; a couple genuinely over-sponsored is a real state |
+| TC-PL-20 | Three cash pledges with receipts totalling ₱600,000 against a ₱500,000 gross → net = **−₱100,000.00**, displayed as `−₱100,000.00` (REQ-GEN-2 cl. 4); no zero floor |
 
-**Two gaps found while writing these — requirement defects, extending §2.1:**
+**Historical gaps resolved by this revision (IDs retained, not reused):**
 
 | # | Gap | Consequence |
 |---|---|---|
-| **UT-10** | **Partially fulfilled pledges are not modelled.** REQ-PL-1 cl. 6 makes status a single enum {tentative, confirmed, received} with one `value`. A ₱60,000 pledge of which ₱25,000 has actually arrived cannot be expressed. | Cannot author a partial-fulfillment test — there is no field to assert on. Needs either a `received_amount` alongside `value`, or a documented decision that partial pledges are split into two records. **No expected value invented.** |
-| **UT-11** | **Reneged pledges are not modelled.** No `withdrawn`/`reneged` state exists. Moving `confirmed` → `tentative` is semantically wrong (it was not tentative, it was broken), and deleting the record destroys the audit trail of who reneged. | Cannot author a renege test. Needs a state or a documented decision to delete-with-log. **No expected value invented.** |
+| **UT-10** | **Resolved (ADR-37):** insert-only partial receipt rows; net moves on receipt, derived received at threshold. | TC-PL-23, TC-PL-42…44, FIX-D. |
+| **UT-11** | **Resolved (ADR-38):** explicit withdrawn state excludes unreceived promise while retaining prior receipts. | TC-PL-35, TC-PL-38, TC-PL-45, FIX-D. |
 
-Both were explicitly requested as unit-test areas. They cannot be tested because the data model has no way to represent them. Flagged rather than faked.
+The old findings are retained for provenance; both now have testable expected results.
 
 ### 4.5 Boundary cases
 
@@ -570,7 +642,7 @@ Both were explicitly requested as unit-test areas. They cannot be tested because
 | TC-GM-06 | Guest count above cap | Full calculation still returned **plus** over-cap indicator naming both numbers (REQ-BS-5 cl. 2, 3); nothing is blocked |
 | TC-GM-13 | Guest count reduced below existing per-head actuals | `manually_valued` entries unchanged; derived entries scale down; no negative amounts |
 | TC-PL-20 | Pledges exceed budget | See §4.4 — net goes negative, not floored |
-| TC-LG-13 | Negative adjustment (credit / refund line) | A negative `actual` is **rejected** (REQ-LG-1 cl. 4 requires ≥ 0). **Finding:** there is therefore no way to record a supplier refund or discount. Flagged as a probable requirement gap — not invented here |
+| TC-LG-13 | Refund / discount path | A negative `actual` or payment amount is rejected; a positive `refund` row lowers derived deposit and can reopen balance; a discount lowers non-negative `actual` (REQ-LG-4, REQ-LG-8) |
 | TC-AE-13 | All six categories overridden to ₱0 | Σ overrides = 0 < budget; shortfall surfaced; no divide-by-zero in variance percent (REQ-LG-6 cl. 3) |
 
 ### 4.6 Setup, notes, and hidden-fee regression cases
@@ -580,6 +652,77 @@ Both were explicitly requested as unit-test areas. They cannot be tested because
 | TC-BS-09 | Selecting Bohol resolves to Provincial index 0.85 for cost indexing **but** `is_destination = true` enables the unfilled OOT prompt. Boracay/Palawan/Siargao resolve to Destination 1.20 and enable it; NCR 1.00 does not default it. No selection writes a fee amount. Assert the selected index/flag and prompt state, **not** expected total cost while benchmarks remain unpopulated (OQ-04; REQ-BS-4 cl. 4, REQ-HF-3, ADR-29). |
 | TC-LG-14 | Notes live counter advances on every edit, accepts exactly 2,000 characters, refuses the 2,001st typed/pasted character without truncating existing text, and allows editing after deletion. Persisted value is at most 2,000 characters (REQ-LG-1 cl. 8, ADR-33). |
 | TC-HF-09 | Each of six hidden fees maps to its fixed category: crew meals/church aircon/corkage/venue power → Catering & Venue, OOT/overtime → Coordination. Every fee has a read-only category label; attempts to reclassify fail. Entries remain separate attributable lines, not merged into a single category entry (REQ-HF-2 cl. 7, 9). |
+
+### 4.7 Money-flow clause-level acceptance cases (planned)
+
+Each newly introduced or materially changed numbered clause below has its own stable TC row; existing unaffected clauses retain their prior mapped tests. Run deterministic unit cases with a fixed local date and integration cases on both target platforms. The fixture values are illustrative user input, not app-generated pricing.
+
+| TC ID | Clause | Decidable assertion |
+|---|---|---|
+| TC-BS-10 | BS-1.8 | Ceremony accepts exactly the five specified values or unset via Not sure yet; invalid value rejected; setup completes when unset. |
+| TC-BS-11 | BS-1.9 | Venue accepts exactly the six specified values or unset; invalid value rejected; setup completes when unset. |
+| TC-BS-12 | BS-1.10 | Civil hints aircon inapplicability; garden/beach hints power; neither creates amounts/dismissals; all six prompts still require partner decisions. |
+| TC-LG-15 | LG-1.5–6 | Entry schema has no persisted `deposit_paid_cents` or entry `due_date`; schedule and payment rows are independent; unscheduled entry shows virtual undated balance. |
+| TC-LG-16 | LG-4.1 | Two payment rows ₱30k + ₱35k and refund ₱5k derive ₱60k, with no cumulative deposit column. |
+| TC-LG-17 | LG-4.2 | ₱120k effective and ₱125k net paid shows ₱125k paid, ₱0 balance, ₱5k overpayment warning. |
+| TC-LG-18 | LG-4.3 | Insert, refund, actual edit, deletion each update plan deposits and balances in one operation; deleted entry excluded. |
+| TC-LG-19 | LG-4.4 | Payment/refund preserves gross and actual; lowering actual by ₱5k discount changes gross by exactly ₱5k without negative row. |
+| TC-LG-20 | LG-4.5 | Recording each supported method/payment/refund triggers no bank/network transfer or authorization. |
+| TC-LG-21 | LG-5.1 | Balance zero yields paid, including after schedule has overdue date. |
+| TC-LG-22 | LG-5.2 | One unpaid past-due item yields overdue even with another due-soon item; paid past item ignored. |
+| TC-LG-23 | LG-5.3 | Unpaid item at today and at window endpoint is due soon; beyond window pending; overdue wins. |
+| TC-LG-24 | LG-5.4 | Positive net paid with balance >0 indicates partial alongside pending, due soon and overdue separately. |
+| TC-LG-25 | LG-5.5 | UI offers no direct status setter; dates and amounts alone change status. |
+| TC-LG-26 | LG-5.6 | No authoritative status column; two differing device dates yield no sync conflict. |
+| TC-LG-27 | LG-5.7 | Offline clock drives recomputation; undated virtual obligation stays pending, never due soon/overdue. |
+| TC-LG-28 | LG-5.8 | Apply paid sum by due date, then sort_order, then id; undated residual last; attribution to later item leaves earlier item paid first; refund reopens allocation. |
+| TC-LG-29 | LG-7.1 | All enumerated schedule fields/types validated; both partners can add/edit/soft-delete offline. |
+| TC-LG-30 | LG-7.2 | No schedule derives exactly one undated effective-amount obligation, no persisted implicit row. |
+| TC-LG-31 | LG-7.3 | Schedule less than effective derives undated residual; schedule greater rejects edit with named validation error; exact sum yields no residual. |
+| TC-LG-32 | LG-7.4 | Residual allocates after dated items and never notifies; actual edit recomputes residual while preserving payment rows. |
+| TC-LG-33 | LG-8.1 | Validate each payment field, nullable attribution and pledge ID, six method codes, positive amount, and client ID. |
+| TC-LG-34 | LG-8.2 | Positive refund reopens previously paid balance/status; zero/negative payment, refund, actual rejected. |
+| TC-LG-35 | LG-8.3 | Two offline partners insert distinct payments; replay in either order and replay twice preserve both, counted once, with actors. |
+| TC-LG-36 | LG-8.4 | Reject foreign-entry schedule_item_id; same-entry attribution does not override due-date allocation. |
+| TC-LG-37 | LG-9.1 | At fixed date, unpaid item gets 7-day, 1-day, and one overdue local reminder; paid/deleted item gets none. |
+| TC-LG-38 | LG-9.2 | Per-plan window/timing edit reschedules both devices locally; off cancels notices even offline. |
+| TC-LG-39 | LG-9.3 | Lock-screen and accessibility string scan finds no supplier name or amount in generic default notification. |
+| TC-LG-40 | LG-9.4 | Due soon lists on SCR-06/07 link to entries within window even if notifications disabled. |
+| TC-PL-21 | PL-1.2 | secondary_sponsor requires candle/veil/cord; other roles reject sub-role. |
+| TC-PL-22 | PL-1.6,8 | Zero-valued pledge without receipts stays tentative/confirmed; received is not editable; withdrawn displays despite prior full receipt and keeps its support; both links prioritize entry; deleted entry excludes support and flags orphan. |
+| TC-PL-23 | PL-2.2–3 | No receipt yields net=gross; ₱25k partial on ₱50k pledge and ₱350k gross yields ₱325k net; second ₱25k yields ₱300k and derived received. |
+| TC-PL-24 | PL-2.4 | Unreceived confirmed ₱50k shows gross/net ₱350k and ₱50k expected. |
+| TC-PL-25 | PL-2.5 | Changing pledge lifecycle or receipt leaves gross unchanged. |
+| TC-PL-26 | PL-2.6 | Receipt or linked-entry deletion recomputes all displays atomically; paired supplier payment reduces balance, never net again. |
+| TC-PL-27 | PL-2.7 | Eligible cash receipts ₱600k against gross ₱500k yield −₱100k net, not zero (TC-PL-20 regression). |
+| TC-PL-28 | PL-2.1 | Gross and net appear simultaneously in dashboard viewport. |
+| TC-PL-29 | PL-2 main | Partial support moves net at receipt time; no status gate waits for full value. |
+| TC-PL-30 | PL-3.1 | Unreceived tentative/confirmed ₱50k contributes full expected, zero net effect. |
+| TC-PL-31 | PL-3.2 | Expected figure has distinct visible label. |
+| TC-PL-32 | PL-3.3 | Partial ₱20k against ₱50k leaves ₱30k expected; over-receipt floors remaining expected at zero. |
+| TC-PL-33 | PL-3.4 | UI never sums expected into net. |
+| TC-PL-34 | PL-3.5 | Label identifies unreceived support as not yet realized. |
+| TC-PL-35 | PL-3.6 | Withdrawn ₱30k after ₱10k receipt removes ₱20k expected but retains ₱10k net support. |
+| TC-PL-36 | PL-4.1 | Confirmed ₱50k receiving ₱20k yields ₱30k exposure; completing receipts yields zero. |
+| TC-PL-37 | PL-4.3 | No outstanding confirmed portion displays ₱0.00. |
+| TC-PL-38 | PL-4.2 | Exposure list names active confirmed pledges with remaining only; withdrawn absent but history present. |
+| TC-PL-39 | PL-5.1 | Breakdown shows eligible partial/withdrawn receipt amounts, names, and statuses. |
+| TC-PL-40 | PL-5.2 | Sum of applied receipts equals gross−net, including negative net; gifts/payments never double-count. |
+| TC-PL-41 | PL-5.3 | Unreceived promises excluded; deleted linked support shown as reconciliation issue, absent from live net. |
+| TC-PL-42 | PL-6.1 | Validate receipt ID, pledge ID, positive amount, date, note, tombstone, nullable unique FK; cash payment_id null. |
+| TC-PL-43 | PL-6.2 | Receipt threshold derivation incl zero-value/no-receipt edge; no stored or editable received flag; over-receipt allowed. |
+| TC-PL-44 | PL-6.3 | Two offline partners add distinct receipt rows; both count once regardless of sync/replay order. |
+| TC-PL-45 | PL-6.4 | Withdrawal retains historical receipts/net and removes only remaining expected/exposure. |
+| TC-PL-46 | PL-7.1 | ₱40k linked entry with ₱50k in-kind receipts across two pledges reduces net by at most ₱40k; receipt date/id fixes which ₱40k is credited and excess remains visible. |
+| TC-PL-47 | PL-7.2 | Supplier direct pay creates equal receipt/payment atomically with reciprocal linkage; simulate failure between inserts and assert neither persists. |
+| TC-PL-48 | PL-7.3 | Unique payment_id blocks duplicate receipt; mismatch of pledge, entry, or amount rejected; duplicate replay idempotent; two partners pairing same payment offline converge to one pair with visible conflict. |
+| TC-PL-49 | PL-7.4 | Sponsor-direct ₱40k lowers ₱40k entry balance to zero and net exactly ₱40k, not ₱80k. |
+| TC-PL-50 | PL-7.5 | Both links count entry only; deletion excludes linked support from live net and flags orphan, retains history. |
+| TC-GF-01 | GF-1.1 | Enumerated sources, positive amount, date, optional giver name/note; both partners add/read/soft-delete offline. |
+| TC-GF-02 | GF-1.2 | Gifts leave gross/net/pledge metrics unchanged; first live gift reveals separate net-after-gifts; negative allowed. |
+| TC-GF-03 | GF-1.3 | Two offline gift inserts count once each on repeated replay; deleting last hides extra figure. |
+| TC-GF-04 | GF-2.1 | FIX-D ₱40k gifts versus ₱210k balance shows −₱170k shortfall in full PHP form; surplus path has non-colour cue. |
+| TC-GF-05 | GF-2.2 | Payment, refund, gift, actual edit recompute view on read without stored rollups, payout or transfer. |
 
 ---
 
@@ -614,14 +757,17 @@ Every v1 entity, airplane mode, expected **end state** stated.
 
 | TC ID | Entity | Create | Read | Update | Delete | Expected end state after reconnect |
 |---|---|---|---|---|---|---|
-| TC-OF-01 | Plan setup (budget, date, cap, region) | ✅ | ✅ | ✅ | n/a | All setup edits present server-side; allocations recomputed identically on both devices |
+| TC-OF-01 | Plan setup (budget, date, cap, region, optional ceremony/venue, reminder settings) | ✅ | ✅ | ✅ | n/a | Setup and reminder settings converge; allocations recomputed identically; devices schedule local notices independently |
 | TC-OF-02 | Ledger entries | ✅ | ✅ | ✅ | ✅ | Every offline entry present exactly once; gross matches the local pre-sync value to the centavo |
 | TC-OF-03 | Fee components (all six subtypes) | ✅ | ✅ | ✅ | ✅ | Per-type shapes intact; crew-meal rollup unchanged by sync |
-| TC-OF-04 | Pledges | ✅ | ✅ | ✅ | ✅ | Statuses preserved; net/expected/exposure recompute to the same figures |
+| TC-OF-04 | Pledges, receipt rows and supplier-linked pairs | ✅ | ✅ | ✅ (pledge) | ✅ (soft-delete) | Distinct receipts and atomic supplier pairs preserved; net/expected/exposure recompute identically |
 | TC-OF-05 | Guests (RSVP + tier) | ✅ | ✅ | ✅ | ✅ | Both axes preserved independently; driving count consistent |
 | TC-OF-06 | Crew headcount | ✅ | ✅ | ✅ | n/a | Separate from guest totals after sync |
 | TC-OF-07 | Allocation overrides | ✅ | ✅ | ✅ | ✅ (revert) | Overrides survive; engine values still visible alongside |
 | TC-OF-08 | Hidden-fee prompt states | ✅ | ✅ | ✅ | n/a | `dismissed` retains dismisser + timestamp; `prompted_unfilled` still distinguishable from ₱0.00 |
+| TC-OF-19 | Schedule items | ✅ | ✅ | ✅ | ✅ | Dates, order and tombstones converge; derived virtual residual consistent |
+| TC-OF-20 | Supplier payments/refunds | ✅ | ✅ | n/a (insert-only) | ✅ (soft-delete correction) | Each distinct row counted once after replay; derived deposits agree |
+| TC-OF-21 | Gifts | ✅ | ✅ | n/a (insert-only) | ✅ (soft-delete correction) | Each distinct row counted once; gifts remain separate from pledges |
 
 ### 6.2 Durability and interruption
 
@@ -633,7 +779,7 @@ Every v1 entity, airplane mode, expected **end state** stated.
 | TC-OF-15 | **Partial sync interruption mid-batch** | Push batch of 20; kill network after row 11 accepted. End state: rows 1–11 committed server-side with `server_ts`; rows 12–20 still queued locally. On retry, rows 1–11 are **insert-ignored** (idempotent, REQ-OF-5 cl. 2–3), retain their assigned `server_ts`, and are not double-counted; final gross equals the single-pass value exactly |
 | TC-OF-18 | Offline replay ordering and clock authority | Queue two edits to the same field with increasing `device_monotonic` values and stable `device_id`; replay after a long offline period. The server assigns each newly accepted row `server_ts` at acceptance, never the device edit timestamp. The later accepted conflicting write wins per REQ-SE-2, even if its offline edit happened earlier in wall-clock time; original device order/id survive replay. Re-send an accepted row: same id and `server_ts`, no duplicate log or cost. |
 | TC-OF-16 | Write that cannot be applied | Surfaced to the partner with data intact, never discarded (REQ-OF-5 cl. 4); badge reads "1 change needs attention" (ux-spec §7.2 state 5) |
-| TC-OF-09 | Offline computation parity | Allocation, guest what-if, variance, buffer, gross, net all compute on-device with no network; figures identical to the online result for the same inputs |
+| TC-OF-09 | Offline computation parity | Allocation, guest what-if, variance, buffer, gross, net, expected/exposure remaining, balances, schedule states, and gifts all compute on-device with no network; figures identical to online result for identical inputs and evaluation date |
 | TC-OF-10 | Offline indicator + pending count | Persistent indicator; exact count; escalates per ux-spec §7.2; **no copy contains "lost", "deleted", "discarded", or "failed to save"** — asserted by string scan |
 | TC-OF-11 | Clock handling | `overdue` derived on read from device local date; two devices with different clocks may display different status **without generating a sync conflict**; status never written to shared state (REQ-OF-4) |
 | TC-OF-17 | Two-device simultaneous editing → convergence | A and B both online, 30 s of concurrent edits across ledger, pledges, guests. End state: identical gross, net, expected, exposure, buffer remaining, and every category variance on both devices, to the centavo; change log identical in content and order |
@@ -705,9 +851,9 @@ These five run **only on physical hardware** (§1.3). Simulators do not reproduc
 | 5 | Partner B invited, joins on a second device, sees identical figures **including the override** |
 | 6–10 | All six hidden fees prompted; crew meals 18 × ₱350; OOT for 3 suppliers; aircon ₱8,000; corkage explicitly dismissed with attribution; overtime + venue power remain visibly outstanding |
 | 11 | Dashboard gross + variance against budget |
-| 12–14 | Pledge logged tentative → **net unchanged**, appears as expected; marked confirmed → **still unchanged**, exposure rises; marked received → **net drops by ₱50,000** (D2 path asserted in E2E, not only unit) |
+| 12–14 | Pledge logged tentative → **net unchanged**, appears as expected; marked confirmed → **still unchanged**, exposure rises; one ₱50,000 receipt → derived received and **net drops by ₱50,000** (D2 path asserted in E2E, not only unit) |
 | 15–17 | Guest what-if 150 → 180 previewed, crew meals excluded, committed; all figures propagate |
-| 18–19 | B offline: edits actual, adds an entry, marks a payment — all succeed. A edits a different field on the same entry online |
+| 18–19 | B offline: edits actual, adds an entry, inserts a payment row — all succeed. A edits a different field on the same entry online |
 | 20 | B reconnects: convergence, no lost writes, attribution correct, same-field conflict surfaced |
 | Gate | The additional gate from that doc: steps 2–17 repeated with connectivity disabled throughout, syncing correctly on reconnect |
 
@@ -738,11 +884,11 @@ Countable. Every line is pass/fail, no partial.
 
 | # | Criterion | Measure |
 |---|---|---|
-| 1 | REQ coverage | **48/48** testable REQ IDs have a passing mapped test. Five deferred REQs are out of v1 (REQ-AI-1…3 and 5 in AI phase; REQ-AI-4 in post-launch payments); REQ-EX-1 has a completed manual review |
-| 2 | Fixtures | **All three fixtures match expected values exactly**, at base and at +25 guests — 8/8 fixture TCs green (TC-FIX-A1…C2, TC-PL-19, TC-AE-05) |
+| 1 | REQ coverage | **55/55** testable REQ IDs have a passing mapped test. Five deferred REQs are out of v1 (REQ-AI-1…3 and 5 in AI phase; REQ-AI-4 in post-launch payments); REQ-EX-1 has a completed manual review |
+| 2 | Fixtures | **All four fixtures match expected values exactly**: FIX-A/B/C each at base and +25 guests, FIX-D at its fixed date — 9/9 fixture/related TCs green (TC-FIX-A1…D1, TC-PL-19, TC-AE-05) |
 | 3 | Defects | **Zero open S1. Zero open S2.** |
 | 4 | Sync matrix | **12/12 rows in §5 green on both iOS and Android** |
-| 5 | Offline matrix | **8/8 entity rows + 10/10 durability rows green**; the string scan in TC-OF-10 finds zero prohibited words |
+| 5 | Offline matrix | **11/11 entity rows + 10/10 durability rows green**; the string scan in TC-OF-10 finds zero prohibited words |
 | 6 | Tenant isolation | **TC-SEC-01 green in CI**, plus TC-SEC-04…06 green. Non-negotiable |
 | 7 | SEC gate — beta tier | **All security-plan §7 items marked PASS for internal beta are PASS.** Any unverifiable item counts as FAIL |
 | 7b | Device at-rest security | TC-SEC-03, TC-SEC-07…10 green **on physical hardware** — simulator results do not count |
@@ -761,11 +907,11 @@ Stated so the residual risk is visible rather than assumed away.
 3. **Penetration testing.** TC-SEC-* proves the RLS policy denies the cases we thought of. It is not an adversarial security assessment, and it does not cover provider misconfiguration, dependency supply-chain, or auth-flow abuse beyond token replay.
 4. **Erasure behaviour (OQ-01).** Per ADR-26, shared-record DPA erasure test cases remain **un-stubbed and blocked pending counsel**. See §11. This is a known compliance gap at RC.
 5. **Budget adequacy (OQ-04).** TC-AE-07 asserts nothing. The feature cannot ship verified.
-6. **Partial and reneged pledges (UT-10, UT-11).** Untestable because unmodelled. Real user scenarios with no coverage.
-7. **Negative ledger adjustments (TC-LG-13).** Refunds and discounts appear to be unrepresentable; flagged, unresolved.
+6. **Partial and withdrawn pledges (UT-10, UT-11) — resolved.** TC-PL-23, TC-PL-35, TC-PL-42…50 and FIX-D cover receipt-based support; these are planned tests, not executed results.
+7. **Negative ledger adjustments (TC-LG-13) — resolved.** Positive refund rows and lower actual cost represent refunds and discounts without negative actuals.
 8. **Localization.** English-only v1 (ux-spec §8.4). No pseudo-localization, no RTL, no translated-string overflow testing.
 9. **Device and OS breadth.** Two devices, latest−1 OS. No matrix across older Android OEM skins, low-memory devices, or tablets.
-10. **Payments and AI.** Out of v1 scope entirely (REQ-AI-4, REQ-EX-1). No PCI or model-behaviour testing.
+10. **Payment rails and AI.** Initiation/settlement of funds (REQ-AI-4) and AI remain out of v1. Manual payment and receipt *records* are v1 and covered above; no PCI or model-behaviour testing.
 11. **Upgrade path from a shipped build.** TC-MIG-* covers schema migration in isolation; there is no test of a real user upgrading from store build N to N+1 with queued offline writes and a pinned older ruleset.
 
 ---
