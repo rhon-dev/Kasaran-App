@@ -1,6 +1,6 @@
 # Kasaran — Requirements (EARS)
 
-*Derived from [mvp-user-stories.md](./mvp-user-stories.md). All requirements are **[v1]** unless tagged **[AI-phase]**.*
+*Derived from [mvp-user-stories.md](./mvp-user-stories.md). Requirements are explicitly tagged **[v1]**, **[v1.1]**, or a deferred phase; REQ-EX-1 is a permanent exclusion.*
 
 **Notation.** This document uses the full EARS keyword set, not only the event-driven form:
 
@@ -442,6 +442,15 @@ WHEN a partner requests a guest what-if for a hypothetical count, THE SYSTEM SHA
 8. A preview is never synced to the other partner's device before commit.
 9. WHERE a partner previews a guest reduction, THE SYSTEM SHALL report how many Tier 2 guests would need removing to reach the target count before any Tier 1 guest is affected.
 
+**REQ-GM-6 [v1] — Affordable-guest ceiling (ADR-54)**
+WHEN a partner requests an affordable-guest preview on SCR-13, THE SYSTEM SHALL calculate a gross-cost ceiling from the live ledger and the partner's chosen nonnegative buffer to keep, without modifying the plan.
+
+1. THE SYSTEM SHALL sum effective amounts of live flat entries, manually valued per-head entries and crew-meal entries as `flat_effective_cents`, and sum nonnegative rates of live, non-manually-valued per-head entries as `active_rate_cents`; tombstoned entries SHALL contribute to neither sum. Priority tiers SHALL NOT change rates.
+2. IF `active_rate_cents > 0` and `budget_cents − flat_effective_cents − buffer_to_keep_cents ≥ 0`, THEN THE SYSTEM SHALL show `floor((budget_cents − flat_effective_cents − buffer_to_keep_cents) / active_rate_cents)` using integer division and expose all three inputs and the current designated driving RSVP status/count.
+3. IF that numerator is negative, THEN THE SYSTEM SHALL show a ceiling of zero and the positive shortfall even at zero guests; it SHALL NOT claim zero guests fits.
+4. IF `active_rate_cents = 0`, THEN THE SYSTEM SHALL say “No per-head costs; no finite budget-based guest limit” rather than display infinity or divide by zero; IF flat costs plus the chosen buffer exceed budget, THE SYSTEM SHALL additionally show the zero-guest shortfall.
+5. THE SYSTEM SHALL NOT subtract pledges, gifts or supplier payments from gross affordability, clamp the ceiling to guest cap, or write the preview. IF the ceiling exceeds cap, THEN THE SYSTEM SHALL show the cap warning separately; cancel leaves the plan byte-identical.
+
 ---
 
 ## 6. Rule-based allocation engine
@@ -510,6 +519,58 @@ THE SYSTEM SHALL compute buffer remaining as the Buffer allocation minus the sum
 5. IF buffer remaining falls below zero, THEN THE SYSTEM SHALL display a budget breach indicator stating the amount by which the total budget is exceeded.
 6. Rounding remainder assigned under REQ-AE-1 clause 6 increases the Buffer allocation before drawdown is computed.
 7. Buffer remaining recomputes within the same operation as any change to an allocation or an effective amount.
+
+**REQ-AE-7 [v1] — Explicit rebalance of committed allocations (ADR-53)**
+WHEN a partner requests “Rebalance to fit what we've committed,” THE SYSTEM SHALL preview a feasible redistribution of the currently effective six-category allocation in integer centavos, without changing the pinned default engine or existing ledger costs.
+
+1. THE SYSTEM SHALL treat every existing non-null `override_cents` as a lock, including Buffer: no locked donor or recipient SHALL change automatically. IF the effective six allocations do not sum exactly to the budget, THEN THE SYSTEM SHALL disclose the discrepancy, disable Apply and require manual correction, never normalize silently.
+2. From a budget-balanced starting allocation, THE SYSTEM SHALL compute each unlocked non-Buffer recipient need as `max(0, committed_effective_cents − allocation_cents)`, transfer up to the unlocked Buffer allocation to recipients in ADR-10 category order, and never take more than the available Buffer amount.
+3. IF recipient need remains, THEN THE SYSTEM SHALL use only positive `allocation_cents − committed_effective_cents` slack of unlocked non-Buffer donor categories. THE SYSTEM SHALL transfer at most `min(total_remaining_need, total_available_slack)` centavos. Each donor contributes the floor of `(transfer_cents × donor_slack_cents / total_slack_cents)`, then remaining individual centavos go by greatest fractional remainder, ties broken by ADR-10 category order, without reducing a donor below committed cost; assign resulting transfers to unlocked recipients in that same fixed order.
+4. THE SYSTEM SHALL show before/after allocations, changed overrides, committed costs, Buffer and donor sources, locks, and every uncovered category shortfall (including locked underfunded categories). IF all need cannot be covered, THEN THE SYSTEM SHALL leave the uncovered breach visible and permit the partner to explicitly apply only the feasible partial result; no preview implies that an uncovered cost fits.
+5. WHEN a partner confirms Apply on a budget-balanced starting state, THE SYSTEM SHALL write only changed `override_cents` through the immutable change log (REQ-AE-5, REQ-SE-4); cancelling SHALL write nothing. Gross, net and baseline engine outputs SHALL remain unchanged. REQ-AE-6 buffer remaining SHALL use post-apply allocations without offsetting overruns by unrelated under-spend.
+
+---
+
+## 6A. Starter templates, requirements checklist, export and locale
+
+**REQ-TM-1 [v1] — Wedding-type starter suggestions (ADR-55)**
+WHEN a partner chooses a wedding-type template, THE SYSTEM SHALL offer unticked expense-type suggestions from the pinned bundled ruleset JSON without creating ledger rows or amounts.
+
+1. THE SYSTEM SHALL offer exactly the named variants civil, church + hotel, church + garden, beach/destination, and intimate (≤50 guests); deterministic optional ceremony/venue inputs from REQ-BS-1 SHALL select relevant suggestions, while `Not sure yet` permits a manual template choice. The intimate label SHALL NOT alter guest cap or driving count.
+2. Each configured suggestion SHALL have a stable identifier, name, one of the six ledger categories and a valid pricing mode, but no amount, rate, supplier, or recommended vendor; the pinned ruleset version SHALL determine ordering and content. Validate that shape on load.
+3. The bundled suggestion vocabulary SHALL include arrhae/unity coins, veil, cord, candle, church fees, Pre-Cana, marriage license, souvenirs/giveaways, lechon, mobile bar, photobooth, prenup shoot, SDE video and entourage attire; a suggestion SHALL NOT assert applicability or a fee.
+4. WHEN a partner ticks a suggestion, THE SYSTEM SHALL open the ledger editor and require a nonblank supplier plus valid user-entered amount or rate before saving an entry under REQ-LG-1; cancelling SHALL leave the suggestion unticked and create no row, including no ₱0 placeholder. Suggested expense types SHALL NOT list, rank or recommend suppliers.
+
+**REQ-CK-1 [v1, verified presets blocked by OQ-11] — Requirements checklist (ADR-56)**
+WHERE a couple uses the requirements checklist, THE SYSTEM SHALL track user completion separately from an optional user-entered reminder date and fee, without treating unverified config as legal or church advice.
+
+1. THE SYSTEM SHALL offer checklist labels for PSA birth certificates, PSA CENOMAR, marriage license application and posting period, Pre-Cana/counselling, canonical interview, baptismal and confirmation certificates, and banns; configuration SHALL carry stable item IDs, labels, optional applicability, source-verification status and, **only after item-specific verification**, an optional signed-integer day offset from the wedding date. No universal applicability, fee or offset is presumed.
+2. WHILE an item or its source/offset is unverified under OQ-11, THE SYSTEM SHALL mark it “NEEDS VERIFICATION,” SHALL NOT publish a preset due date or claim legal/church eligibility, and SHALL permit an explicitly couple-entered reminder date with a user-date label. Publishing verified preset rules or date-offset assertions is BLOCKED until relevant LGU, civil registrar or parish/church verification is documented per item.
+3. WHEN either partner changes an item's done state, THE SYSTEM SHALL persist that state as a separate LWW field with normal offline/sync history; changing the wedding date SHALL recompute a verified configured due date on read from its signed offset, but SHALL NOT shift an explicit user-entered reminder date.
+4. WHERE the couple enters an optional nonnegative fee in integer centavos, THE SYSTEM SHALL keep it outside gross, net and ledger until the couple explicitly confirms fee-to-ledger and supplies the valid ledger fields under REQ-LG-1; conversion requires a **positive** user-entered fee and creates an entry for **that exact fee amount**, not an invented or divergent amount. Declining or entering zero SHALL create no entry. A later checklist-fee edit SHALL NOT silently alter a linked ledger entry; the couple edits that entry explicitly. Checklist completion or a configured item SHALL NOT imply a fee.
+
+**REQ-EX-2 [v1] — Private offline export and OS sharing (ADR-57)**
+WHEN a partner exports a plan, THE SYSTEM SHALL generate the selected file on-device while offline and offer the OS share sheet, without a live share link or a web dependency. Curated PDFs/CSVs use the local eligible projection; the separate SEC-32 copy in clause 5 covers locally held historical data as well.
+
+1. A summary PDF SHALL show gross, net, expected pledge support, six-category table and payment schedule. Before generation, THE SYSTEM SHALL show a privacy preview naming included sections; guest and sponsor names SHALL have independent hide/show toggles, with names hidden by default for shared summaries.
+2. THE SYSTEM SHALL offer separate ledger, payments, pledges and guests CSVs; before each export it SHALL show a sensitive-data warning and the fields included. Every cell SHALL be RFC-4180-quoted as needed; for every text or formatted-value cell whose first non-whitespace/control character is `=`, `+`, `-` or `@`, THE SYSTEM SHALL prepend a literal apostrophe to the original cell **before** CSV quoting, including when the dangerous character follows leading whitespace/control characters. RFC quoting alone is insufficient; the imported cell SHALL remain text rather than an evaluated formula.
+3. WHERE a partner requests a sponsor statement PDF, THE SYSTEM SHALL require one chosen **Ninong or Ninang** pledge and include only that pledge's sponsor, pledged value/status, eligible receipts and linked coverage; it SHALL omit all other sponsors' names, unrelated amounts and other plan data. Statement sharing SHALL use the same privacy preview and OS handoff.
+4. THE SYSTEM SHALL NOT sync generated files or create live share links; after OS share-sheet handoff or cancellation it SHALL remove app-controlled temporary export artifacts. The preview SHALL warn that copies handed to another app cannot be recalled remotely or deleted from their destination by Kasaran.
+5. WHERE a partner requests a copy of their personal data under SEC-32, THE SYSTEM SHALL offer a **separate full machine-readable export** from the same export UI, not a redacted summary or the four curated CSVs. It SHALL include all locally held accessible plan/account personal fields (including retained historical/tombstoned rows), including profile and membership, setup, ledger and schedule, payment/refund, hidden-fee, pledge and receipt, gift/giver, guest, crew, checklist, allocation override, and activity/change-log data with attribution. A versioned machine-readable manifest SHALL identify included entity/field inventories, missing/inaccessible fields and **as-of-last-sync** scope, making clear that server-only account fields and other devices' unsynced changes are absent from an offline copy. THE SYSTEM SHALL disclose sensitive contents before OS handoff and apply clause 2's CSV formula-neutralization to every exported text or formatted-value cell if CSV is used; this path SHALL NOT assert a shared-record erasure outcome (OQ-01). The DPO SHALL reconcile server-only fields with the authoritative account data before declaring the SEC-32 access request complete; correction of profile display name/email remains available through the account path.
+
+**REQ-LO-1 [v1.1; v1 English-only] — User-selectable interface locale (ADR-58)**
+WHERE the v1.1 locale feature is shipped, THE SYSTEM SHALL use versioned ARB resources for English, Taglish and Filipino interface copy with a deterministic English fallback for missing translations and a user-selectable locale.
+
+1. v1 SHALL present English UI only; v1.1 locale selection SHALL change interface labels without changing budget arithmetic, persisted centavos, syncing, user-entered text or currency.
+2. THE SYSTEM SHALL retain “Kasaran,” “Ninong/Ninang,” “PSA/CENOMAR,” local acronyms and user-entered strings untranslated; all locales SHALL format PHP amounts and dates with `en_PH` conventions and full-form accessibility labels per REQ-GEN-2/2A.
+3. WHEN a locale resource key is missing, THE SYSTEM SHALL use its English ARB string without runtime machine translation; pseudo-localized/expanded text SHALL preserve legible bento values and full-form accessibility labels without clipping or overlap.
+
+**REQ-AT-1 [v1.1 backlog stub; no v1 upload] — Private photo attachments (ADR-59)**
+WHERE receipt or contract photos are implemented after v1, THE SYSTEM SHALL design attachment metadata and private bytes separately; this requirement is a v1.1 backlog gate, not a claim that upload ships in v1 or that OCR is included.
+
+1. Attachment metadata SHALL reference a live plan-scoped ledger entry or pledge receipt by stable ID; contract photos SHALL attach to a ledger entry, not a nonexistent contract table. Supabase Storage bucket policies SHALL deny cross-plan reads/writes and public URLs. No v1 UI SHALL upload photos, and no OCR is included in this stub.
+2. Offline pending bytes SHALL be staged encrypted on-device and queued separately from metadata events; THE SYSTEM SHALL display pending/uploaded/error truthfully and SHALL NOT represent inaccessible or unsynced bytes as uploaded.
+3. Before implementation, the team SHALL approve configured maximum byte size and permitted MIME types, reject files outside those limits, and review/update the Photos privacy label/declaration before shipping. This stub specifies no invented size/MIME value and does not imply a forced remote wipe.
 
 ---
 
@@ -667,11 +728,16 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 | Hidden fees | REQ-HF-1 … 3 | HF-1, HF-2 |
 | Pledges and receipts | REQ-PL-1 … 7 | PL-1, PL-2, PL-3 |
 | Day-of gifts and reconciliation | REQ-GF-1 … 2 | Prompt 2 day-of gifts |
-| Guest math | REQ-GM-1 … 5 | GM-1, GM-2, GM-3 |
-| Allocation engine | REQ-AE-1 … 6 | AE-1, AE-2, AE-3 |
+| Guest math and affordability preview | REQ-GM-1 … 6 | GM-1, GM-2, GM-3; Prompt 4 / ADR-54 |
+| Allocation engine and explicit rebalance | REQ-AE-1 … 7 | AE-1, AE-2, AE-3; Prompt 4 / ADR-53 |
+| Wedding-type suggestions | REQ-TM-1 [v1] | Prompt 4 / ADR-55 |
+| Requirements checklist (verified presets gated) | REQ-CK-1 [v1; OQ-11] | Prompt 4 / ADR-56 |
+| Offline export, curated sharing and full SEC-32 copy | REQ-EX-2 [v1] | Prompt 4 / ADR-57; SEC-32 |
+| Interface locale | REQ-LO-1 [v1.1] | Prompt 4 / ADR-58 |
+| Private attachment backlog | REQ-AT-1 [v1.1 stub] | Prompt 4 / ADR-59 |
 | Shared editing, conflicts, onboarding, attribution and restore | REQ-SE-1 … 6 (ADR-43–45, 47, 50–52) | SE-1, SE-2, SE-3; Prompt 3 sync integrity |
 | Offline computation, committed cursors and compatibility | REQ-OF-1 … 5 (ADR-46, 48–49) | OF-1, OF-2; Prompt 3 sync integrity |
-| AI phase | REQ-AI-1 … 5, REQ-EX-1 | AI-1 … AI-5 |
+| AI/post-launch payments and permanent marketplace exclusion | REQ-AI-1 … 5, REQ-EX-1 | AI-1 … AI-5; ADR-28 |
 
 ---
 
@@ -734,7 +800,7 @@ This preserves your intent — sponsors and close family are explicitly categori
 
 ## 13. Open items and resolved defaults
 
-Platform, database engine, monetary display, and ruleset management are resolved (§11, decisions 7, 12, 13). Item 1 remains open (OQ-04); items 2–4 below record resolved defaults without reopening them. OQ-03 and other decision-log questions retain their own status.
+Platform, database engine, monetary display, and ruleset management are resolved (§11, decisions 7, 12, 13). Item 1 remains open (OQ-04); items 2–4 below record resolved defaults without reopening them. OQ-03 and other decision-log questions retain their own status. **OQ-11 additionally blocks verified legal/church checklist presets and date offsets**; REQ-CK-1 permits user dates/done state but does not fill this source-verification gap.
 
 1. **Reference cost benchmarks for budget adequacy.** REQ-AE-2 clause 2 needs a reference cost per guest per region tier to compute expected total cost. The baseline *percentages* are settled; this is the separate absolute figure — roughly what a Metro-tier wedding costs per head. Without it the adequacy indicator cannot be built, though every other allocation requirement can. This is the one genuinely blocking item for a single feature.
 2. **Driving RSVP default — resolved (ADR-31).** `invited` is the designated status on a new plan (REQ-GM-1 clause 6).

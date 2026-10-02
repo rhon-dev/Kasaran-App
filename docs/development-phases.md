@@ -2,7 +2,7 @@
 
 **Index plus phase bodies 01–06 (batch 1).** The index's one-sitting versus phase-cap conflict is still awaiting a decision; later phase bodies are pending. Written bodies do not imply their exit criteria have passed.
 
-*Inputs: `requirements.md` (54 REQ IDs), `testing-plan.md` (TC IDs), `security-plan.md` (SEC IDs), `agents.md`, `decision-log.md`.*
+*Inputs: `decision-log.md` (givens, ADRs and OQs) and `project-brief.md` scope govern `requirements.md` acceptance criteria; `design.md` / `ux-spec.md` specify structure and presentation, `security-plan.md` controls and `testing-plan.md` test oracles; `agents.md` assigns ownership. This index is downstream and cannot override any of them.*
 
 ---
 
@@ -18,15 +18,15 @@
 | 04 | Backend shell: Supabase envs & secrets | DevOps/Release | 01 | — | Staging and prod projects, secret handling, empty `/v1/sync` surface | yes |
 | 05 | Local encrypted store | Data & Sync | 03, 04 | REQ-PLT-2 | `drift` + SQLCipher opening, key in Keychain/Keystore, backup-excluded | yes |
 | 06 | Shared-account auth & pairing | Security | 04, 05 | REQ-PLT-3, REQ-SE-1 | Accounts, sessions, single active plan, invite/accept pairing | yes |
-| 07 | Data layer: entities, repositories, change-log writer | Data & Sync | 05 | — | All v1 tables, repository-only SQL, append-only change-log writer | **no** |
+| 07 | Data layer: entities, repositories, change-log writer | Data & Sync | 05 | — | All v1 tables (including checklist state), repository-only SQL, append-only change-log writer | **no** |
 | 08 | Sync engine: transport, ordering, replay, convergence | Data & Sync | 06, 07 | REQ-SE-2, REQ-SE-3, REQ-OF-5 | Push/pull, server-assigned ordering, idempotent replay, convergence | **no** |
-| 09 | Budget setup / onboarding | Mobile/Frontend | 02, 07, 08 | REQ-BS-1, REQ-BS-2, REQ-BS-3, REQ-BS-4, REQ-BS-5, REQ-BS-6 | Setup wizard: budget, date, region, cap, and non-destructive editing | **no** |
-| 10 | Expense ledger | Mobile/Frontend | 09 | REQ-LG-1, REQ-LG-2, REQ-LG-3, REQ-LG-4, REQ-LG-5, REQ-LG-6 | Entries, CRUD, estimated vs actual, deposits, derived status, variance | **no** |
+| 09 | Budget setup / onboarding | Mobile/Frontend | 02, 07, 08 | REQ-BS-1…6, REQ-CK-1 | Setup wizard, wedding-type context and optional requirements checklist; preset rules/offsets blocked by OQ-11 | **no** |
+| 10 | Expense ledger | Mobile/Frontend | 09 | REQ-LG-1…9; REQ-TM-1 | Entries, CRUD, schedules/payments/refunds, reminders, derived money and five unticked wedding-type starter templates | **no** |
 | 11 | Hidden-fee line items | Mobile/Frontend | 10 | REQ-HF-1, REQ-HF-2, REQ-HF-3 | Six prompted fee types with per-type forms and recorded dismissal | **no** |
-| 12 | Guest math | Backend | 10 | REQ-GM-1, REQ-GM-2, REQ-GM-3, REQ-GM-4, REQ-GM-5 | RSVP/tier axes, per-head vs flat, crew separation, propagation, what-if | **no** |
-| 13 | Rule-based allocation engine | Backend | 02, 09, 12 | REQ-AE-1, REQ-AE-2, REQ-AE-3, REQ-AE-4, REQ-AE-5, REQ-AE-6 | Deterministic allocation, regional index, overrides, buffer drawdown | **no** |
-| 14 | Pledges module | Backend | 10, 13 | REQ-PL-1, REQ-PL-2, REQ-PL-3, REQ-PL-4, REQ-PL-5 | Pledge records, fulfillment-only net reduction, expected and exposure | **no** |
-| 15 | Main dashboard (bento) | Mobile/Frontend | 09, 10, 11, 12, 13, 14 | — | Bento layout composing all figures, budget-health card, inert AI tile | yes |
+| 12 | Guest math | Backend | 10 | REQ-GM-1…6 | RSVP/tier axes, per-head vs flat, crew separation, propagation, what-if and affordable-guest preview | **no** |
+| 13 | Rule-based allocation engine | Backend | 02, 09, 12 | REQ-AE-1…7 | Deterministic default allocation, overrides, buffer drawdown and explicit rebalance preview/apply | **no** |
+| 14 | Pledges module | Backend | 10, 13 | REQ-PL-1…7, REQ-GF-1…2 | Pledge records and receipts, fulfillment-only net reduction, expected and exposure, gifts/reconciliation | **no** |
+| 15 | Main dashboard (bento) | Mobile/Frontend | 09, 10, 11, 12, 13, 14 | REQ-EX-2 | Bento layout and offline PDF/CSV export/share UI (including sponsor statement); inert AI tile | **no** |
 | 16 | Shared-editing, conflict & lifecycle hardening | Data & Sync | 08, 15 | REQ-SE-4, REQ-SE-5, REQ-SE-6 | Visible change log, attribution, mutual removal, ownership transfer | **no** |
 | 17 | Offline hardening | Data & Sync | 16 | REQ-OF-1, REQ-OF-2, REQ-OF-3, REQ-OF-4 | Full offline CRUD and computation, indicators, clock handling | **no** |
 | 18 | Security hardening & SEC beta gate | Security | 17 | REQ-EX-1 | RLS coverage, at-rest verification, log hygiene, beta-tier SEC gate PASS | **no** |
@@ -35,20 +35,22 @@
 | 21 | UAT with real couples | Product Manager | 20 | — | Real PH couples plan real weddings; findings triaged into defects | **no** |
 | 22 | Production readiness & rollback rehearsal | Production Readiness | 21 | — | Every gate row PASS, restore drill and rollback rehearsed with durations | **no** |
 | 23 | Store submission & launch | DevOps/Release | 22 | — | Metadata, labels, demo accounts, review notes, staged rollout to 100% | **no** |
-| 24 | Post-launch monitoring & stabilisation | Production Readiness | 23 | — | Alerts observed, P1 response exercised, cost tracked, backlog groomed | **no** |
+| 24 | Post-launch monitoring & stabilisation | Production Readiness | 23 | — | Alerts observed, P1 response exercised, cost tracked; v1.1 locale/photo backlog stubs groomed, not implemented | **no** |
 | 25 | Payments: InstaPay / QR Ph | Backend | 24 | REQ-AI-4 | In-app payment initiation and reconciliation, separate from the ledger's record-of-intent | **no** |
 | 26 | AI phase 1: on-device categorisation | AI/ML | 24 | REQ-AI-2 | On-device suggestion behind `CategorySuggester`, suggestions never auto-apply | **no** |
 | 27 | AI phase 2: cloud AI reasoning + OCR | AI/ML | 26 | REQ-AI-1, REQ-AI-3, REQ-AI-5 | Cloud advisories, OCR drafts, assistant — all behind documented seams | **no** |
 
-**Phases carrying no REQ IDs** (10 of 27): 03, 04, 07, 15, and 19–24. These are infrastructure, composition, or process phases. Phase 15 (dashboard) integrates figures whose requirements are covered in 09–14 and introduces no new REQ; it is validated against the `ux-spec.md` bento layout and state matrix instead.
+**Prompt-4 integration without a 28th phase:** REQ-CK-1 → 09 (checklist state schema in 07; OQ-11 blocks publishing verified applicability/offset presets), REQ-TM-1 → 10 (bundled suggestion data prepared in 07, ledger entry only on explicit save), REQ-GM-6 → 12, REQ-AE-7 → 13, REQ-EX-2 → 15 (pledge-linked sponsor statement requires 14). Existing phase 15's former one-sitting “yes” no longer holds with export added. Phase 17 checks local-only/offline operations; phase 18 verifies export privacy controls SEC-32/42; phase 19 executes the new planned cases, and 20–23 retain their existing release gates. **v1.1 REQ-LO-1 and REQ-AT-1 are backlog stubs in phase 24 only:** this is a grooming handoff, *not* implementation coverage or an assertion that they ship in phase 24. Their actual build/gate scheduling requires a later approved plan; no new phase or retroactive feature in 01–04 is implied.
+
+**Phases carrying no implemented REQ IDs** (9 of 27): 03, 04, 07, and 19–24. These are infrastructure or process phases; 24's v1.1 backlog stubs do not count as implemented REQ coverage. Existing phase bodies 01–06 are planning artifacts, not evidence of implementation; the repository currently has only phases 01–04 foundation source/scaffolds.
 
 ---
 
 ## Self-validation
 
-### (a) REQ coverage — complete, no orphans, no duplicates
+### (a) REQ coverage — baseline reconciled with Prompt 4
 
-All **54** REQ IDs appear in **exactly one** phase.
+The former 54-ID index omitted seven already-authored v1 IDs (LG-7…9, PL-6…7, GF-1…2). The current requirements document contains **68 distinct REQ headings**: those 61 pre-Prompt-4 IDs plus five new v1 IDs and two deferred v1.1 IDs. The table assigns each ID one implementation phase or, for v1.1, one *backlog handoff only* in 24.
 
 | Group | Count | Phase |
 |---|---|---|
@@ -57,11 +59,18 @@ All **54** REQ IDs appear in **exactly one** phase.
 | REQ-PLT-3 | 1 | 06 |
 | REQ-GEN-1, 2, 2A | 3 | 02 |
 | REQ-BS-1…6 | 6 | 09 |
-| REQ-LG-1…6 | 6 | 10 |
+| REQ-LG-1…9 | 9 | 10 |
 | REQ-HF-1…3 | 3 | 11 |
 | REQ-GM-1…5 | 5 | 12 |
+| REQ-GM-6 | 1 | 12 |
 | REQ-AE-1…6 | 6 | 13 |
-| REQ-PL-1…5 | 5 | 14 |
+| REQ-AE-7 | 1 | 13 |
+| REQ-PL-1…7 | 7 | 14 |
+| REQ-GF-1…2 | 2 | 14 |
+| REQ-TM-1 | 1 | 10 |
+| REQ-CK-1 | 1 | 09; verified presets blocked OQ-11 |
+| REQ-EX-2 | 1 | 15 |
+| REQ-LO-1, REQ-AT-1 | 2 | 24 backlog only; no implementation phase assigned |
 | REQ-SE-1 | 1 | 06 |
 | REQ-SE-2, 3 | 2 | 08 |
 | REQ-SE-4, 5, 6 | 3 | 16 |
@@ -71,9 +80,9 @@ All **54** REQ IDs appear in **exactly one** phase.
 | REQ-AI-4 | 1 | 25 (payments — no longer in the AI tail) |
 | REQ-AI-2 | 1 | 26 |
 | REQ-AI-1, 3, 5 | 3 | 27 |
-| **Total** | **54** | |
+| **Total** | **68** | 66 implementation/exclusion assignments; 2 v1.1 backlog stubs |
 
-**Orphans: none. Duplicates: none.**
+**No duplicate assignments in this index.** REQ-EX-1 is a permanent exclusion checked in 18, not an implemented marketplace. Phase 24 does not implement LO-1 or AT-1. The authoritative REQ→TC mapping is the traceability table in `testing-plan.md` §2.
 
 Two placement notes worth your eye:
 
@@ -83,9 +92,9 @@ Two placement notes worth your eye:
   2. **The ID `REQ-AI-4` is retained and NOT renumbered**, per the never-reuse-or-renumber rule. Its `AI-` prefix is now a historical artifact and no longer describes its classification. Recorded in the requirements retired/merged appendix so the mismatch is documented rather than confusing.
   3. **Phase 25 has no SEC coverage yet.** `security-plan.md` §9 explicitly scopes payment-rail security (PCI and equivalent) out of v1, to be revisited "when payments enter the AI phase." Payments now has its own phase, so a new SEC block must be authored before phase 25 can start. Flagged as **OQ-10**.
 
-### (b) SEC and TC coverage — every group lands somewhere
+### (b) SEC and TC coverage — new groups mapped to the existing phases
 
-**SEC items (41), by group:**
+**SEC items (01–44), by group:**
 
 | SEC group | Phase |
 |---|---|
@@ -100,11 +109,13 @@ Two placement notes worth your eye:
 | SEC-26 (secrets) | 04 |
 | SEC-27 (backup encryption, restore) | 22 |
 | SEC-28 (log hygiene) | 18 |
-| SEC-29…36 (DPA: basis, notice, consent, rights, erasure, breach, retention) | 18 |
+| SEC-29…36 (DPA: basis, notice, consent, rights, erasure, breach, retention) | 18; SEC-32 export implementation in 15, verification in 18 |
 | SEC-37, 38 (NPC registration, counsel review) | 22 |
 | SEC-39, 40, 41 (store labels, deletion path, location) | 23 |
 | **SEC gate tiers** (security-plan §7) | beta tier → 18; store-submission tier → 23; public-launch tier → 22 |
 | **Payment-rail security — DOES NOT EXIST YET** | required by 25; must be authored first (OQ-10) |
+| **SEC-42 export/share privacy** | 15 implement PDF/CSV privacy, OS handoff and local-file cleanup → 18 verify with SEC-32 → 19 QA |
+| **SEC-43/44 private photo Storage and labels** | Phase 24 v1.1 backlog only; RLS, size/MIME, offline-staging and Photos-label gates belong to a later approved implementation plan, not the v1 beta gate |
 
 **TC groups:**
 
@@ -126,18 +137,24 @@ Two placement notes worth your eye:
 | TC-MIG-01…03 | 07 |
 | TC-BAK-01, 02 | 22 |
 | TC-E2E-01 | 19 |
+| TC-AE-16…20 (explicit rebalance, FIX-C arithmetic and locked/shortfall paths) | 13 → 19 regression suite |
+| TC-GM-16…20 (affordable-guest, FIX-A and edge cases) | 12 → 19 regression suite |
+| TC-TM-01…04 (five unticked templates, no default amounts/rows) | 10 → 19 regression suite |
+| TC-CK-01…05 (manual state, date, fee and blocked preset oracle) | 09 → 19 regression suite; verified preset applicability/offset oracle **BLOCKED OQ-11** |
+| TC-EX-02…08 (offline PDFs/CSVs, disclosure, single sponsor, CSV injection, share) | 15 → 17 offline hardening → 18 SEC-32/42 gate → 19 QA |
+| TC-LO-01…04, TC-AT-01…04 (v1.1) | 24 backlog handoff only; no v1 test-execution claim |
 
-No SEC item and no TC group is unplaced.
+These are *authored test specifications*, not executed tests. Older TC-group ranges here are representative phase examples, not an exhaustive index of all legacy TC IDs; `testing-plan.md` §2 and its scenario sections are authoritative for individual cases. Every Prompt-4 TC group is mapped above. OQ-11 blocks a verified preset oracle, not the manual checklist state/fee cases.
 
-### (c) One-sitting failures — **20 of 27 phases are marked "no", and I cannot fix this within your phase cap**
+### (c) One-sitting failures — **21 of 27 phases are marked "no", and I cannot fix this within your phase cap**
 
-Only 7 pass: phases 01, 02, 03, 04, 05, 06, and 15.
+Only 6 pass: phases 01, 02, 03, 04, 05, and 06. Prompt-4 export/share work makes phase 15 another non-one-sitting phase; these are index assessments, not implementation results.
 
 This is the finding that needs your decision before approval.
 
 **Two distinct reasons a phase fails the one-sitting test:**
 
-**Reason 1 — scope too large (11 phases).** These can be split, and here is the exact split each needs:
+**Reason 1 — scope too large (12 phases).** These can be split, and here is the indicative split each needs (Prompt-4 additions add work to 09, 10, 12 and 13):
 
 | # | Why it fails | Proposed split |
 |---|---|---|
@@ -149,6 +166,7 @@ This is the finding that needs your decision before approval.
 | 12 | 5 REQs spanning model and propagation | 12a axes, per-head/flat, crew (GM-1,2,4) · 12b propagation & what-if (GM-3,5) |
 | 13 | 6 REQs spanning engine core and modifiers | 13a baselines, determinism, pinning, explainability (AE-1,3,4) · 13b index, overrides, buffer (AE-2,5,6) |
 | 14 | 5 REQs spanning records and D2 math | 14a pledge records (PL-1) · 14b fulfillment math, expected, exposure, traceability (PL-2,3,4,5) |
+| 15 | Bento composition plus offline PDF/CSV production, privacy preview and share | 15a dashboard composition · 15b export and share (REQ-EX-2) |
 | 16 | Change log + attribution + removal + transfer | 16a change log & attribution (SE-4) · 16b lifecycle: removal & transfer (SE-5,6) |
 | 17 | 4 REQs across every entity | 17a offline CRUD & computation (OF-1,2) · 17b indicators & clock handling (OF-3,4) |
 | 18 | RLS + at-rest + logs + 8 DPA items + gate | 18a technical hardening (RLS, at-rest, logs) · 18b DPA compliance & beta gate |
@@ -166,12 +184,12 @@ This is the finding that needs your decision before approval.
 | 25 | **Payments.** Externally gated — rail onboarding, merchant/partner approval, and compliance review sit with third parties, not with us. Also blocked on OQ-10 (no payment-rail SEC block exists) |
 | 26, 27 | Post-launch AI work, multi-sitting by scope and by gate |
 
-**The conflict, stated plainly.** Splitting the 11 scope-bound phases yields **+11 phases → 38**, which exceeds your 20–26 cap — and the index is already at 27 after Decision 2. The two constraints — "between 20 and 26 phases" and "every phase validatable in one sitting" — are not simultaneously satisfiable for this scope. I have not resolved it by quietly marking large phases "yes."
+**The conflict, stated plainly.** Splitting the 12 scope-bound phases yields **+12 phases → 39**, which exceeds your 20–26 cap — and the index is already at 27 after Decision 2. The two constraints — "between 20 and 26 phases" and "every phase validatable in one sitting" — are not simultaneously satisfiable for this scope. I have not resolved it by quietly marking large phases "yes."
 
 **Three ways forward — your call:**
 
-1. **Raise the cap to ~38** and accept the splits above. Best granularity; the index gets long.
-2. **Keep the work phases and add a separate row type for time-bound gates.** The 9 Reason-2 phases become *gates* (entry/exit criteria, no sitting expectation), leaving 18 work phases of which 11 still need splitting → **29 work phases + 9 gates**.
+1. **Raise the cap to ~39** and accept the splits above. Best granularity; the index gets long.
+2. **Keep the work phases and add a separate row type for time-bound gates.** The 9 Reason-2 phases become *gates* (entry/exit criteria, no sitting expectation), leaving 18 work phases of which 12 still need splitting → **30 work phases + 9 gates**.
 3. **Keep the cap at 26 and redefine the column** as "validatable in one sitting *once its sub-tasks are enumerated in the phase body*." Honest only if the bodies carry the sub-splits. I do not recommend this — it moves the problem rather than solving it.
 
 **My recommendation: option 2.** It preserves one-sitting discipline where it is meaningful (implementation work) and stops pretending a store review or a UAT window is a sitting.
@@ -215,8 +233,9 @@ The index is followed below by phase bodies 01–06; later bodies remain pending
 
 1. **The one-sitting vs phase-cap conflict** in (c) — options 1, 2, or 3. Decision 2 has pushed the index to 27, already over the cap, so this now needs resolving either way.
 2. **OQ-10 (new):** payment-rail security has no SEC block. `security-plan.md` §9 scoped it out of v1 on the assumption payments would arrive inside the AI phase. Phase 25 cannot start until that block exists.
+3. **OQ-11:** requirements-checklist preset applicability and due-date offsets must be verified item by item with the relevant authority before publication. Keep “NEEDS VERIFICATION”; user-entered reminder dates are not authoritative rules. Prompt-4 REQ/TC/SEC groups are mapped to phases 09, 10, 12, 13, 15, 17–19 and the v1.1 backlog in 24 above; no blocked preset case is treated as passed.
 
-Also carried forward: **8 OQ items remain OPEN** in `decision-log.md`. Per the `agents.md` escalation rule, phases touching them will stop rather than decide — most relevantly OQ-04 (reference costs) against phase 13, OQ-07 (data residency) against phase 23, and OQ-01/OQ-03 (erasure, force-wipe) against phases 16 and 18.
+Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents.md` escalation rule, phases touching them will stop rather than decide — most relevantly OQ-04 (reference costs) against phase 13, OQ-07 (data residency) against phase 23, and OQ-01/OQ-03 (erasure, force-wipe) against phases 16 and 18.
 
 ---
 ---

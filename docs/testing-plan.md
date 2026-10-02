@@ -57,7 +57,7 @@ One Maestro flow set, two targets. Flows live in `e2e/flows/` and are parameteri
 
 ## 2. Traceability matrix
 
-Every REQ ID in `requirements.md` (61 total) appears. Levels: **U** unit, **I** integration, **E** E2E, **M** manual/review, **S** static analysis. Test cases below are planned assertions, not executed results.
+Every REQ ID in `requirements.md` (68 total) appears. Levels: **U** unit, **I** integration, **E** E2E, **M** manual/review, **S** static analysis. Test cases below are planned assertions, not executed results; v1.1 attachment rows are design/backlog gates, not executed upload tests.
 
 | REQ ID | Test IDs | Level |
 |---|---|---|
@@ -99,12 +99,19 @@ Every REQ ID in `requirements.md` (61 total) appears. Levels: **U** unit, **I** 
 | REQ-GM-3 | TC-GM-07 | U |
 | REQ-GM-4 | TC-GM-08 | U |
 | REQ-GM-5 | TC-GM-09, TC-GM-10 | U + I |
+| REQ-GM-6 [v1] | TC-GM-16 … TC-GM-20 | U + widget |
 | REQ-AE-1 | TC-AE-01, TC-AE-02, TC-AE-03, TC-AE-04 | U |
 | REQ-AE-2 | TC-AE-05, TC-AE-06, **TC-AE-07 (BLOCKED)** | U |
 | REQ-AE-3 | TC-AE-08 | U |
 | REQ-AE-4 | TC-AE-09, TC-AE-14 | U + widget |
 | REQ-AE-5 | TC-AE-10, TC-AE-11, TC-AE-15 | U + I |
 | REQ-AE-6 | TC-AE-12 | U |
+| REQ-AE-7 [v1] | TC-AE-16 … TC-AE-20 | U + I + widget |
+| REQ-TM-1 [v1] | TC-TM-01 … TC-TM-04 | U + I + widget |
+| REQ-CK-1 [v1; preset gate OQ-11] | TC-CK-01 … TC-CK-05; verified preset oracle BLOCKED | U + I + widget |
+| REQ-EX-2 [v1] | TC-EX-02 … TC-EX-08 | U + I + widget + M |
+| REQ-LO-1 [v1.1] | TC-LO-01 … TC-LO-04 | U + widget (deferred) |
+| REQ-AT-1 [v1.1 backlog stub] | TC-AT-01 … TC-AT-04 | I + M (deferred design gates, no v1 upload) |
 | REQ-SE-1 | TC-SE-23, TC-SE-42 | I + E |
 | REQ-SE-2 | TC-SE-20, TC-SE-21, TC-SE-24, TC-SE-27 … TC-SE-28, TC-SE-33 … TC-SE-35, TC-SE-39 | U + I |
 | REQ-SE-3 | TC-SE-25, TC-SE-36, TC-SE-39 | U + I |
@@ -123,7 +130,7 @@ Every REQ ID in `requirements.md` (61 total) appears. Levels: **U** unit, **I** 
 | REQ-AI-5 | — | Out of v1 scope (AI phase) |
 | REQ-EX-1 | TC-EX-01 | M (see §2.1) |
 
-**Coverage:** 55 of 61 REQ IDs have at least one mapped executable test specification. 5 (REQ-AI-1…5, including reclassified post-launch payments REQ-AI-4) are deliberately out of v1 scope; 1 (REQ-EX-1) is review-verified only. Five tracked testability limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 and UT-10…11 have executable redirects. Authored cases are not passing implementation tests until code exists.
+**Coverage:** 60 v1 REQ IDs have mapped test specifications (55 existing plus five Prompt 4 IDs); two v1.1 IDs have deferred cases, five REQ-AI-1…5 are out of v1, and REQ-EX-1 is review-only: 60 + 2 + 5 + 1 = 68. REQ-CK-1's unverified legal/church preset oracle is **BLOCKED (OQ-11)**, not counted as a passing case. Five tracked historical limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 and UT-10…11 have executable redirects. Authored cases are not passing implementation tests until code exists.
 
 ### 2.1 Untestable-as-written and resolved testability gaps
 
@@ -559,6 +566,20 @@ Budget headroom: 350,000 − 310,000 = 40,000.
 | TC-PL-19 | FIX-C net = ₱335,750.00 exactly; explicitly not 250,750 or 190,750 | U |
 | TC-AE-05 | FIX-A / FIX-B / FIX-C / FIX-D allocation percentages are identical | U |
 
+### 3.6 Prompt 4 worked examples — append-only overlays (not edits to FIX-A/B/C/D)
+
+These are **planned test oracles**, evaluated on a copy of the named fixture. None changes the original fixture inputs or expected tables above; in particular a rebalance preview never changes original FIX-C's negative buffer result until the couple explicitly applies overrides. Values below are integer centavos; displayed pesos are merely formatting.
+
+**Overlay P4-C: explicit FIX-C rebalance at 300 guests (TC-AE-16).** Original allocation in category order = `[20,000,000, 7,500,000, 5,000,000, 5,000,000, 2,500,000, 10,000,000]` centavos; corresponding committed effective costs = `[29,475,000, 5,500,000, 5,300,000, 5,500,000, 3,800,000, 0]`. No override is locked. Unlocked recipient needs = `[9,475,000, 0, 300,000, 500,000, 1,300,000]` = `11,575,000` centavos; Buffer first contributes `10,000,000` in category order: Catering `9,475,000`, Attire `300,000`, Coordination `225,000`; remaining Coordination `275,000` + Entourage `1,300,000` = `1,575,000`. Photo has `2,000,000` slack and is the only unlocked donor, so supplies all `1,575,000`. Final allocations = `[29,475,000, 5,925,000, 5,300,000, 5,500,000, 3,800,000, 0]` centavos = **₱294,750 / ₱59,250 / ₱53,000 / ₱55,000 / ₱38,000 / ₱0**, summing exactly **₱500,000**. After Apply, each category meets its commitment; Buffer remaining is ₱0. Original gross ₱495,750 and net ₱335,750 remain unchanged. Preview/cancel leaves original FIX-C allocation and original −₱15,750 buffer remaining unchanged.
+
+**Overlay P4-C-lock: feasible partial, not a false fit (TC-AE-17/18).** On a fresh FIX-C copy, manually lock Photo at its original ₱75,000. All allocations still sum to ₱500,000. Buffer supplies ₱100,000 as above; Photo cannot donate. Preview final `[29,475,000, 7,500,000, 5,300,000, 5,225,000, 2,500,000, 0]` centavos (sum `50,000,000`) and identifies uncovered Coordination `275,000` + Entourage `1,300,000` = **1,575,000 centavos / ₱15,750**. Applying this feasible partial leaves the locked Photo amount unchanged and the breach visible. If instead all six locked overrides sum to `50,000,001` centavos for a ₱500,000 budget, Apply is disabled, with the one-cent discrepancy shown; no normalization or override write occurs.
+
+**Overlay P4-cent: largest remainder and stable tie (TC-AE-19).** Synthetic integer-centavo algorithm probe (not a suggested budget, price, fee or benchmark): input total `10,000`, allocations `[4000,1500,1000,1000,500,2000]` centavos; committed Catering `6003`, all other categories `0`. Buffer supplies `2000`, remaining need `3`; donor slacks Photo `1500`, Attire `1000`, Coordination `1000`, Entourage `500`, total `4000`. Proportional exact centavo quotas are `1.125, 0.75, 0.75, 0.375`; floors `1,0,0,0` leave two cents. Largest remainders award Attire then Coordination (their tie follows ADR-10 order): donor transfers `[1,1,1,0]`. Final allocations `[6003,1499,999,999,500,0]` = **10,000 centavos**, none below a committed amount. These are arithmetic test operands only, never app defaults.
+
+**Overlay P4-A: FIX-A gross affordability, not pledged affordability (TC-GM-16/17).** Live flat effective sum = `29,680,000` centavos (₱296,800, including `630,000` crew-meal centavos); active guest rates = `240,000 + 12,000 + 8,000 = 260,000` centavos/guest (₱2,600). At buffer `0`: `floor((80,000,000 − 29,680,000)/260,000) = floor(50,320,000/260,000) = 193` remainder `140,000` centavos; gross for 193 = `79,860,000` (₱798,600), for 194 = `80,120,000` (₱801,200 > budget). With buffer-to-keep `16,000,000` centavos (₱160,000): `floor(34,320,000/260,000) = 132` exactly; gross for 132 = `64,000,000` (₱640,000), plus buffer = ₱800,000; 133 costs ₱642,600 + buffer = ₱802,600. The original cap is 160: 193 gets a separate over-cap warning rather than a ceiling of 160, while 132 does not. ₱50,000 realized and ₱50,000 expected pledges do not change either answer. FIX-A's original totals remain unchanged.
+
+**P4 guest boundary overlays (TC-GM-18/19/20).** Starting from a copied FIX-A, set the selected buffer to `60,400,001` centavos (₱604,000.01): `80,000,000 − 29,680,000 − 60,400,001 = −10,080,001` centavos, so display ceiling `0` and zero-guest shortfall **₱100,800.01** even though no guest fits. For a distinct user-entered plan with budget `10,000` centavos, flat committed `2,000`, buffer `1,000`, and **all live per-head rates zero**, say “No per-head costs; no finite budget-based guest limit”; if flat cost is instead `10,001` centavos, also show `1,001` centavos / ₱10.01 zero-guest shortfall with that buffer. Changing a formerly per-head entry to manually valued actual moves its effective amount into flat and removes its rate from the active denominator; deleting a per-head entry does the same for the rate without inventing another. Preview only, no event or payment write.
+
 ---
 
 ## 4. Unit test areas
@@ -726,6 +747,49 @@ Each newly introduced or materially changed numbered clause below has its own st
 | TC-GF-04 | GF-2.1 | FIX-D ₱40k gifts versus ₱210k balance shows −₱170k shortfall in full PHP form; surplus path has non-colour cue. |
 | TC-GF-05 | GF-2.2 | Payment, refund, gift, actual edit recompute view on read without stored rollups, payout or transfer. |
 
+### 4.8 Prompt 4 clause-level cases (planned, not executed)
+
+Every value in §3.6 is a hand-specified oracle. Run v1 cases offline on both platforms where UI/storage is involved. v1.1 cases are deferred design/acceptance specifications, **not** a claim that photo upload or translated UI exists.
+
+| TC ID | REQ clauses | Decidable assertion |
+|---|---|---|
+| TC-AE-16 | AE-7.2–5 | §3.6 P4-C: before/after `200000/75000/50000/50000/25000/100000` → `294750/59250/53000/55000/38000/0` pesos; explicit Apply persists only changed override cents with log attribution, gross/net and engine unchanged; after Apply Buffer remaining ₱0. Cancel writes zero rows and retains original −₱15,750 buffer result. |
+| TC-AE-17 | AE-7.1,4 | §3.6 P4-C-lock: Photo override ₱75,000 stays locked and unchanged; partial preview allocates `294750/75000/53000/52250/25000/0`, with named Coordination ₱2,750 and Entourage ₱13,000 breaches. Explicit partial Apply retains breach; locked underfunded recipient also remains unchanged with its shortfall disclosed. |
+| TC-AE-18 | AE-7.1,5 | Six locked overrides sum 50,000,001 centavos vs 50,000,000 budget: Apply disabled, one-cent mismatch named, no silent normalization or writes. Repeat for 49,999,999. |
+| TC-AE-19 | AE-7.3 | §3.6 P4-cent: 3-cent need after Buffer, proportional quotas `1.125/.75/.75/.375`; floor then remainders produce transfers `[1,1,1,0]` by fixed tie order, exact 10,000-centavo conservation. Also test zero slack: no division by zero, uncovered need remains. |
+| TC-AE-20 | AE-7 main,4–5 | Offline preview on two identical pinned-rule copies gives identical explanations and post-Apply allocations; preview names locks/donors/shortfall, no vendor or funds UI; only changed overrides sync via immutable events. |
+| TC-GM-16 | GM-6.1–2 | §3.6 P4-A flat 29,680,000 and rate 260,000 centavos yield ceiling **193** with zero kept buffer; at 193 gross ₱798,600 fits and at 194 ₱801,200 does not. Explain flat, rate, chosen buffer and driving RSVP/count. |
+| TC-GM-17 | GM-6.2,5 | P4-A keeping 16,000,000 centavos yields **132**, 133 breaks buffer; 193 exceeds cap 160 but remains ceiling with separate warning. Received/expected pledges, gifts and supplier payments never change either ceiling; preview writes nothing. |
+| TC-GM-18 | GM-6.3–4 | P4 boundary: negative numerator −10,080,001 centavos gives ceiling 0, zero-guest shortfall ₱100,800.01, not “fits”; zero-rate case with overcommitted flat + buffer reports both no finite limit and shortfall. |
+| TC-GM-19 | GM-6.1,4 | Rate sum zero with nonnegative numerator says “No per-head costs; no finite budget-based guest limit,” no infinity/division; manually valued actual and crew meals count flat; deleted entries/rates excluded; priority-tier change cannot affect rate. |
+| TC-GM-20 | GM-6.5 | Offline on SCR-13: preview explanation displays flat/rate/buffer, cap warning separately, no supplier promotion or money initiation; discard preserves byte-identical data and no sync event. |
+| TC-TM-01 | TM-1.1–2 | Validate pinned JSON has five named templates with stable IDs, valid categories/pricing modes, no price/supplier fields; ceremony/venue mapping deterministic and unset allows manual choice; bad shape rejected. |
+| TC-TM-02 | TM-1.3 | Inventory matches all 14 listed Filipino/local expense types with configured names/modes, never asserts fees/applicability or vendor names. |
+| TC-TM-03 | TM-1 main,4 | Opening/cancelling all unticked suggestions writes no rows (not even ₱0); ticking opens ledger editor, rejects missing supplier or invalid amount/rate, saves only after user enters valid fields; works offline. |
+| TC-TM-04 | TM-1.1,4 | Intimate ≤50 label leaves cap/count unchanged; compare variants with same ledger to prove gross/net unchanged; inspect UI for no vendor ranking/booking or payment initiation. |
+| TC-CK-01 | CK-1.1–2 | Config includes named checklist labels/stable IDs; each unverified item reads NEEDS VERIFICATION with no preset eligibility, fee or due date; reject unverified offset/applicability as authoritative. **Verified rule/offset assertion BLOCKED on OQ-11; no guessed offset.** |
+| TC-CK-02 | CK-1.2–3 | Couple enters a reminder date for an unverified item: label identifies user date; changing wedding date leaves that date untouched. Done toggles independently offline and two-partner LWW history preserves both field writes. |
+| TC-CK-03 | CK-1.3 | Once an item-specific source/offset is actually verified and recorded (future gated test data), recompute signed-day offset on read after wedding-date edit and preserve manual date; **no concrete offset or authority oracle until OQ-11 is resolved.** |
+| TC-CK-04 | CK-1.4 | Couple enters their own positive `fee_cents = F` (no preset amount): gross/net unchanged; declining confirmation or a zero fee creates no ledger row; explicit confirmation with valid supplier/category creates one ledger entry for exactly `F` centavos counted once, never a divergent amount or payment initiation. Editing the checklist fee afterward does not mutate the linked ledger entry without a separate explicit ledger edit. |
+| TC-CK-05 | CK-1 main–4 | Checklist remains usable offline with done/user date/fee; preview explains source-verification gate and contains no supplier recommendation or auto-transfer. Fail release gate if unverified preset appears as legal/church advice. |
+| TC-EX-02 | EX-2 main,1 | Offline summary PDF contains full-form gross/net/expected, six-category amounts and dated payment schedule from eligible projection; privacy preview names included sections before OS sheet. No network/file-link dependency. |
+| TC-EX-03 | EX-2.2 | Four separate CSV schemas ledger/payments/pledges/guests with sensitive-data warning; round-trip RFC-4180 quoted commas, quotes, CRLF and UTF-8; `=1+1`, `+cmd`, `-2+3`, `@SUM`, ` \t=1+1`, control-prefixed `\r=1+1` become apostrophe-prefixed **before** CSV quoting and import as text, not executable formulas. |
+| TC-EX-04 | EX-2.1,3 | Shared summary hides guest/sponsor names by default; toggle each independently and inspect generated PDF text, not merely UI. Statement for one Ninong or Ninang contains only the selected pledge, eligible receipts and linked coverage; another sponsor's name and unrelated amounts absent, and a non-Ninong/Ninang pledge cannot be selected for the v1 statement. |
+| TC-EX-05 | EX-2.4 | Airplane-mode OS share-sheet handoff (Messenger/Viber/email if installed) exposes local file only, no generated link or sync; cancel/handoff removes app-owned temp artifact. Warning states external copy cannot be recalled/deleted by Kasaran. |
+| TC-EX-06 | EX-2.2–3 | Deleted/ineligible rows excluded from curated export; sponsor-direct payment/receipt shown in their respective source rows without double net subtraction; statement never leaks a different sponsor when identical names or entries exist. |
+| TC-EX-07 | EX-2.4–5 | Exported bytes/temp names/logs contain no accidentally persisted share URL or raw sensitive cache after handoff; independent review checks profile/activity inclusion and SEC-32 disclosure, not merely PDF visual redaction. |
+| TC-EX-08 | EX-2.5; SEC-32 | From the same UI request a distinct full machine-readable copy: parse versioned manifest and compare local source fields for profile, membership, setup, ledger/schedule/payments/refunds, fee components, pledges/receipts, gifts/giver, guests, crew, checklist, overrides and attributed change history (including retained tombstones), including names omitted from redacted PDF/curated CSVs. Manifest reports as-of-last-sync, missing/inaccessible fields and server-only/other-device-unsynced limits; reconcile server-only account data with DPO before claiming SEC-32 PASS, and verify account display-name/email correction path. Formula-neutralize CSV text/formatted cells if used, warn before share, and do **not** assert OQ-01 erasure. |
+| TC-LO-01 | LO-1 main,1 | v1 English only; deferred v1.1 ARB English/Taglish/Filipino key inventory and user selection, missing key falls back to English deterministically, no runtime translation. |
+| TC-LO-02 | LO-1.1–2 | Switching locale leaves centavos, budget calculations, sync and user-entered text byte-identical; PHP/date remain en_PH and full a11y form. |
+| TC-LO-03 | LO-1.2 | Kasaran, Ninong/Ninang, PSA/CENOMAR and local acronyms remain untranslated in both new locales. |
+| TC-LO-04 | LO-1.3 | Pseudo-localize/expand labels at largest text scale in dashboard bento tiles: value legible, no clipping/overlap; VoiceOver/TalkBack label announces full amount rather than shorthand. |
+| TC-AT-01 | AT-1.1 | Deferred design/security gate: private plan-scoped Supabase Storage policies reject cross-tenant read/write and public URL; metadata attaches only to a valid plan-owned ledger entry or pledge receipt (contract photo linked to ledger), with no v1 upload UI or OCR. |
+| TC-AT-02 | AT-1.2 | Deferred offline design gate: stage encrypted photo bytes separately from metadata; disconnected item says pending, failed transfer says error, never uploaded until bytes are reachable; retry is idempotent. |
+| TC-AT-03 | AT-1.3 | Deferred configuration gate: approve maximum bytes and MIME allowlist *before* authoring concrete limits or asserting boundary values; reject disallowed oversize/type once values are approved. **No invented threshold oracle.** |
+| TC-AT-04 | AT-1.3 | Deferred release review: Photos privacy declaration updated before shipping; neither forced remote wipe nor public URL nor OCR claimed. Stub remains non-shipping until gates approved. |
+
+**Project-brief §4 four-test gate per feature.** Deterministic: AE-16/19, GM-16/18, TM-01, CK-01/02 (verified preset BLOCKED), EX-03/08, LO-01, AT-01/03 (deferred). Explainable: AE-20, GM-20, TM-03, CK-05, EX-02/04, LO-04, AT-02. No money movement: AE-20, GM-20, TM-04, CK-04/05, EX-05, LO-02, AT-04; historical payment records and fee ledger entries never initiate transfers. No supplier recommendation: AE-20, GM-20, TM-04, CK-05, EX-04, LO-03, AT-04. All are planned test cases; OQ-11 preset and v1.1 gates retain their blocked/deferred status.
+
 ---
 
 ## 5. Sync & conflict tests
@@ -833,7 +897,7 @@ Every v1 entity, airplane mode, expected **end state** stated.
 | TC-SEC-02 | Removed member replays last valid token (existing) | Denied identically to a never-member |
 | TC-SEC-04 | Enumeration: request a valid-but-foreign `plan_id` vs a nonexistent one | **Responses indistinguishable** — foreign plans must not be distinguishable from nonexistent ones, or existence leaks |
 | TC-SEC-05 | Direct REST bypass of the app layer | RLS denies; app-layer checks are not the only control (SEC-22) |
-| TC-SEC-06 | Policy coverage | Every plan-scoped table has a policy **and** `FORCE ROW LEVEL SECURITY`; a new table without one fails CI | SEC-22, SEC-23 |
+| TC-SEC-06 | Policy coverage | Every v1 plan-scoped table, including new `checklist_items`, has a policy **and** `FORCE ROW LEVEL SECURITY`; a new table without one fails CI. v1.1 attachments also require metadata-table and Storage object-policy checks before release (SEC-43). | SEC-22, SEC-23, SEC-43 |
 
 Maps to **SEC-07, SEC-09, SEC-22, SEC-23, SEC-24, SEC-25**.
 
@@ -912,8 +976,8 @@ Countable. Every line is pass/fail, no partial.
 
 | # | Criterion | Measure |
 |---|---|---|
-| 1 | REQ coverage | **55/55** testable REQ IDs have a passing mapped test. Five deferred REQs are out of v1 (REQ-AI-1…3 and 5 in AI phase; REQ-AI-4 in post-launch payments); REQ-EX-1 has a completed manual review |
-| 2 | Fixtures | **All four fixtures match expected values exactly**: FIX-A/B/C each at base and +25 guests, FIX-D at its fixed date — 9/9 fixture/related TCs green (TC-FIX-A1…D1, TC-PL-19, TC-AE-05) |
+| 1 | REQ coverage | **60 v1 REQ IDs mapped; every shippable clause has a passing case**, including Prompt 4 cases in §4.8 and a separate full SEC-32 copy (TC-EX-08). Five REQ-AI IDs and two v1.1 IDs are out of v1; REQ-EX-1 requires completed manual review. Do not declare REQ-AE-2 adequacy or REQ-CK-1 verified presets passed while OQ-04/OQ-11 are open; those capabilities cannot ship as verified. |
+| 2 | Fixtures | **All four original fixtures match expected values exactly**: FIX-A/B/C each at base and +25 guests, FIX-D at its fixed date — 9/9 fixture/related TCs green (TC-FIX-A1…D1, TC-PL-19, TC-AE-05). Additionally §3.6 overlays have their own Prompt 4 case assertions; no original fixture expected output is replaced. |
 | 3 | Defects | **Zero open S1. Zero open S2.** |
 | 4 | Sync matrix | **Every TC-SE row in §5 green on both iOS and Android**; TC-SE-40/41 assert alias/request mechanics only, not counsel-blocked shared erasure |
 | 5 | Offline matrix | **Every entity row in §6.1 and durability/protocol row in §6.2 green**; the string scan in TC-OF-10 finds zero prohibited words |
@@ -925,6 +989,7 @@ Countable. Every line is pass/fail, no partial.
 | 10 | Restore drill | TC-BAK-02 completed within the last 7 days **with a recorded restore duration** |
 | 11 | Rounding | TC-GEN-05 drift guard green; no cent gained or lost over 1,000 iterations |
 | 12 | Static money check | TC-GEN-01 lint clean — zero `double` in money paths |
+| 13 | Prompt 4 privacy and verification | TC-EX-03/04/08 demonstrate CSV neutralization, independent PDF name redaction and **full** personal-data copy; TC-CK-01/05 expose NEEDS VERIFICATION and no unverified due-date preset. Neither redacted summary nor four curated CSVs alone satisfy SEC-32. |
 
 ### 10.1 What this plan does NOT cover
 
@@ -937,10 +1002,12 @@ Stated so the residual risk is visible rather than assumed away.
 5. **Budget adequacy (OQ-04).** TC-AE-07 asserts nothing. The feature cannot ship verified.
 6. **Partial and withdrawn pledges (UT-10, UT-11) — resolved.** TC-PL-23, TC-PL-35, TC-PL-42…50 and FIX-D cover receipt-based support; these are planned tests, not executed results.
 7. **Negative ledger adjustments (TC-LG-13) — resolved.** Positive refund rows and lower actual cost represent refunds and discounts without negative actuals.
-8. **Localization.** English-only v1 (ux-spec §8.4). No pseudo-localization, no RTL, no translated-string overflow testing.
+8. **Localization.** English-only v1 (ux-spec §8.4). v1.1 adds the deferred pseudo-localization/overflow cases TC-LO-01…04; RTL is not specified.
 9. **Device and OS breadth.** Two devices, latest−1 OS. No matrix across older Android OEM skins, low-memory devices, or tablets.
 10. **Payment rails and AI.** Initiation/settlement of funds (REQ-AI-4) and AI remain out of v1. Manual payment and receipt *records* are v1 and covered above; no PCI or model-behaviour testing.
 11. **Upgrade path from a shipped build.** TC-MIG-04/05 cover simulated old-client local migration and retained unknown rows with queued writes; a real store build N → N+1 upgrade on a physical user's device with an older pinned ruleset is still not covered.
+12. **Checklist source verification (OQ-11).** TC-CK-01/02/04/05 specify unverified labels, user-entered dates, completion and optional fees; no legal/church applicability or preset date-offset result is asserted. TC-CK-03 is blocked pending item-specific source evidence from the relevant LGU, civil registrar and parish/church. Do not release preset rules as verified until the gate closes.
+13. **v1.1 photos (ADR-59).** TC-AT-01…04 are deferred backlog/design gates, not executed Storage or upload results. Size/MIME values and Photos privacy review must be approved before implementation and shipment; OCR stays separate.
 
 ---
 
