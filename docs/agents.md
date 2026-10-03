@@ -307,7 +307,7 @@ Every file in `docs/` and every top-level source module maps to **exactly one** 
 | `fastlane/` | DevOps/Release | |
 | `CHANGELOG.md` ⚠ | DevOps/Release | |
 | `ai/` ⚠ | AI/ML | **Must not exist in a v1 build.** Excludes payments — see below |
-| `payments/` ⚠ | Backend | Post-launch phase 25 (REQ-AI-4, ADR-28). **Security is a mandatory reviewer.** Must not exist in a v1 build |
+| `payments/` ⚠ | Backend | Post-launch phase 22 in the 24-phase index (formerly 25) (REQ-AI-4, ADR-28). **Security is a mandatory reviewer.** Must not exist in a v1 build |
 
 **Two boundaries worth restating**, because they are the ones most likely to be violated:
 

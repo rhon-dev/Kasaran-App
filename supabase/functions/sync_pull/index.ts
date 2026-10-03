@@ -6,7 +6,8 @@
 // and returns an empty row set. No rows exist yet (change_log table and
 // RLS policies are implemented in phases 07/08).
 //
-// Request  (design.md §2.4):
+// Phase-04-only legacy GET envelope (not design.md §2.4's future
+// versioned POST /sync/pull cursor contract):
 //   GET /sync/pull?plan_id=<uuid>&since_server_ts=<int>&limit=<n>
 //   Authorization: Bearer <jwt>
 //

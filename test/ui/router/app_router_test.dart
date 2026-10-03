@@ -16,14 +16,14 @@ class _AuthController extends Notifier<AuthState> {
   @override
   AuthState build() => AuthState.unauthenticated;
 
-  void set(AuthState value) => state = value;
+  set value(AuthState next) => state = next;
 }
 
 class _PlanController extends Notifier<bool> {
   @override
   bool build() => false;
 
-  void set(bool value) => state = value;
+  set value(bool next) => state = next;
 }
 
 Future<(ProviderContainer, GoRouter)> _pump(
@@ -38,8 +38,8 @@ Future<(ProviderContainer, GoRouter)> _pump(
     ],
   );
   addTearDown(container.dispose);
-  container.read(_auth.notifier).set(auth);
-  container.read(_plan.notifier).set(plan);
+  container.read(_auth.notifier).value = auth;
+  container.read(_plan.notifier).value = plan;
   final router = container.read(appRouterProvider);
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -139,12 +139,12 @@ void main() {
       auth: AuthState.unauthenticated,
       plan: false,
     );
-    container.read(_auth.notifier).set(AuthState.authenticated);
+    container.read(_auth.notifier).value = AuthState.authenticated;
     expect(container.read(authStateProvider), AuthState.authenticated);
     await tester.pumpAndSettle();
     _expectScreen('SCR-03');
     expect(identical(container.read(appRouterProvider), router), isTrue);
-    container.read(_plan.notifier).set(true);
+    container.read(_plan.notifier).value = true;
     expect(container.read(hasActivePlanProvider), isTrue);
     await tester.pumpAndSettle();
     _expectScreen('SCR-06');

@@ -2,10 +2,11 @@
 //
 // API contract tests for the sync_push and sync_pull Edge Function stubs.
 //
-// TC-API-01: Unauthenticated request → 401.
-// TC-API-02: Well-formed authenticated request → 200 with correct shape.
-// TC-API-04: Malformed push body rejected → 400.
-// TC-API-05: Malformed pull query rejected → 400.
+// Phase-04 GET/POST Edge stub smoke tests, not the future versioned
+// POST/cursor and tenant-isolation acceptance cases in testing-plan §7.
+// Current tests cover authentication, empty-envelope shape, malformed
+// input and a bounded pull limit. TC-API-01/02/03/05 and SEC-24 remain
+// future phase 07/08/RLS work; they do not pass based on these smoke tests.
 // SEC-03: Issued access token exp − iat ≤ 3600 s.
 //
 // Requires `supabase start`. Tests call `markTestSkipped` inside the body
@@ -185,8 +186,8 @@ void main() {
     _tok = await _acquireToken();
   });
 
-  // ─── TC-API-01: Auth enforcement ─────────────────────────────────────────
-  group('TC-API-01 — Auth enforcement', () {
+  // ─── Phase-04 authentication smoke tests ────────────────────────────────
+  group('Phase04 smoke — Auth enforcement', () {
     test('sync_push: no Authorization → 401', () async {
       skipIfOffline();
       final r = await http.post(_fn('sync_push'),
@@ -235,8 +236,8 @@ void main() {
     });
   });
 
-  // ─── TC-API-02: Authenticated success ────────────────────────────────────
-  group('TC-API-02 — Authenticated success', () {
+  // ─── Phase-04 empty-envelope smoke tests ────────────────────────────────
+  group('Phase04 smoke — Authenticated success', () {
     for (final limit in <String>['1', '100', '1000']) {
       test(
         'sync_pull: positive limit $limit accepted by phase-04 stub',
@@ -318,8 +319,8 @@ void main() {
     });
   });
 
-  // ─── TC-API-04: Malformed push rejected ──────────────────────────────────
-  group('TC-API-04 — Malformed push rejected', () {
+  // ─── Phase-04 push validation smoke tests ───────────────────────────────
+  group('Phase04 smoke — Malformed push rejected', () {
     test('invalid JSON → 400', () async {
       skipIfOffline();
       final r = await http.post(_fn('sync_push'),
@@ -406,8 +407,8 @@ void main() {
     });
   });
 
-  // ─── TC-API-05: Malformed pull query rejected ─────────────────────────────
-  group('TC-API-05 — Malformed pull query rejected', () {
+  // ─── Phase-04 pull validation smoke tests ───────────────────────────────
+  group('Phase04 smoke — Malformed pull query rejected', () {
     for (final limit in <String>[
       '0',
       '-1',
