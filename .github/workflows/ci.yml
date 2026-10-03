@@ -20,7 +20,7 @@ env:
 
 # ---------------------------------------------------------------------------
 # Job: secret-scan
-# Runs gitleaks on every push to confirm no secrets have been committed.
+# Runs gitleaks over full history on every push/PR.
 # SEC-26: service-role keys, signing credentials, and .env values must never
 # appear in source. The gate deliberately fails on a dummy secret (phase 04
 # task 8) to prove the scanner is wired correctly.
@@ -36,10 +36,41 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Go for pinned gitleaks CLI
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Install gitleaks
+        run: go install github.com/zricethezav/gitleaks/v8@v8.30.1
+
+      - name: Scan full Git history (redacted report)
+        shell: bash
+        run: |
+          # Keep all findings for exact-fingerprint filtering, rather than
+          # swallowing a failed scan or excluding an entire historic path.
+          "$HOME/go/bin/gitleaks" git --no-banner --redact=100 \
+            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json" \
+            --exit-code 0 .
+          python3 - "$RUNNER_TEMP/gitleaks.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          findings = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          known = {
+              ('secret_probe.txt', 'jwt',
+               '5be282bc5deb6808a18be17252e7f2423a470b87:secret_probe.txt:jwt:7'),
+          }
+          unexpected = [finding for finding in findings if (
+              finding['File'], finding['RuleID'], finding['Fingerprint']) not in known]
+          print(f'Known historical finding(s) suppressed: {len(findings) - len(unexpected)}')
+          for finding in unexpected:
+              # Never print the match, secret, token, or raw finding JSON.
+              print(f"New finding: {finding['File']} [{finding['RuleID']}]")
+          if unexpected:
+              sys.exit(1)
+          PY
 
 # ---------------------------------------------------------------------------
 # Job: analyze
@@ -147,10 +178,92 @@ jobs:
         run: supabase stop
 
 # ---------------------------------------------------------------------------
+# Job: tenant-isolation
+# Once migrations land, the cross-tenant suite is mandatory and must execute
+# real non-skipped assertions against a running local Supabase instance.
+# ---------------------------------------------------------------------------
+  tenant-isolation:
+    name: Tenant isolation (blocking when migrations exist)
+    runs-on: ubuntu-latest
+    needs: analyze
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require tenant-isolation suite when migrations exist
+        id: gate
+        shell: bash
+        run: |
+          if [ ! -d supabase/migrations ]; then
+            echo 'No migrations yet; tenant-isolation suite not required.'
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+          else
+            if [ ! -d test/api/tenant_isolation ] || \
+               ! find test/api/tenant_isolation -type f -name '*_test.dart' -print -quit | grep -q .; then
+              echo 'ERROR: migrations exist but tenant-isolation test suite is absent.'
+              exit 1
+            fi
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Flutter
+        if: steps.gate.outputs.enabled == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        if: steps.gate.outputs.enabled == 'true'
+        run: flutter pub get
+
+      - name: Set up Supabase CLI
+        if: steps.gate.outputs.enabled == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase with migrations
+        if: steps.gate.outputs.enabled == 'true'
+        run: supabase start && supabase status
+        timeout-minutes: 10
+
+      - name: Run tenant-isolation suite and require executed assertions
+        if: steps.gate.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          flutter test test/api/tenant_isolation/ --reporter=json > "$RUNNER_TEMP/isolation.jsonl"
+          python3 - "$RUNNER_TEMP/isolation.jsonl" <<'PY'
+          import json
+          import sys
+
+          events = [json.loads(line) for line in open(sys.argv[1]) if line.strip().startswith('{')]
+          names = {e['test']['id']: e['test']['name'].lower() for e in events
+                   if e.get('type') == 'testStart' and not e['test'].get('hidden')}
+          done = [e for e in events if e.get('type') == 'testDone' and
+                  e.get('testID') in names]
+          passed = [e for e in done if e.get('result') == 'success' and
+                    not e.get('skipped')]
+          required = ('cross-tenant read', 'cross-tenant write',
+                      'cross-tenant delete', 'forged plan_id pull')
+          if len(passed) != len(done) or not all(
+              any(label in names[e['testID']] for e in passed) for label in required
+          ):
+              sys.exit('Tenant isolation requires executed, passing read/write/delete '
+                       'and forged plan_id pull denials; skipped tests cannot satisfy gate')
+          print(f'Tenant-isolation checks executed: {len(passed)}')
+          PY
+
+      - name: Stop Supabase
+        if: always() && steps.gate.outputs.enabled == 'true'
+        run: supabase stop
+
+# ---------------------------------------------------------------------------
 # Job: build-android
 # ---------------------------------------------------------------------------
   build-android:
-    name: Build Android (debug AAB)
+    name: Build Android (debug and release AAB)
     runs-on: ubuntu-latest
     needs: test
 
@@ -195,20 +308,47 @@ jobs:
           fi
           echo "AAB produced: $AAB ($(du -sh "$AAB" | cut -f1))"
 
-      # SEC-26 guard: confirm the service-role key prefix never appears in
-      # the compiled artifact. "service_role" is the role claim in the JWT.
-      - name: Verify service-role key absent from AAB
+      - name: Build Android App Bundle (release, local config only)
         run: |
-          AAB=build/app/outputs/bundle/debug/app-debug.aab
-          # Unzip AAB into a temp dir and search all extracted files.
-          TMP=$(mktemp -d)
-          unzip -q "$AAB" -d "$TMP"
-          if grep -r --include='*.dex' -l 'service_role' "$TMP" 2>/dev/null | grep -q .; then
-            echo "ERROR: 'service_role' string found inside compiled AAB — SEC-26 violation"
+          flutter build appbundle \
+            --release \
+            --build-number=${{ github.run_number }} \
+            --dart-define=ENV=local
+
+      # SEC-26: Dart code is in flutter_assets/kernel_blob.bin (debug) or
+      # lib/<abi>/libapp.so (release), not necessarily in classes.dex.
+      - name: Scan every extracted file in debug and release AABs
+        shell: bash
+        run: |
+          scan_aab() {
+            local artifact="$1" extracted
+            [ -f "$artifact" ] || { echo "ERROR: missing AAB: $artifact"; return 1; }
+            extracted=$(mktemp -d)
+            if ! unzip -q "$artifact" -d "$extracted"; then
+              rm -rf "$extracted"
+              return 1
+            fi
+            if grep -a -r -q -- 'service_role' "$extracted"; then
+              echo "ERROR: service-role marker in $artifact — SEC-26 violation"
+              rm -rf "$extracted"
+              return 1
+            fi
+            rm -rf "$extracted"
+          }
+          # Red-capable probe: a synthetic non-dex binary MUST fail the gate.
+          probe=$(mktemp -d)
+          mkdir -p "$probe/lib/arm64-v8a"
+          printf '\000service_role\000' > "$probe/lib/arm64-v8a/libapp.so"
+          (cd "$probe" && zip -q "$RUNNER_TEMP/sec26-probe.aab" lib/arm64-v8a/libapp.so)
+          rm -rf "$probe"
+          if scan_aab "$RUNNER_TEMP/sec26-probe.aab"; then
+            echo 'ERROR: SEC-26 scanner failed its red probe'
             exit 1
           fi
-          echo "SEC-26 check passed: no service-role key in compiled artifact"
-          rm -rf "$TMP"
+          echo 'SEC-26 red probe detected the synthetic marker'
+          scan_aab build/app/outputs/bundle/debug/app-debug.aab
+          scan_aab build/app/outputs/bundle/release/app-release.aab
+          echo 'SEC-26 debug and release artifacts passed'
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4

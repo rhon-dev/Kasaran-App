@@ -254,7 +254,7 @@ Recorded here only so the boundary stays explicit. None of these enter a v1 spri
 **AI-1 [AI-phase] — OCR contract parsing.** *As a partner, I want to photograph a supplier contract and have its line items extracted, so that I stop typing them in.*
 **AI-2 [AI-phase] — On-device AI categorization.** *As a partner, I want entries categorised automatically, so that I do not pick a category every time.*
 **AI-3 [AI-phase] — Cloud AI reasoning.** *As a partner, I want budget advice, risk warnings, and forecasts, so that I get guidance beyond arithmetic.*
-**AI-4 [post-launch payments] — InstaPay / QR Ph payments.** *As a partner, I want to pay suppliers in-app, so that recording and paying are one action.* The historical AI-4 identifier is retained, but ADR-28 assigns this to its own payments phase (phase 25), not the AI tail.
+**AI-4 [post-launch payments] — InstaPay / QR Ph payments.** *As a partner, I want to pay suppliers in-app, so that recording and paying are one action.* The historical AI-4 identifier is retained, but ADR-28 assigns this to its own payments phase (phase 22 in the 24-phase launch-readiness index; formerly phase 25), not the AI tail.
 **AI-5 [AI-phase] — Chat assistant.** *As a partner, I want to ask questions in plain language, so that I do not navigate menus.*
 
 **Excluded entirely, not deferred:** supplier marketplace, vendor directory, reviews, and booking. Per the project brief this is a different business, not a later release.

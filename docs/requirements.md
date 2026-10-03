@@ -587,6 +587,7 @@ THE SYSTEM SHALL support exactly two partner accounts per plan, with identical r
 6. WHEN the second partner joins, they see every existing figure identically, including manual overrides.
 7. WHEN a signed-in account has no active plan, THE SYSTEM SHALL offer “Start our plan” and “Join my partner's plan” before creating any plan; choosing Join SHALL NOT create a separate plan (ADR-52).
 8. WHEN a partner pastes an invite link instead of tapping it, THE SYSTEM SHALL send its token through the same acceptance, revocation, membership and seven-day expiry checks as the deep link; the token SHALL have at least 128 bits of CSPRNG entropy, be stored server-side only as a hash, and never appear in logs (SEC-05, ADR-52).
+9. WHEN an applicant signs up, THE SYSTEM SHALL present an unchecked “I am 18 or older” declaration and block account creation with an accessible explanation unless explicitly checked; it SHALL NOT infer adulthood from an invite or collect a birth date for this gate. Counsel SHALL review the legal basis and privacy-notice wording before real-data internal beta (ADR-63, SEC-29/30/31).
 
 **REQ-SE-2 [v1] — Field-level last-write-wins**
 WHEN two partners have edited the same plan and their changes reconcile, THE SYSTEM SHALL resolve conflicts at field granularity using last-write-wins ordered by a **server-assigned timestamp applied at sync time**, with a device-side monotonic counter used only as a deterministic tiebreaker. *(Amended per Decision D1: device wall-clocks are never authoritative for ordering.)*
@@ -705,12 +706,35 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 
 ---
 
+## 8A. Consent-based product measurement and feedback (v1)
+
+**REQ-MT-1 [v1] — Optional privacy-first success measurement (ADR-62)**
+WHERE both active partners separately opt in after reading the approved measurement notice, THE SYSTEM SHALL permit a first-party, plan-scoped cohort measurement of project-brief §5 metrics; otherwise THE SYSTEM SHALL perform no product-measurement analysis or event collection from that plan.
+
+1. A new or restored account SHALL start with measurement off. Neither onboarding, core budgeting nor diagnostics SHALL turn it on; refusing consent SHALL leave every core planning feature available.
+2. Only with both active partners' consent and an approved lawful basis/notice SHALL the cohort computation derive available facts from already-synced `hidden_fee_prompts` and the attributed immutable `change_log`, budget snapshot and wedding date. Existing sync permission alone SHALL NOT authorize retroactive analysis. If a setup-end budget snapshot, final actual gross, prompt decision time or complete history is unavailable, the affected plan SHALL be reported as unknown, not counted as success or failure; duplicate replay SHALL not create a second observation.
+3. To count gross-versus-net comparison views, an explicitly opted-in app SHALL send only an allowlisted `net_comparison_viewed` event with a random event ID, UTC day and notice version; the authenticated server binds it to the plan and stores a coarse plan pseudonym. The client event payload SHALL contain no plan ID, account identifier, amount, email, name, note, URL or token. No third-party analytics SDK or background navigation tracking ships in v1.
+4. WHEN either partner withdraws, THE SYSTEM SHALL stop new optional events and plan-level analysis immediately, discard unsent optional events, and expose consent controls in SCR-18; signing in again or reinstalling SHALL NOT silently re-enable collection. Previously collected events SHALL follow a DPO/counsel-approved deletion and retention policy, not an invented expiry.
+5. Cohort denominators SHALL include only eligible, explicitly enrolled plans with the necessary known inputs. Reports SHALL disclose cohort size, missing-data exclusions and opt-in/self-selection bias; partner-level activity SHALL not appear on a consumer analytics dashboard. No cohort statistic SHALL publish below a DPO-approved aggregation floor.
+6. Before collecting real beta events or analysing existing real plan data for this purpose, DPO/counsel SHALL approve the purpose-specific lawful basis, notice text, both store labels, processor/residency disclosures, event payload, retention and withdrawal flow (SEC-29/30/31, OQ-07). The absence of approval blocks measurement, not core local budgeting.
+
+**REQ-SV-1 [v1] — Optional spreadsheet-displacement survey (ADR-62)**
+WHEN a partner next opens the app after their plan's wedding date, THE SYSTEM SHALL offer one optional in-app question, “Is Kasaran the only tool you used to track your wedding budget, without a parallel spreadsheet?”, without requiring a response to continue planning.
+
+1. SCR-24 SHALL show Yes, No, Prefer not to say, Not now and Skip, with no free-text field; it SHALL be dismissible while offline and SHALL NOT block budgeting, export or sync.
+2. Only an explicit Submit on a selected Yes, No or Prefer not to say SHALL create an answer. Skip records a permanent local dismissal with no answer; Not now defers the prompt once for the next app open and never loops within a session. An answer or Skip SHALL suppress future prompts for that plan on that account.
+3. Survey participation SHALL have its own default-off, separately revocable opt-in and notice; a survey answer or dismissal SHALL NOT imply consent to product measurement under REQ-MT-1. Without opt-in, no response leaves the device. An offline opted-in submission SHALL queue once, deduplicate by stable response ID and sync only after the approved first-party path is available.
+4. A plan SHALL contribute at most one submitted response: the server accepts the first validated submission and labels a later partner response as already answered without silently replacing it. The metric SHALL report the number of eligible responding plans, the Yes share among Yes/No answers, and nonresponse/Prefer-not-to-say separately; it SHALL NOT claim a two-person consensus from one respondent.
+5. Before real-couple survey collection, DPO/counsel SHALL approve the survey lawful basis, notice, role-limited access, retention/withdrawal and Apple/Play labels; until then show no real survey prompt and report no real-cohort result (SEC-29/30/31, OQ-07).
+
+---
+
 ## 9. AI-phase requirements — excluded from v1
 
 **REQ-AI-1 [AI-phase]** — OCR extraction of ledger entries from photographed contracts and receipts.
 **REQ-AI-2 [AI-phase]** — On-device automatic categorisation of ledger entries.
 **REQ-AI-3 [AI-phase]** — Cloud AI budget advice, risk warnings, forecasting, and natural-language summaries.
-**REQ-AI-4 [post-launch — PAYMENTS, not AI-phase]** — InstaPay and QR Ph payment initiation and reconciliation. *(Reclassified per ADR-28: payments is its own post-launch phase (development-phases §25), owned by Backend with Security as mandatory reviewer, and is no longer part of the AI tail. The `REQ-AI-` prefix is retained because IDs are never renumbered — see §14. Still excluded from v1.)*
+**REQ-AI-4 [post-launch — PAYMENTS, not AI-phase]** — InstaPay and QR Ph payment initiation and reconciliation. *(Reclassified per ADR-28: payments has its own post-launch phase (development-phases phase 22), owned by Backend with Security as mandatory reviewer. The `REQ-AI-` prefix is historical and cannot be renumbered; see §14. Excluded from v1.)*
 **REQ-AI-5 [AI-phase]** — Conversational assistant for natural-language input and queries.
 
 **REQ-EX-1 — Excluded entirely, not deferred.** THE SYSTEM SHALL NOT include a supplier marketplace, vendor directory, supplier reviews, supplier ratings, quote solicitation, or booking, in v1 or in the AI phase.
@@ -737,6 +761,8 @@ WHEN connectivity is restored, THE SYSTEM SHALL replay queued writes automatical
 | Private attachment backlog | REQ-AT-1 [v1.1 stub] | Prompt 4 / ADR-59 |
 | Shared editing, conflicts, onboarding, attribution and restore | REQ-SE-1 … 6 (ADR-43–45, 47, 50–52) | SE-1, SE-2, SE-3; Prompt 3 sync integrity |
 | Offline computation, committed cursors and compatibility | REQ-OF-1 … 5 (ADR-46, 48–49) | OF-1, OF-2; Prompt 3 sync integrity |
+| Consent-based measurement and optional survey | REQ-MT-1, REQ-SV-1 [v1] | Prompt 5 / ADR-62; privacy review SEC-29…31 before real-data beta |
+| 18+ sign-up declaration | REQ-SE-1 clause 9 [v1] | Prompt 5 / ADR-63; counsel gate |
 | AI/post-launch payments and permanent marketplace exclusion | REQ-AI-1 … 5, REQ-EX-1 | AI-1 … AI-5; ADR-28 |
 
 ---

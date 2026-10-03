@@ -1,253 +1,103 @@
 # Kasaran — Development Phases
 
-**Index plus phase bodies 01–06 (batch 1).** The index's one-sitting versus phase-cap conflict is still awaiting a decision; later phase bodies are pending. Written bodies do not imply their exit criteria have passed.
+**24-phase index; detailed bodies 01–08.** This is a plan, not a completion certificate. Inputs and precedence: `decision-log.md` and `project-brief.md` govern `requirements.md`; `design.md`/`ux-spec.md`, `security-plan.md`, and `testing-plan.md` supply implementation constraints and test oracles. A requirement appears in exactly one *owning* phase below; a later verification gate is not a second assignment. The two v1.1 entries are assigned a **backlog handoff**, not implementation or release coverage.
 
-*Inputs: `decision-log.md` (givens, ADRs and OQs) and `project-brief.md` scope govern `requirements.md` acceptance criteria; `design.md` / `ux-spec.md` specify structure and presentation, `security-plan.md` controls and `testing-plan.md` test oracles; `agents.md` assigns ownership. This index is downstream and cannot override any of them.*
+## Phase index — 24 phases
 
----
+A phase is a milestone with several independently testable **sittings**, not a promise to complete the entire phase in one sitting. External waits (beta, counsel, store review, observation) are gates, not sittings. No phase is marked complete solely because its body exists.
 
-## Phase index — 27 phases
+| # | Name | Owner | Depends on | Sole REQ ownership | Objective / sitting boundary |
+|---|---|---|---|---|---|
+| 01 | Repo, tooling & CI skeleton | DevOps/Release | — | REQ-PLT-1 | Flutter/CI skeleton; finish outstanding real CI gates |
+| 02 | Money primitives & formatting | Backend | 01 | REQ-GEN-1, REQ-GEN-2, REQ-GEN-2A | Integer-centavo arithmetic and formatting/lint tests |
+| 03 | Flutter shell & navigation | Mobile/Frontend | 01 | — | Placeholder routes, tabs, real-router/deep-link tests |
+| 04 | Backend shell: environments & secrets | DevOps/Release | 01 | — | Local sync stubs/contracts; staging ref and production residency gated |
+| 05 | Local encrypted store | Data & Sync | 03, 04 | REQ-PLT-2 | SQLCipher and hardware-backed keys; device verification |
+| 06 | Shared-account auth & pairing | Security | 04, 05 | REQ-PLT-3, REQ-SE-1 | Verified-email sign-in, 18+ declaration, Start/Join, deep-link/paste invite |
+| 07 | Data layer: entities & change-log writer | Data & Sync | 05, 06 | — | Several sittings: schemas/repositories; immutable log/RLS; migration tests |
+| 08 | Sync engine: ordered replay & convergence | Data & Sync | 06, 07 | REQ-SE-2, REQ-SE-3, REQ-OF-5 | Several sittings: transport; commit ordering; projections; compatibility |
+| 09 | Budget setup & requirements checklist | Mobile/Frontend | 02, 07, 08 | REQ-BS-1…6, REQ-CK-1 | Setup then optional manual checklist; verified presets blocked OQ-11 |
+| 10 | Expense ledger & unticked templates | Mobile/Frontend | 09 | REQ-LG-1…9, REQ-TM-1 | Entries, schedule/payment/refund rows, reminders; suggestion-to-editor |
+| 11 | Hidden-fee line items | Mobile/Frontend | 10 | REQ-HF-1…3 | Six prompts, typed fee components, explicit dismissal |
+| 12 | Guest math | Backend | 10 | REQ-GM-1…6 | RSVP/priority, per-head/flat, what-if, affordable ceiling |
+| 13 | Rule-based allocation | Backend | 02, 09, 12 | REQ-AE-1…7 | Pinned ruleset, overrides, buffer, explicit preview/apply; OQ-04 cost benchmarks |
+| 14 | Pledges & gifts | Backend | 10, 13 | REQ-PL-1…7, REQ-GF-1…2 | Receipt-based net, linked payments, gifts and reconciliation |
+| 15 | Dashboard, private export & consented feedback | Mobile/Frontend | 09–14 | REQ-EX-2, REQ-MT-1, REQ-SV-1 | Bento, offline export, opt-in metrics and skippable survey; distinct testable sittings |
+| 16 | Shared editing & lifecycle | Data & Sync | 08, 15 | REQ-SE-4…6 | Activity/conflict UI, alias attribution, mutual removal/transfer; OQ-01 erasure unresolved |
+| 17 | Offline feature hardening | Data & Sync | 16 | REQ-OF-1…4 | Full offline CRUD/computation, queue visibility, local clock, exports |
+| 18 | Security, privacy & beta gate | Security | 17 | REQ-EX-1 | RLS/device/log/privacy controls, survey/metric notice review; no marketplace |
+| 19 | QA execution & RC sign-off | QA | 18 | — | Planned TC suites actually executed on both platforms; triage and RC gate |
+| 20 | Internal beta & real-couple UAT | Product Manager | 19 | — | Consent and real beta data in approved production environment; validate optional survey and multi-day soak/UAT |
+| 21 | Production readiness, submission & stabilisation | Production Readiness + DevOps/Release | 20 | — | Backup/restore and rollback, counsel/store gates, default Apple phased release, observation |
+| 22 | **Post-launch** payments | Backend (Security reviewer) | 21 | REQ-AI-4 | Separate payment-rail design/build only after OQ-10 SEC block and external approvals |
+| 23 | **Post-launch** AI | AI/ML | 21 | REQ-AI-1, REQ-AI-2, REQ-AI-3, REQ-AI-5 | On-device categorisation first; cloud advice/OCR/assistant later; separate sittings and gates |
+| 24 | **v1.1 backlog handoff only** | Product Manager | 21 | REQ-LO-1, REQ-AT-1 | Plan later build/gates for locale and private photos; no v1 implementation claim |
 
-> **⚠ Now one over your 20–26 cap.** Decision 2 (REQ-AI-4 gets its own phase, pulled out of the AI tail) adds phase 25, taking the index to 27. This is a second independent signal that the cap needs revisiting — see §(c), which was already unresolvable within 26.
+**Old → new phase mapping:** 01–19 → same numbers; 20 (internal beta) + 21 (real-couple UAT) → 20; 22 (production readiness) + 23 (store submission/launch) + 24 (monitoring) → 21; 25 (payments) → 22; 26 (on-device AI) + 27 (cloud AI/OCR) → 23; **new 24** owns the former phase-24 v1.1 backlog handoff. Old numbered references elsewhere in the docs require the parent audit; this file must not imply they were already updated.
 
-| # | Name | Owning agent | Depends on | REQ IDs covered | One-line objective | One sitting? |
-|---|---|---|---|---|---|---|
-| 01 | Repo, tooling & CI skeleton | DevOps/Release | — | REQ-PLT-1 | Flutter repo, Fastlane, lint, and a CI pipeline that runs and fails correctly | yes |
-| 02 | Money primitives & formatting | Backend | 01 | REQ-GEN-1, REQ-GEN-2, REQ-GEN-2A | int64 centavo type, presenter chokepoint, full and constrained ₱ forms | yes |
-| 03 | Flutter app shell & navigation | Mobile/Frontend | 01 | — | Routable shell with `go_router`, Riverpod wiring, no features | yes |
-| 04 | Backend shell: Supabase envs & secrets | DevOps/Release | 01 | — | Staging and prod projects, secret handling, empty `/v1/sync` surface | yes |
-| 05 | Local encrypted store | Data & Sync | 03, 04 | REQ-PLT-2 | `drift` + SQLCipher opening, key in Keychain/Keystore, backup-excluded | yes |
-| 06 | Shared-account auth & pairing | Security | 04, 05 | REQ-PLT-3, REQ-SE-1 | Accounts, sessions, single active plan, invite/accept pairing | yes |
-| 07 | Data layer: entities, repositories, change-log writer | Data & Sync | 05 | — | All v1 tables (including checklist state), repository-only SQL, append-only change-log writer | **no** |
-| 08 | Sync engine: transport, ordering, replay, convergence | Data & Sync | 06, 07 | REQ-SE-2, REQ-SE-3, REQ-OF-5 | Push/pull, server-assigned ordering, idempotent replay, convergence | **no** |
-| 09 | Budget setup / onboarding | Mobile/Frontend | 02, 07, 08 | REQ-BS-1…6, REQ-CK-1 | Setup wizard, wedding-type context and optional requirements checklist; preset rules/offsets blocked by OQ-11 | **no** |
-| 10 | Expense ledger | Mobile/Frontend | 09 | REQ-LG-1…9; REQ-TM-1 | Entries, CRUD, schedules/payments/refunds, reminders, derived money and five unticked wedding-type starter templates | **no** |
-| 11 | Hidden-fee line items | Mobile/Frontend | 10 | REQ-HF-1, REQ-HF-2, REQ-HF-3 | Six prompted fee types with per-type forms and recorded dismissal | **no** |
-| 12 | Guest math | Backend | 10 | REQ-GM-1…6 | RSVP/tier axes, per-head vs flat, crew separation, propagation, what-if and affordable-guest preview | **no** |
-| 13 | Rule-based allocation engine | Backend | 02, 09, 12 | REQ-AE-1…7 | Deterministic default allocation, overrides, buffer drawdown and explicit rebalance preview/apply | **no** |
-| 14 | Pledges module | Backend | 10, 13 | REQ-PL-1…7, REQ-GF-1…2 | Pledge records and receipts, fulfillment-only net reduction, expected and exposure, gifts/reconciliation | **no** |
-| 15 | Main dashboard (bento) | Mobile/Frontend | 09, 10, 11, 12, 13, 14 | REQ-EX-2 | Bento layout and offline PDF/CSV export/share UI (including sponsor statement); inert AI tile | **no** |
-| 16 | Shared-editing, conflict & lifecycle hardening | Data & Sync | 08, 15 | REQ-SE-4, REQ-SE-5, REQ-SE-6 | Visible change log, attribution, mutual removal, ownership transfer | **no** |
-| 17 | Offline hardening | Data & Sync | 16 | REQ-OF-1, REQ-OF-2, REQ-OF-3, REQ-OF-4 | Full offline CRUD and computation, indicators, clock handling | **no** |
-| 18 | Security hardening & SEC beta gate | Security | 17 | REQ-EX-1 | RLS coverage, at-rest verification, log hygiene, beta-tier SEC gate PASS | **no** |
-| 19 | QA execution & RC sign-off | QA | 18 | — | Full suite, fixtures, sync/offline matrices, E2E both platforms, RC signed | **no** |
-| 20 | Internal beta (TestFlight + Play internal) | DevOps/Release | 19 | — | Signed builds distributed to internal testers, crash reporting live | **no** |
-| 21 | UAT with real couples | Product Manager | 20 | — | Real PH couples plan real weddings; findings triaged into defects | **no** |
-| 22 | Production readiness & rollback rehearsal | Production Readiness | 21 | — | Every gate row PASS, restore drill and rollback rehearsed with durations | **no** |
-| 23 | Store submission & launch | DevOps/Release | 22 | — | Metadata, labels, demo accounts, review notes, staged rollout to 100% | **no** |
-| 24 | Post-launch monitoring & stabilisation | Production Readiness | 23 | — | Alerts observed, P1 response exercised, cost tracked; v1.1 locale/photo backlog stubs groomed, not implemented | **no** |
-| 25 | Payments: InstaPay / QR Ph | Backend | 24 | REQ-AI-4 | In-app payment initiation and reconciliation, separate from the ledger's record-of-intent | **no** |
-| 26 | AI phase 1: on-device categorisation | AI/ML | 24 | REQ-AI-2 | On-device suggestion behind `CategorySuggester`, suggestions never auto-apply | **no** |
-| 27 | AI phase 2: cloud AI reasoning + OCR | AI/ML | 26 | REQ-AI-1, REQ-AI-3, REQ-AI-5 | Cloud advisories, OCR drafts, assistant — all behind documented seams | **no** |
+**Status against source on this branch, not exit certification:** 01 is **partial**: Flutter project, workflow, Fastlane and lint skeleton exist, but the deliberate fail/recover CI evidence and release-artifact secret scan are not established. 02 is **partial**: money helpers/presenter and half-centavo/drift tests exist, but the custom money lint and CI evidence must still meet exit criteria. 03 is **partial**: screens 01–19, router, tab shell and golden tests exist; the inspected router has two trees, a duplicate SCR-19 route, and a route-copying test, and `kasaran://accept/<token>` does not match `/invite/accept/:token`; real deep-link reachability is not established. 04 is **partial**: local config, Edge stubs, contract test source, and CI job exist, **but no staging project ref is recorded** and OQ-07 residency remains open; no claim of authenticated staging success, live production project or passing remote CI. Phase 05 onward is planned, not implemented. A test file or CI job existing does not mean it has passed. Reassess after Prompt 5 D code changes land.
 
-**Prompt-4 integration without a 28th phase:** REQ-CK-1 → 09 (checklist state schema in 07; OQ-11 blocks publishing verified applicability/offset presets), REQ-TM-1 → 10 (bundled suggestion data prepared in 07, ledger entry only on explicit save), REQ-GM-6 → 12, REQ-AE-7 → 13, REQ-EX-2 → 15 (pledge-linked sponsor statement requires 14). Existing phase 15's former one-sitting “yes” no longer holds with export added. Phase 17 checks local-only/offline operations; phase 18 verifies export privacy controls SEC-32/42; phase 19 executes the new planned cases, and 20–23 retain their existing release gates. **v1.1 REQ-LO-1 and REQ-AT-1 are backlog stubs in phase 24 only:** this is a grooming handoff, *not* implementation coverage or an assertion that they ship in phase 24. Their actual build/gate scheduling requires a later approved plan; no new phase or retroactive feature in 01–04 is implied.
+**SEC-02 / phase 06 prerequisite:** `supabase/config.toml` currently has `[auth.email] enable_confirmations = false` for **local development only**. Staging and production **MUST set it to true** and prevent unverified accounts from creating or joining a plan; do not promote the local configuration unchanged. Require the 18+ sign-up declaration before real beta access, subject to counsel's legal-basis review. Staging remains synthetic-only; real couples' beta data belongs in the separately approved production environment, not staging. OQ-07 blocks production location and the notice until resolved.
 
-**Phases carrying no implemented REQ IDs** (9 of 27): 03, 04, 07, and 19–24. These are infrastructure or process phases; 24's v1.1 backlog stubs do not count as implemented REQ coverage. Existing phase bodies 01–06 are planning artifacts, not evidence of implementation; the repository currently has only phases 01–04 foundation source/scaffolds.
-
----
+**Launch-readiness sittings in the later milestones:** Phase 15 distinguishes computation from existing synced `hidden_fee_prompts`/attributed `change_log` and wedding date from optional view-frequency events, with notice/consent, a payload allowlist and opt-in **off** until chosen; no third-party analytics SDK. A separate phase-15 sitting implements the optional, skippable in-app survey and explicit response action, with tests in 19 before inviting real couples in 20; a skip is not a response and a survey answer is not analytics consent. Phase 18 must gate SEC-29…31/35 (and the age and metric/survey notices) **before phase 20's first real-data beta**, not postpone those to store submission. Phase 21 must record the chosen paid Supabase tier/budget ceiling and threshold actions, RPO/RTO, encrypted off-provider backup including Auth users, break-glass custody, measured **monthly and pre-release** restore drills, RC-only macOS Maestro, and Apple's default iOS phased release. No live rollout proceeds on an unverified backup, unresolved counsel gate or OQ-07; payment rails remain phase 22 and all AI phase 23.
 
 ## Self-validation
 
-### (a) REQ coverage — baseline reconciled with Prompt 4
+### (a) Exclusive REQ coverage matrix
 
-The former 54-ID index omitted seven already-authored v1 IDs (LG-7…9, PL-6…7, GF-1…2). The current requirements document contains **68 distinct REQ headings**: those 61 pre-Prompt-4 IDs plus five new v1 IDs and two deferred v1.1 IDs. The table assigns each ID one implementation phase or, for v1.1, one *backlog handoff only* in 24.
+The current baseline `requirements.md` has **68 distinct REQ headings** (66 v1/post-launch/permanent-exclusion assignments plus two v1.1 backlog entries). Prompt 5 adds **REQ-MT-1 and REQ-SV-1** for an expected **70** once their authoritative headings are merged. The index assigns each ID below to *one owner only*; TC/SEC work in later phases is verification, not ownership. These counts are a planned integrated target until the new headings land.
 
-| Group | Count | Phase |
-|---|---|---|
-| REQ-PLT-1 | 1 | 01 |
-| REQ-PLT-2 | 1 | 05 |
-| REQ-PLT-3 | 1 | 06 |
-| REQ-GEN-1, 2, 2A | 3 | 02 |
-| REQ-BS-1…6 | 6 | 09 |
-| REQ-LG-1…9 | 9 | 10 |
-| REQ-HF-1…3 | 3 | 11 |
-| REQ-GM-1…5 | 5 | 12 |
-| REQ-GM-6 | 1 | 12 |
-| REQ-AE-1…6 | 6 | 13 |
-| REQ-AE-7 | 1 | 13 |
-| REQ-PL-1…7 | 7 | 14 |
-| REQ-GF-1…2 | 2 | 14 |
-| REQ-TM-1 | 1 | 10 |
-| REQ-CK-1 | 1 | 09; verified presets blocked OQ-11 |
-| REQ-EX-2 | 1 | 15 |
-| REQ-LO-1, REQ-AT-1 | 2 | 24 backlog only; no implementation phase assigned |
-| REQ-SE-1 | 1 | 06 |
-| REQ-SE-2, 3 | 2 | 08 |
-| REQ-SE-4, 5, 6 | 3 | 16 |
-| REQ-OF-1…4 | 4 | 17 |
-| REQ-OF-5 | 1 | 08 |
-| REQ-EX-1 | 1 | 18 |
-| REQ-AI-4 | 1 | 25 (payments — no longer in the AI tail) |
-| REQ-AI-2 | 1 | 26 |
-| REQ-AI-1, 3, 5 | 3 | 27 |
-| **Total** | **68** | 66 implementation/exclusion assignments; 2 v1.1 backlog stubs |
+| Requirement IDs (inclusive ranges) | Count | Sole phase | Scope |
+|---|---:|---:|---|
+| REQ-PLT-1; REQ-PLT-2; REQ-PLT-3 | 3 | 01; 05; 06 respectively | v1 |
+| REQ-GEN-1, REQ-GEN-2, REQ-GEN-2A | 3 | 02 | v1 |
+| REQ-BS-1…6; REQ-CK-1 | 7 | 09 | v1; OQ-11 blocks verified presets |
+| REQ-LG-1…9; REQ-TM-1 | 10 | 10 | v1 |
+| REQ-HF-1…3 | 3 | 11 | v1 |
+| REQ-GM-1…6 | 6 | 12 | v1 |
+| REQ-AE-1…7 | 7 | 13 | v1; OQ-04 blocks benchmark-dependent adequacy |
+| REQ-PL-1…7; REQ-GF-1…2 | 9 | 14 | v1 |
+| REQ-EX-2; REQ-MT-1; REQ-SV-1 | 3 | 15 | v1; metrics opt-in and optional survey distinct from crash diagnostics |
+| REQ-SE-1; REQ-SE-2, REQ-SE-3; REQ-SE-4…6 | 6 | 06; 08; 16 respectively | v1 |
+| REQ-OF-1…4; REQ-OF-5 | 5 | 17; 08 respectively | v1 |
+| REQ-EX-1 | 1 | 18 | permanent prohibition, not feature implementation |
+| REQ-AI-4 | 1 | 22 | post-launch payment rails, OQ-10 block; historical ID retained |
+| REQ-AI-1, REQ-AI-2, REQ-AI-3, REQ-AI-5 | 4 | 23 | post-launch AI, not v1 |
+| REQ-LO-1, REQ-AT-1 | 2 | 24 | v1.1 **backlog handoff only**, build/gate unassigned |
+| **Total** | **70** | **one ownership row per ID** | **68 existing + 2 incoming** |
 
-**No duplicate assignments in this index.** REQ-EX-1 is a permanent exclusion checked in 18, not an implemented marketplace. Phase 24 does not implement LO-1 or AT-1. The authoritative REQ→TC mapping is the traceability table in `testing-plan.md` §2.
+### (b) SEC and TC phase gates (test specifications are not executions)
 
-Two placement notes worth your eye:
-
-- **REQ-OF-5 sits in phase 08, not 17.** Durable idempotent replay *is* the sync engine's mechanism; the remaining offline requirements (OF-1…4) can only be validated once features exist, so they land in 17.
-- **REQ-AI-4 (InstaPay / QR Ph payments) is now phase 25, its own phase, outside the AI tail** (Decision 2, ADR-28). Three consequences recorded here because they cross documents:
-  1. **Owner changes from AI/ML to Backend Agent** (with Security as mandatory reviewer). Payments is a financial-rail integration, not inference — it was only ever in the AI tail because it shared the "deferred" bucket.
-  2. **The ID `REQ-AI-4` is retained and NOT renumbered**, per the never-reuse-or-renumber rule. Its `AI-` prefix is now a historical artifact and no longer describes its classification. Recorded in the requirements retired/merged appendix so the mismatch is documented rather than confusing.
-  3. **Phase 25 has no SEC coverage yet.** `security-plan.md` §9 explicitly scopes payment-rail security (PCI and equivalent) out of v1, to be revisited "when payments enter the AI phase." Payments now has its own phase, so a new SEC block must be authored before phase 25 can start. Flagged as **OQ-10**.
-
-### (b) SEC and TC coverage — new groups mapped to the existing phases
-
-**SEC items (01–44), by group:**
-
-| SEC group | Phase |
+| Gate group | Planned implementation → verification |
 |---|---|
-| SEC-01…04 (identity, sessions) | 06 |
-| SEC-05, 06 (pairing codes) | 06 |
-| SEC-07, 08, 09 (removal, revocation) | 16 |
-| SEC-10, 11 (re-pair, device loss) | 06 |
-| SEC-12, 13, 14 (at-rest, keys, no-passcode) | 05 (implement) → 18 (verify on hardware) |
-| SEC-15, 16 (uninstall, backup exclusion) | 05 (implement) → 18 (verify) |
-| SEC-17…21 (TLS, tokens, replay, queued writes) | 08 |
-| SEC-22…25 (RLS, isolation, membership path) | 07 (policies authored) → 18 (adversarial verification) |
-| SEC-26 (secrets) | 04 |
-| SEC-27 (backup encryption, restore) | 22 |
-| SEC-28 (log hygiene) | 18 |
-| SEC-29…36 (DPA: basis, notice, consent, rights, erasure, breach, retention) | 18; SEC-32 export implementation in 15, verification in 18 |
-| SEC-37, 38 (NPC registration, counsel review) | 22 |
-| SEC-39, 40, 41 (store labels, deletion path, location) | 23 |
-| **SEC gate tiers** (security-plan §7) | beta tier → 18; store-submission tier → 23; public-launch tier → 22 |
-| **Payment-rail security — DOES NOT EXIST YET** | required by 25; must be authored first (OQ-10) |
-| **SEC-42 export/share privacy** | 15 implement PDF/CSV privacy, OS handoff and local-file cleanup → 18 verify with SEC-32 → 19 QA |
-| **SEC-43/44 private photo Storage and labels** | Phase 24 v1.1 backlog only; RLS, size/MIME, offline-staging and Photos-label gates belong to a later approved implementation plan, not the v1 beta gate |
+| SEC-01…06, SEC-10/11; SEC-02 email confirmation/age | 04 config → 06 auth/invite → 18 gate; true staging/prod confirmation |
+| SEC-07…09, SEC-12…16, SEC-17…21 | 16 removal, 05 encrypted store, 08 sync respectively → 18 device/adversarial gate |
+| SEC-22…25, SEC-26 | 06/07 RLS, 04 CI secret scan → 18 tenant-isolation gate; new plan-scoped metrics/survey data needs policy coverage if persisted |
+| SEC-27/28, SEC-29…36, SEC-37…42 | 21 backups, 18 log/privacy/consent/DPA beta gate, 21 counsel/store gate; export in 15 → 18/19 review |
+| SEC-43/44 | 24 backlog handoff only; later v1.1 private Storage policy/label review, not v1 gate |
+| TC-PLT-01…03, TC-GEN-01…05, TC-API-01/02/04/05 | 01/05/06; 02; 04 respectively; TC-API-03 in 08 |
+| TC-MIG-01…03, TC-SEC-01/04/05/06 | 07 migrations/RLS → 18 adversarial check; 08 adds TC-MIG-04/05 upgrade/rebuild |
+| TC-SE-20/21/24/25/27…30/33…39/43/44; TC-OF-12/15/18/23…26; TC-API-02/03/06…08 | 08 engine, protocol and migrations → 16 visible conflict/lifecycle → 19 cross-platform suite |
+| TC-SE-10…19/22/23/26/31/32/40…42; TC-API-09 | 06 invite; 16 activity/removal/session mechanics → 19 suite; shared-record erasure oracle remains blocked OQ-01 |
+| TC-BS-01…08, TC-CK-01…05; TC-LG-01…13/41, TC-TM-01…04, TC-HF-01…08 | 09, 10, 11 → 19; verified checklist preset oracle blocked OQ-11 |
+| TC-GM-01…13/16…20; TC-AE-01…13/15…20; TC-PL-10…20; TC-FIX-A1…C2 | 12, 13, 14 → 19; OQ-04 benchmark-specific assertion not invented |
+| TC-EX-02…08, TC-SEC-01…10, TC-EX-01, TC-E2E-01 | 15 export → 17 offline → 18 security → 19 QA; SEC-32 requires server-only retrieval/DPO review, not just a curated share file |
+| TC-MT-01…05; TC-SV-01…03 | 15 metrics/survey → 18 privacy review → 19 QA; 20 beta responses **only after** consent/privacy gate and tests; TC-MT-05 and TC-SV-03 remain blocked until counsel/disclosures approved; specifications are not passing results |
+| TC-BAK-01/02 | 21 measured monthly restore drill and one before each release (ADR-61…69 integration), not an unverified weekly success claim |
+| TC-LO-01…04, TC-AT-01…04 | 24 backlog handoff only; no v1 test-execution claim |
 
-**TC groups:**
+### (c) Sitting and dependency check
 
-| TC group | Phase |
-|---|---|
-| TC-GEN-01…05 | 02 |
-| TC-PLT-01…03 | 01, 05, 06 |
-| TC-BS-01…08 | 09 |
-| TC-LG-01…13 | 10 |
-| TC-HF-01…08 | 11 |
-| TC-GM-01…13 | 12 |
-| TC-AE-01…13, TC-FIX-A1…C2 | 13 |
-| TC-PL-10…20 | 14 |
-| TC-SE-20, 21, 24, 25, 27…30 | 08 |
-| TC-SE-10…19, 22, 26 | 16 |
-| TC-OF-01…17 | 17 |
-| TC-SEC-01…10, TC-EX-01 | 18 (suite runs in CI from 01) |
-| TC-API-01…05 | 04 |
-| TC-MIG-01…03 | 07 |
-| TC-BAK-01, 02 | 22 |
-| TC-E2E-01 | 19 |
-| TC-AE-16…20 (explicit rebalance, FIX-C arithmetic and locked/shortfall paths) | 13 → 19 regression suite |
-| TC-GM-16…20 (affordable-guest, FIX-A and edge cases) | 12 → 19 regression suite |
-| TC-TM-01…04 (five unticked templates, no default amounts/rows) | 10 → 19 regression suite |
-| TC-CK-01…05 (manual state, date, fee and blocked preset oracle) | 09 → 19 regression suite; verified preset applicability/offset oracle **BLOCKED OQ-11** |
-| TC-EX-02…08 (offline PDFs/CSVs, disclosure, single sponsor, CSV injection, share) | 15 → 17 offline hardening → 18 SEC-32/42 gate → 19 QA |
-| TC-LO-01…04, TC-AT-01…04 (v1.1) | 24 backlog handoff only; no v1 test-execution claim |
+**24 index rows (within 20–26); 8 detailed phase bodies (01–08).** Each multi-sitting implementation phase names a bounded next testable slice; detailed 07/08 bodies below enumerate their slices and TC exits. Remaining phase bodies (09–24) still need expansion before execution. The previous “every phase is one sitting” condition is **not satisfiable** alongside the 20–26 cap for this scope: 07/08, feature groups, beta, counsel/store review and observation are inherently multi-sitting. This index explicitly treats a phase as a milestone and uses sittings/gates for execution; if the original literal one-sitting-per-phase rule is non-negotiable, it remains an unresolved planning contradiction requiring approval, not a fictitious pass. All listed dependencies point to lower phase numbers; 22, 23 and 24 are independent post-launch/backlog branches from 21.
 
-These are *authored test specifications*, not executed tests. Older TC-group ranges here are representative phase examples, not an exhaustive index of all legacy TC IDs; `testing-plan.md` §2 and its scenario sections are authoritative for individual cases. Every Prompt-4 TC group is mapped above. OQ-11 blocks a verified preset oracle, not the manual checklist state/fee cases.
-
-### (c) One-sitting failures — **21 of 27 phases are marked "no", and I cannot fix this within your phase cap**
-
-Only 6 pass: phases 01, 02, 03, 04, 05, and 06. Prompt-4 export/share work makes phase 15 another non-one-sitting phase; these are index assessments, not implementation results.
-
-This is the finding that needs your decision before approval.
-
-**Two distinct reasons a phase fails the one-sitting test:**
-
-**Reason 1 — scope too large (12 phases).** These can be split, and here is the indicative split each needs (Prompt-4 additions add work to 09, 10, 12 and 13):
-
-| # | Why it fails | Proposed split |
-|---|---|---|
-| 07 | All v1 tables + repositories + change-log writer | 07a entities & repositories · 07b change-log writer & migrations |
-| 08 | Transport + ordering + replay + convergence | 08a push/pull transport & idempotency · 08b LWW ordering & convergence |
-| 09 | 6 REQs spanning capture, taxonomy, and editing | 09a budget/date capture & validation (BS-1,2,3) · 09b region, cap & non-destructive edit (BS-4,5,6) |
-| 10 | 6 REQs spanning CRUD and derived money | 10a entries, CRUD, estimated vs actual (LG-1,2,3) · 10b deposits, derived status, variance (LG-4,5,6) |
-| 11 | HF-2 alone is six distinct typed forms | 11a prompt framework & dismissal (HF-1,3) · 11b six typed fee forms (HF-2) |
-| 12 | 5 REQs spanning model and propagation | 12a axes, per-head/flat, crew (GM-1,2,4) · 12b propagation & what-if (GM-3,5) |
-| 13 | 6 REQs spanning engine core and modifiers | 13a baselines, determinism, pinning, explainability (AE-1,3,4) · 13b index, overrides, buffer (AE-2,5,6) |
-| 14 | 5 REQs spanning records and D2 math | 14a pledge records (PL-1) · 14b fulfillment math, expected, exposure, traceability (PL-2,3,4,5) |
-| 15 | Bento composition plus offline PDF/CSV production, privacy preview and share | 15a dashboard composition · 15b export and share (REQ-EX-2) |
-| 16 | Change log + attribution + removal + transfer | 16a change log & attribution (SE-4) · 16b lifecycle: removal & transfer (SE-5,6) |
-| 17 | 4 REQs across every entity | 17a offline CRUD & computation (OF-1,2) · 17b indicators & clock handling (OF-3,4) |
-| 18 | RLS + at-rest + logs + 8 DPA items + gate | 18a technical hardening (RLS, at-rest, logs) · 18b DPA compliance & beta gate |
-
-**Reason 2 — bound by elapsed time or an external party, not scope (9 phases).** Splitting does **not** help these; a five-day beta soak is five days regardless of how the work is divided.
-
-| # | Time constraint |
-|---|---|
-| 19 | Full suite + E2E on both platforms + triage; multi-day by volume |
-| 20 | ≥ 5-day soak per `deployment-plan.md` §4.1 |
-| 21 | Real couples planning real weddings — weeks, inherently |
-| 22 | Restore drill + rollback rehearsal + counsel-gated items |
-| 23 | Store review 1–3 days, then a 7-day phased rollout |
-| 24 | Observation window by definition |
-| 25 | **Payments.** Externally gated — rail onboarding, merchant/partner approval, and compliance review sit with third parties, not with us. Also blocked on OQ-10 (no payment-rail SEC block exists) |
-| 26, 27 | Post-launch AI work, multi-sitting by scope and by gate |
-
-**The conflict, stated plainly.** Splitting the 12 scope-bound phases yields **+12 phases → 39**, which exceeds your 20–26 cap — and the index is already at 27 after Decision 2. The two constraints — "between 20 and 26 phases" and "every phase validatable in one sitting" — are not simultaneously satisfiable for this scope. I have not resolved it by quietly marking large phases "yes."
-
-**Three ways forward — your call:**
-
-1. **Raise the cap to ~39** and accept the splits above. Best granularity; the index gets long.
-2. **Keep the work phases and add a separate row type for time-bound gates.** The 9 Reason-2 phases become *gates* (entry/exit criteria, no sitting expectation), leaving 18 work phases of which 12 still need splitting → **30 work phases + 9 gates**.
-3. **Keep the cap at 26 and redefine the column** as "validatable in one sitting *once its sub-tasks are enumerated in the phase body*." Honest only if the bodies carry the sub-splits. I do not recommend this — it moves the problem rather than solving it.
-
-**My recommendation: option 2.** It preserves one-sitting discipline where it is meaningful (implementation work) and stops pretending a store review or a UAT window is a sitting.
-
-### (d) Dependency graph — acyclic, no forward dependencies
-
-Every phase depends only on lower-numbered phases, verified row by row:
-
-```
-01 ← —                          14 ← 10,13
-02 ← 01                         15 ← 09,10,11,12,13,14
-03 ← 01                         16 ← 08,15
-04 ← 01                         17 ← 16
-05 ← 03,04                      18 ← 17
-06 ← 04,05                      19 ← 18
-07 ← 05                         20 ← 19
-08 ← 06,07                      21 ← 20
-09 ← 02,07,08                   22 ← 21
-10 ← 09                         23 ← 22
-11 ← 10                         24 ← 23
-12 ← 10                         25 ← 24
-13 ← 02,09,12                   26 ← 24
-                                27 ← 26
-```
-
-Phases 25 (payments) and 26 (AI on-device) both depend on 24 and **not on each other** — they are independent post-launch tracks and may proceed in either order or in parallel.
-
-- **No cycles.** All edges point strictly backward, so the graph is a DAG by construction.
-- **No forward dependencies.** Max dependency index is always < the phase's own number.
-- **Sequencing constraints honoured:** foundation (01–05) precedes auth/pairing (06); data layer (07) and sync engine (08) both complete before the first feature UI (09); features run in the mandated order (09 setup → 10 ledger → 11 hidden fees → 12 guest math → 13 allocation → 14 pledges → 15 dashboard); conflict hardening (16) and offline hardening (17) are dedicated phases, not folded into any feature; security (18) → QA (19) → beta (20) → UAT (21) → readiness (22) → submission (23) → monitoring (24); AI phases (26, 27) come strictly after the completed launch phase (23) and its stabilisation (24), split as on-device then cloud/OCR. Payments (25) is a separate post-launch track, no longer part of the AI tail (ADR-28).
+**Open blockers:** OQ-01 shared-record erasure; OQ-03 force-wipe (current policy is offer only); OQ-04 cost benchmarks; OQ-07 residency/production/staging ref; OQ-09 clearance/domain; OQ-10 payment SEC block; OQ-11 checklist verified presets; OQ-12 business-model choice (no monetisation decision or v1 upsell implied). Counsel must verify the 18+ basis and measurement/notice obligations before real beta. The measurement plan must not silently convert existing synced data into analytics without notice/opt-in; no third-party analytics SDK in v1. Phase 20 cannot begin with real couples until SEC-29…31/35 and the internal-beta gate pass. The proposed lower-scope local derivations and explicit opt-in events need the authoritative Prompt 5 requirement/privacy wording before being treated as implementation decisions.
 
 ---
-
-## Stopping here
-
-The index is followed below by phase bodies 01–06; later bodies remain pending.
-
-**Decision 2 — RESOLVED.** REQ-AI-4 is phase 25, its own phase, outside the AI tail, owned by Backend with Security as mandatory reviewer (ADR-28).
-
-**Still needed before writing later phase bodies:**
-
-1. **The one-sitting vs phase-cap conflict** in (c) — options 1, 2, or 3. Decision 2 has pushed the index to 27, already over the cap, so this now needs resolving either way.
-2. **OQ-10 (new):** payment-rail security has no SEC block. `security-plan.md` §9 scoped it out of v1 on the assumption payments would arrive inside the AI phase. Phase 25 cannot start until that block exists.
-3. **OQ-11:** requirements-checklist preset applicability and due-date offsets must be verified item by item with the relevant authority before publication. Keep “NEEDS VERIFICATION”; user-entered reminder dates are not authoritative rules. Prompt-4 REQ/TC/SEC groups are mapped to phases 09, 10, 12, 13, 15, 17–19 and the v1.1 backlog in 24 above; no blocked preset case is treated as passed.
-
-Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents.md` escalation rule, phases touching them will stop rather than decide — most relevantly OQ-04 (reference costs) against phase 13, OQ-07 (data residency) against phase 23, and OQ-01/OQ-03 (erasure, force-wipe) against phases 16 and 18.
-
----
----
-
 # Phase bodies
 
-*Batch 1 of N — phases 01–06 only. Later batches appended on request.*
-
-**Note on Decision 1.** The one-sitting vs phase-cap conflict in §(c) is still unresolved, but every phase in this batch is marked "yes" for one sitting, so none of them is affected. It will bite from phase 07 onward, which is the first "no".
+*Phases 01–06 retain their previously authored detailed bodies below, corrected for their current planning/status caveats above. Bodies describe target outcomes, not work already certified. Phase 07 and 08 bodies are added after 06.*
 
 ---
-
 ## Phase 01: Repo, tooling & CI skeleton
 
 **Owning agent:** DevOps/Release
@@ -298,13 +148,13 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 - Supabase, any backend resource, any network call (phase 04).
 - Any database, table, or migration (phases 05, 07).
 - Auth or credentials (phase 06).
-- iOS builds in CI (nightly/RC only, per cost policy).
+- iOS builds in PR CI (release candidates only under the solo-maintainer trim; no nightly Maestro obligation).
 - **No AI code, no AI dependencies.**
 
 **Rollback:** Greenfield phase — revert the initialisation commits, or delete the branch. No data, no deployed resource, no external state to unwind.
 
 **Open questions to resolve before starting:** None blocking.
-*Advisory, not a blocker:* OQ-09 (name clearance) is OPEN. The bundle identifier and Android package name are set in task 1, and they are effectively immutable after first store submission. Running OQ-09 steps 1, 2, and 4 now is cheap insurance; doing it after phase 23 is not possible.
+*Advisory, not a blocker:* OQ-09 (name clearance) is OPEN. The bundle identifier and Android package name are set in task 1, and they are effectively immutable after first store submission. Running OQ-09 steps 1, 2, and 4 now is cheap insurance; doing it after phase 21 is not possible.
 
 ---
 
@@ -433,7 +283,7 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 **Depends on:**
 - **01** — `.github/workflows/ci.yml` to attach the new jobs to, and the repo secret-scan baseline.
 
-**Objective:** Create the Supabase project(s), commit declarative auth and project configuration, and expose an authenticated but empty `/v1/sync` surface with contract tests, so later phases have a real backend to target and a verified secrets boundary.
+**Objective:** Establish the local backend and, once its reference is supplied, the synthetic-only staging project; commit declarative auth and project configuration and expose authenticated but empty sync endpoints with contract tests. Production region/project remains blocked by OQ-07, not implicitly created here. See `design.md` §2.4 for the authoritative `POST /sync/push` and `POST /sync/pull` contract (not `/v1/sync`).
 
 **Requirements covered:** — (none; this phase is infrastructure)
 
@@ -441,7 +291,7 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 
 1. Create the **staging** Supabase project in region `ap-southeast-1` per `deployment-plan.md` §2.2. **Production project creation is blocked — see open questions.**
 2. Commit `supabase/config.toml` with auth settings satisfying SEC-03: access-token TTL ≤ 1 hour, refresh-token rotation enabled.
-3. Create `supabase/functions/` with `sync_push` and `sync_pull` RPC stubs matching the request and response shapes in `design.md` §2.4 — authenticate the caller, return an empty result set, assign no `server_ts` yet.
+3. Create `supabase/functions/` with `sync_push` and `sync_pull` Edge stubs accepting the versioned envelopes in `design.md` §2.4 — authenticate the caller, return an empty result set; full acceptance stamps, durable cursor and idempotency are phase 08. Do not claim the full `TC-API-01/02` contract on an empty stub.
 4. Wire environment configuration: anon key injected at build time via `--dart-define`; service-role key present only in CI secrets and never in a client build (SEC-26).
 5. Set up the local Supabase CLI development environment (`supabase start`) so phases 05+ can work offline against a local instance.
 6. Add API contract tests for the stubs covering request/response shape, auth enforcement, and rejection of malformed rows.
@@ -462,15 +312,14 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 |---|---|---|
 | Local backend runs | `supabase start && supabase status` | All services report healthy |
 | Contract tests pass | `flutter test test/api/contract` (or the suite's runner) | Exit 0, zero failures |
-| Unauthenticated call rejected | `curl` `/v1/sync/pull` with no bearer token | HTTP 401 |
+| Unauthenticated call rejected | `curl` the local `/functions/v1/sync_pull` endpoint with no bearer token | HTTP 401 |
 | Authenticated call succeeds and is empty | `curl` with a valid staging token | HTTP 200, empty row set |
 | Malformed push rejected | `curl` push with an invalid row body | 4xx, and no partial commit observable in the DB |
 | Token TTL correct | Decode an issued access token | `exp − iat` ≤ 3600 s |
 | **Secret scan gate works** | Commit a dummy secret, run CI; remove it, re-run | Fails, then passes |
 | No service-role key in client | `strings` the built `.aab` and grep for the key prefix | Zero matches |
 
-**TC IDs that must pass:** TC-API-01, TC-API-02, TC-API-04, TC-API-05
-*(TC-API-03 idempotency is deferred to phase 08, which is where `server_ts` assignment and insert-ignore behaviour are implemented.)*
+**TC IDs that must pass:** TC-API-04 and the *empty-stub envelope subset* of TC-API-01/02. Full TC-API-01/02 (accepted rows, stamps, committed pagination), TC-API-03 idempotency are phase 08; TC-API-05 direct membership denial is phase 06/07 when that table exists. A scaffold cannot pass those full oracles by returning empty success.
 
 **Non-goals** — must not touch:
 - Any table, schema, or migration (identity tables are phase 06; budget entities are phase 07).
@@ -491,7 +340,7 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 > Per the `agents.md` escalation rule this phase stops rather than decides. Two ways forward, your call:
 >
 > 1. **Decide OQ-07 now** (the deployment plan recommends accepting `ap-southeast-1` / Singapore and disclosing it), then this phase runs in full.
-> 2. **Authorise a descope:** create staging only in `ap-southeast-1` and defer the production project to a later phase. Staging holds synthetic data exclusively (`deployment-plan.md` §1.1), so the residency question does not bind for it. Phase 04 would then complete with production deferred, and phase 23 (submission) inherits the blocker.
+> 2. **Authorise a descope:** create staging only in `ap-southeast-1` and defer the production project to a later phase. Staging holds synthetic data exclusively (`deployment-plan.md` §1.1), so the residency question does not bind for it. Phase 04 still remains partial until a **real staging project ref and contract evidence** are recorded; phase 20's real-data beta and phase 21 submission inherit the production blocker.
 >
 > I have not chosen between these.
 
@@ -575,7 +424,7 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 
 **Tasks**
 
-1. Integrate Supabase Auth for sign-up, sign-in, and mandatory email verification; block plan creation and joining until the email is verified (SEC-01, SEC-02).
+1. Integrate Supabase Auth for sign-up, sign-in, mandatory email verification and an explicit 18+ declaration; block plan creation and joining until verification (SEC-01, SEC-02). `supabase/config.toml`'s `enable_confirmations = false` is **local-only**: stage/prod deployment configuration MUST set `enable_confirmations = true` and test the unverified-account denial. Counsel must verify the age/legal-basis copy before real beta.
 2. Implement session handling: store access and refresh tokens in Keychain/Keystore (SEC-19), rotate refresh tokens on use, and invalidate server-side on sign-out (SEC-03, SEC-04).
 3. Write the migration creating the identity and access tables from `design.md` §4.1 — `users`, `plans`, `plan_members`, `invites`. (`lifecycle_confirmations` belongs to phase 16.)
 4. Enable and force RLS on those four tables, with membership resolved through `plan_members` keyed to the authenticated user (SEC-22, SEC-23 scoped to identity tables).
@@ -586,7 +435,7 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 9. Wire SCR-01 (Sign In / Sign Up) and SCR-02 (Invite Acceptance) to real behaviour, replacing the phase-03 placeholders, and replace the stubbed auth guard provider with the real one.
 10. Verify re-pairing after reinstall: a reinstalled app signs in and recovers plan membership with no residual credential from the prior install (SEC-10, SEC-11).
 
-> **At the one-sitting boundary.** This phase has exactly 10 tasks, the stated limit. If it slips in practice, the natural split is **06a auth and sessions** (tasks 1, 2, 9-partial, 10) and **06b pairing and plan membership** (tasks 3–8), which would take the index to 28. Flagged now so the split is a known option rather than a surprise.
+> **Sitting boundary:** Auth/sessions (tasks 1–2, 9-partial, 10) and pairing/membership (tasks 3–8) are separately testable sittings within phase 06. The 24-phase index no longer equates a milestone with one sitting.
 
 **Deliverables**
 
@@ -603,6 +452,7 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 | Check | Command / steps | Expected result |
 |---|---|---|
 | Sign-up requires verification | Manual: sign up, then attempt to create a plan before clicking the verification link | Creation refused with a message naming email verification |
+| Stage/prod confirmation and age gate | Inspect deployed auth settings; try unverified and under-18 sign-ups | `enable_confirmations = true` in both deployed environments; unverified cannot create/join; 18+ declaration required; legal notice approved before beta |
 | Sign-in works | `flutter test integration_test/auth/pairing_test.dart` | Exit 0 |
 | Token TTL and rotation | Decode the access token; use the refresh token twice | `exp − iat` ≤ 3600 s; the first refresh token is rejected on reuse |
 | Sign-out revokes server-side | Sign out, then `curl` a refresh with the prior token | Rejected |
@@ -616,7 +466,7 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 | Re-pair after reinstall | Uninstall, reinstall, sign in | Plan membership restored; no prior credential required |
 | Partner B sees the same plan | Manual: pair two accounts, sign in as each | Both see the identical plan |
 
-**TC IDs that must pass:** TC-PLT-03, TC-SE-23
+**TC IDs that must pass:** TC-PLT-03, TC-SE-23, TC-SE-42 (pasted and tapped invite parity)
 
 **Non-goals** — must not touch:
 - Any budget entity table — ledger, pledges, guests, allocations, fee components (phase 07).
@@ -631,3 +481,102 @@ Also carried forward: open OQ items remain in `decision-log.md`. Per the `agents
 
 **Open questions to resolve before starting:** None blocking this phase directly.
 *Inherited:* if phase 04 was descoped to staging-only under OQ-07, this phase runs against staging only, and the production identity migration is deferred with it.
+
+
+---
+
+## Phase 07: Data layer — entities, repositories & change-log writer
+
+**Owning agent:** Data & Sync (Security reviews RLS and plan-scoped schema)
+
+**Depends on:**
+- **05** — SQLCipher/drift lifecycle, secure key, and local-first reads.
+- **06** — identity/plan membership and alias model; auth and identity migrations must exist before plan-scoped RLS. A local synthetic project is sufficient for development; no live production deployment is implied.
+
+**Objective:** Implement the v1 entity schema, repository-only writes and transactional immutable change-log/outbox foundation. Store source inputs and integer-centavo events, not computed money or derived status. Establish forced RLS on every plan-scoped server table and migration safety before network replication.
+
+**Requirements covered:** — (structural dependency for the REQ IDs owned by feature phases 09–17; no duplicate REQ assignment)
+
+**Sittings / Tasks**
+
+1. **Schema sitting:** Add versioned server migrations and matching drift tables for `plans`, `plan_members`, aliases, `ledger_entries`, `schedule_items`, `payments`, `fee_components`, `hidden_fee_prompts`, `guests`, `crew`, `pledges`, `pledge_receipts`, `gifts_received`, `plan_allocations`, `checklist_items`, `change_log`, and device queue/cursor state as applicable in `design.md` §4. Phase 06 owns identity migration; extend it rather than silently duplicate tables. Client UUIDv7 IDs; money is signed int64 centavos. Keep `estimated_cents` null for per-head entries, no cumulative deposit/receipt, no stored derived status, `engine_cents`, conflict flag or generated export artifact. Template suggestions stay in the bundled validated ruleset, not ledger rows.
+2. **Repository sitting:** Add typed repositories behind `data/repositories/` for plan setup, ledger and children, prompted fees, guest/crew, allocations, pledges/receipts, gifts and checklist. Read projections only from local SQLite; validate parent-child plan/entry links and record every financial correction as tombstone plus new positive row. Materialize checklist state on first edit via one stable plan/item create; idempotently avoid duplicate concurrent first creates. Fees become entries only after explicit confirmation with user-entered positive centavos. Do not seed fictitious fees, checklist dates or costs (OQ-04/11).
+3. **Writer sitting:** In one local DB transaction, validate the complete input, apply the local projection, append an immutable typed `change_log` event and enqueue it durably. Use a single full-snapshot `$create` event; one field event for each independent field, one full `change_group_id` snapshot for pricing mode/rate and fee quantity/rate/amount; include plan member alias/device ID, `schema_version`, typed old/new including null and monotonic device counter. Preserve tombstones and history; never persist derived conflict/superseded flags. Atomic sponsor-direct receipt/payment pairs must remain indivisible both locally and for later server acceptance.
+4. **Server-security sitting:** Enable **and force** plan-membership RLS on every new plan-scoped table, deny foreign-plan read/write/delete and direct membership insertion, and constrain immutable log updates/deletes. Add executable cross-tenant negative and policy-inventory tests to CI before calling the schema safe. Any new persisted opt-in measurement or survey record added in 15/20 reopens this inventory and gate; do not assume ordinary analytics bypass RLS. No actual data layer is complete with missing RLS.
+5. **Migration sitting:** Test forward/backward behavior on representative data and drift upgrades with a queued offline write. Stage synthetic seed fixtures only. Keep unknown versioned rows/cursor retained for phase 08's transactional rebuild; verify no cents change and no queue loss. Pin ruleset IDs on plans without computing/syncing engine outputs.
+
+**Deliverables**
+
+- Versioned `supabase/migrations/` for the data layer and forced-RLS policies; corresponding `data/db/` drift schema/migrations.
+- `data/repositories/` typed implementations and `data/changelog/` transactional writer/queue.
+- Local repository, schema, tenant-isolation and migration tests, plus a **blocking** `tenant-isolation` CI gate once migrations exist.
+
+**Exit Criteria**
+
+| Check | Evidence / command | Expected result |
+|---|---|---|
+| Data model and writer | Local repository tests over a reopened encrypted DB | Full create snapshot, typed updates, group snapshots, tombstone and queue commit atomically; reads need no network; integer cents preserved |
+| Migration safety | Run migration suite with queued rows and representative money data | **TC-MIG-01…03** pass; backward migration cleanly applies or fails before partial effects; no queued row or centavo lost |
+| Tenant boundary | Run all negative tests with two real authenticated synthetic plans against local Supabase | **TC-SEC-01, TC-SEC-04…06** pass; no cross-plan enumeration or REST bypass; every plan table has enforced policy; CI fails if a new table lacks one |
+| Membership/write integrity | Direct client write attempt and append-only log mutation attempt | **TC-API-05** and the storage/API assertions of **TC-SE-26** pass; its UI assertion waits for phase 16 |
+| Local schema versus requirements | Inspect columns and repository writes | No float money, no stored derived status/engine amount, no phantom template/fee row; complete plan-scoped checklist protection |
+
+**TC IDs that must pass:** TC-MIG-01, TC-MIG-02, TC-MIG-03, TC-SEC-01, TC-SEC-04, TC-SEC-05, TC-SEC-06, TC-API-05 and the writer/storage assertions of TC-SE-26. The **full** TC-SE-26 includes UI and belongs to phase 16/19; auth/device adversarial and physical-encryption tests remain in 18; TC-MIG-04/05 require the phase-08 replay/rebuild engine.
+
+**Non-goals** — must not touch:
+- Network replay, server ordering, committed pull cursors or version negotiation (08).
+- Full feature screens, price benchmarks, legal/checklist preset dates or monetisation (09–15 and OQ-04/11/12).
+- v1.1 photo bytes/Storage and any AI or payment rail.
+
+**Rollback:** Roll back development-only migrations against a synthetic test project after confirming no queued writes; use forward corrective migrations rather than destructive down-migration on any shared/real dataset. Preserve immutable events and encryption key until recovery is verified; never delete a production log to undo a projection bug.
+
+**Open questions to resolve before starting:** No OQ authorises skipping RLS. OQ-07 still blocks creating/attesting production region and live staging reference; OQ-11 blocks publication of verified checklist presets but not manual state/date/fee schema. OQ-01 blocks any claim that alias unlink resolves legal erasure.
+
+---
+
+## Phase 08: Sync engine — transport, ordering, replay & convergence
+
+**Owning agent:** Data & Sync (Security reviews authorization and version/tenant boundaries)
+
+**Depends on:**
+- **06** — valid member sessions and server membership checks.
+- **07** — versioned entity schema, append-only writer, local outbox/projections, forced RLS and migration suite.
+
+**Objective:** Deliver automatic, durable two-device push/pull over the immutable log with server-authoritative LWW, commit-safe per-plan pagination, atomic group/financial events, deterministic local projections and upgrade-safe compatibility. Local writes remain readable before any network call; failure retains the queue.
+
+**Requirements covered:** REQ-SE-2, REQ-SE-3, REQ-OF-5.
+
+**Sittings / Tasks**
+
+1. **Transport sitting:** Implement `POST /sync/push` and `POST /sync/pull` exactly as `design.md` §2.4 (including `protocol_version`, row `schema_version`, validated pull `limit`, cursor/`has_more`, auth and live plan membership). Reject foreign plans indistinguishably from nonexistent ones. Do not accept client-authored `server_ts`. Cap batches, respond to unsupported major with structured `min_supported_build` and leave the device's queue/cursor intact. Retry on connectivity restoration without a screen/button; make pending/error/progress visible in 17.
+2. **Ordering sitting:** Under a transactional **per-plan lock held through commit**, assign server sequence/`server_ts` on first acceptance. Duplicate row IDs are insert-ignore and retain original stamp. Pull only committed rows through a committed high-water mark; cursor advances to the last returned committed event only after the entire local page (including unknown rows) commits. Test racing push transactions, rollback gaps, `limit=1`, replay and process death between persistence and cursor update.
+3. **Merge sitting:** Replay full-snapshot creates atomically; hold child events until parent creation, and gate live state/totals on tombstones until an explicit Restore. Resolve ordinary fields by `(server_ts, device_monotonic, device_id)`, compound pricing and component groups by the same key over the *whole* typed snapshot; preserve losing events. Compare typed `old_value` to the immediately replaced effective value to derive (not store) stale conflict; a later-accepted old offline edit may win. Derived overdue/payment/engine/per-head values are never synced as authoritative fields. Revalidate cross-field invariants on read; exclude only invalid dependent contributions and surface needs attention without repair writes.
+4. **Atomicity/compatibility sitting:** Enforce sponsor-direct linked payment+receipt as one accept/reject unit on server and client. Keep each device's queue, counter and cursor distinct even for the same account; revoked membership/session cannot pull or push. Retain compatible unknown additive rows and ordering data without projecting them; on app upgrade migrate drift + rebuild projections transactionally from the *entire* retained log, with rollback preserving queue, cursor and old schema on failure. Missing pinned ruleset → needs attention, not fabricated allocations.
+5. **Convergence sitting:** Exercise two synthetic accounts/devices and independent arrival orders across entries, ledger/payment/receipt/gift inserts, delete/restore, groups and long-offline writes. Repeat sync with empty queues and assert byte-identical projections and integer-centavo gross/net/exposure/variance across peers, with attribution visible for both partners and same-user devices. Run all contract/isolation suites on both supported platforms in 19; never call an unexecuted suite passed.
+
+**Deliverables**
+
+- Versioned Edge `sync_push`/`sync_pull` with server transaction/lock and RLS membership checks; `sync/transport/`, `sync/queue/`, `sync/clock/` client services and local projection/rebuild support.
+- Automated API/concurrency/idempotency and two-device sync tests, plus transactional upgrade/failure-injection tests.
+
+**Exit Criteria**
+
+| Check | Evidence / command | Expected result |
+|---|---|---|
+| API envelope/auth/version | Run local Supabase contract tests with valid and invalid accounts | **TC-API-01…04, TC-API-06…08** pass; `/sync/pull` respects bounded `limit`, no malformed/unauthorized partial write, unsupported major keeps queue |
+| Per-plan commit cursor | Pause one push before commit, race a second; page pull at `limit=1` and inject rollback | **TC-SE-43, TC-API-02/06** pass: no later commit overtakes an uncommitted earlier key; no event skipped |
+| Replay/idempotency | Queue offline writes, force-quit/restart, deliver same batch twice | **TC-OF-12/15/18/23…25, TC-API-03** pass; original server stamps preserved, no loss or duplicate sums |
+| LWW, groups, projection safety | Run deterministic two-device sync matrix and swap arrival order | **TC-SE-20/21/24/25/27…30/33…39** pass on applicable engine paths; full group wins, stale mismatch shown to both, tombstones and parent-gated children safe, same accepted log converges |
+| Mixed-version migration | Retain unknown events and pending writes; upgrade, inject failure, retry | **TC-SE-44, TC-MIG-04/05, TC-API-07/08** pass; no silent financial projection or lost cursor; failed rebuild rolls back wholly |
+| Tenant and pair atomicity | Foreign/revoked token and interrupted sponsor-payment pair attempts | **TC-SEC-01/02/04/05** and pair integrity checks pass; no cross-tenant leak or half-applied linked receipt/payment |
+
+**TC IDs that must pass:** TC-API-01…04 and 06…08; TC-SE-20/21/24/25/27…30/33…39/43/44; TC-OF-12/15/18/23…25; TC-MIG-04/05; TC-SEC-01/02/04/05. Some UI portions of TC-SE-28/33/35/37/39 depend on phase 16, visibility on 17, and complete cross-platform rerun on 19: this engine exits only on its implemented assertions, **not** a claim those later end-to-end checks have passed.
+
+**Non-goals** — must not touch:
+- Feature forms/dashboard, human conflict resolution, partner-removal UI (09–17); payment state remains locally derived.
+- Counsel-dependent shared-record erasure or force-wipe claims (OQ-01/03); a removed partner retains already synced local bytes.
+- AI, payment initiation, v1.1 photos or analytics SDKs.
+
+**Rollback:** Disable further push and keep encrypted local outboxes/cursors intact; revert an unshipped client build or deploy a forward-compatible server correction. Never erase accepted log rows, renumber server order, reset client cursors, or replay non-idempotent payments as a shortcut. Re-run contract, migration and tenant tests before restoring sync.
+
+**Open questions to resolve before starting:** No unresolved OQ changes the server-authoritative LWW algorithm. OQ-07 limits this development to local synthetic infrastructure until production region and notices are approved; OQ-01/03 prevent claims about legal erasure or enforceable remote wiping. Any incompatible protocol release must have a tested minimum-build/rollback path before phase 21.
