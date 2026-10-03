@@ -12,6 +12,7 @@
 //
 // Response (phase 04 stub):
 //   200 OK  { "rows": [], "next_cursor": null, "has_more": false }
+//   limit defaults to 100; explicit values must be integers in [1, 1000].
 //
 // Error responses:
 //   401 — missing/invalid token
@@ -41,6 +42,7 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const planId = url.searchParams.get('plan_id');
   const sinceServerTs = url.searchParams.get('since_server_ts');
+  const limits = url.searchParams.getAll('limit');
 
   if (!planId) {
     return new Response(
@@ -78,6 +80,17 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  // Keep the phase-04 endpoint's paging contract bounded even before rows exist.
+  const limitText = limits[0];
+  const limit = limitText === undefined ? 100 : Number(limitText);
+  if (limits.length > 1 || (limitText !== undefined && !/^\d+$/.test(limitText)) ||
+    !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
+    return new Response(
+      JSON.stringify({ error: 'limit must be an integer between 1 and 1000' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
   // Phase 04 stub: no rows returned, cursor null, has_more false.
   // Phase 08 implements: query change_log WHERE server_ts > since_server_ts
   // ORDER BY server_ts, paged by limit, returning rows with server_ts values.
@@ -86,8 +99,6 @@ Deno.serve(async (req: Request) => {
       rows: [],
       next_cursor: null,
       has_more: false,
-      // Stub marker — removed when phase 08 implements real behaviour.
-      _stub: 'phase-04: no rows returned; real query in phase-08',
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );

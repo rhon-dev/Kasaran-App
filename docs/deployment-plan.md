@@ -37,9 +37,9 @@ Neither triggers the stop condition, but both change what this plan can promise.
 | Migrations applied | Automatically on reset | Automatically on merge to `main` | Manually gated (§2.3) |
 | Who can access | The maintainer, locally only | Maintainer + any future collaborator; credentials in CI secrets | **Maintainer only.** MFA required (SEC-27) |
 | Client build pointed at it | Debug build, `--dart-define=ENV=local` | Internal TestFlight / Play internal track | App Store / Play production |
-| Crash reporting | Disabled | Sentry, `environment=staging` | Sentry, `environment=production` |
+| Crash reporting | Disabled | Sentry EU organization, `environment=staging`, synthetic-only payloads | Sentry **EU (Frankfurt event storage)** organization, `environment=production`, scrubbed diagnostics; US metadata caveat (§7.2) |
 
-> **Phase 04 descope note (OQ-07):** Staging project creation in `ap-southeast-1` was authorised as a staging-only descope. The production project is **deferred** until OQ-07 (data residency) is resolved. See §2.2 and `decision-log.md`. This blocks the privacy notice (SEC-30) and ultimately phase 23 (store submission).
+> **Phase 04 descope note (OQ-07):** Staging project creation in `ap-southeast-1` was authorised as a staging-only descope, but its project reference is not yet recorded; authorization does not prove creation. The production project is **deferred** until OQ-07 (data residency) is resolved. See §2.2 and `decision-log.md`. This blocks the real-data beta (phase 20), privacy notice (SEC-30) and phase 21 submission.
 
 ### 1.1 Production data is never copied to staging
 
@@ -53,13 +53,15 @@ Neither triggers the stop condition, but both change what this plan can promise.
 
 If a production bug cannot be reproduced from synthetic data, the fix is to **extend the generator**, not to copy production. A production-only bug is investigated via logs (which carry UUIDs only, never content — SEC-28) and by asking the affected user directly.
 
+**Real-data beta (ADR-63):** invited couples use the separately controlled **production** Supabase project and production app configuration, not staging, scratch or local. Create/enable this only after OQ-07 residency is decided and SEC-29/30/31/35 are demonstrated PASS, including an approved pre-signup privacy notice, lawful-basis review, 18+ declaration, versioned acknowledgement and incident runbook. SEC-27/28 and the production PITR/off-provider backup are also PASS before accepting real records. If any approval is missing, test only with synthetic accounts and do not invite real couples. A scratch restore of real data is production-equivalent restricted recovery infrastructure, not staging; delete it promptly after the validated drill.
+
 ---
 
 ## 2. Backend deployment
 
 ### 2.1 Hosting
 
-Per **ADR-16**: Supabase managed Postgres, with Supabase Auth and Row-Level Security. Two projects — `kasaran-staging` and `kasaran-prod` — never sharing a database, an Auth pool, or a service-role key.
+Per **ADR-16/64**: Supabase managed Postgres, with Supabase Auth and Row-Level Security. Three isolated paid Pro projects — `kasaran-staging`, `kasaran-prod`, and a restricted scratch restore project (created as needed) — never share an Auth pool or service-role key. The scratch project's existence and billable duration must be checked at each monthly review; its access and cleanup are part of the drill, not a license to move real data to staging.
 
 The backend surface is deliberately thin (design.md §2.4): two idempotent endpoints over one append-only table, plus auth. Deployable units:
 
@@ -72,15 +74,14 @@ The backend surface is deliberately thin (design.md §2.4): two idempotent endpo
 
 ### 2.2 Region — and the residency gap
 
-**Chosen region: `ap-southeast-1` (Singapore).** It is Supabase's closest region to the Philippines; expected round-trip from Metro Manila is roughly 30–60 ms, which matters little for a local-first app that syncs in the background but does matter for sign-in and first-device replay (design.md §2.5).
+**Proposed region: `ap-southeast-1` (Singapore) for Supabase.** OQ-07 is still open; do not create a production project for real beta before approving its location. Local-first sync reduces latency sensitivity; no unverified round-trip estimate is promised.
 
 **There is no Supabase region in the Philippines.** So Philippine personal data will be stored outside the country. This is a decision with legal weight and **no ADR currently covers it** (see §0.1a):
 
-- The Data Privacy Act of 2012 does **not** mandate local storage. Cross-border transfer is permitted.
-- But the personal information controller remains **accountable** for data transferred abroad, and must ensure comparable protection.
-- **SEC-30 already requires the privacy notice to state recipients and locations.** That notice cannot be finalised until this is decided, because it must name Singapore.
+- Cross-border processing and controller obligations require DPO/counsel review; this plan is not a legal opinion or residency approval.
+- **SEC-30 requires the privacy notice to state recipients and locations.** It cannot be approved until OQ-07 decides Singapore for Supabase and discloses Sentry's selected EU organization: diagnostic events at rest in **Frankfurt, Germany**, while Sentry says some account/project/usage/integration metadata may be stored in the **US** regardless of region and shared support material is stored there. EU organization location cannot later be changed; use a region-specific endpoint and verify settings before sending any real event. Source: https://docs.sentry.io/organization/data-storage-location/ .
 
-**Logged as OQ-07 — data residency.** Options: accept Singapore and disclose it (recommended, and what this plan assumes); or require in-country storage, which would mean leaving Supabase and rebuilding auth. Do not let this drift — it gates the privacy notice, which gates store submission (SEC-30, §5.1).
+**Logged as OQ-07 — data residency.** Options: approve Singapore with the Sentry EU/US caveat in the notice, or choose an alternative reviewed by counsel and the owner. Do not imply that an in-country option is available on the current Supabase setup; a different infrastructure design would be needed. OQ-07 gates the real-data beta, privacy notice and store submission (SEC-30, §5.1).
 
 ### 2.3 CI/CD stages, in order, with gates
 
@@ -97,9 +98,10 @@ The backend surface is deliberately thin (design.md §2.4): two idempotent endpo
 ② Merge to main
    ├─ migrations applied to STAGING automatically
    ├─ staging smoke: sync push/pull round-trip
-   └─ nightly: iOS integration_test + Maestro E2E both platforms (TC-E2E-01)
+   └─ nightly: iOS integration_test only (no nightly Maestro; ADR-68)
         ↓
 ③ Release candidate cut (tag vX.Y.Z)
+   ├─ Maestro E2E on iOS and Android (TC-E2E-01; RC-only, ADR-68)
    ├─ PRODUCTION READINESS GATE (§7)          gate: every row PASS
    └─ manual approval by rollback owner (§7.1)
         ↓
@@ -175,6 +177,16 @@ Supabase PITR can restore production to a prior timestamp. Two consequences to u
 
 1. **Writes after the restore point are lost server-side.** Clients still holding them in their local queues will re-push on next sync, so much of the data returns — that is a genuine benefit of the local-first design (GIV-03).
 2. **But re-pushed rows receive *new* `server_ts` values.** Since `server_ts` is the LWW ordering authority (ADR-21), re-pushing can **change conflict outcomes** relative to the original history: a field that had resolved to A's value may resolve to B's. Restoring is therefore not a perfectly transparent rewind. If PITR is used, the incident record must note that conflict resolution may have shifted, and the change log will show the new ordering.
+
+#### Recovery targets and independent copy (ADR-65/67)
+
+**Production target:** RPO **≤1 hour** while PITR is healthy and its latest recovery point has been checked; RTO **≤24 hours** from incident declaration to validated service. These are operational targets, **not Supabase SLAs**. A complete provider outage or unusable PITR may fall back to the daily off-provider copy (up to **24 hours** of server-side data at risk); declare target breach rather than quietly relabel the RPO. Local unsynced writes and re-push behavior are not guaranteed recovery and require reconciliation (§2.6). Track recovery-point lag and actual drill elapsed time; escalate if the one-hour window cannot be selected or a restore exceeds 24 hours.
+
+Run a **daily encrypted, authenticated off-provider logical export** of production Postgres including application schemas, `auth.users` and the needed Auth schema/identity dependencies, schema migrations, roles/grants **without copying operational credentials**, plus a versioned inventory of Auth settings and required project configuration. Use a dedicated least-privilege backup principal as feasible, encrypt before transfer with an independently held key, store in a separately administered destination with MFA and restricted restore access, retain **30 days**, and verify upload, integrity/hash and decryptability. Supabase's downloadable backup behavior and PITR do not themselves establish an independent copy; database backup excludes Storage object bytes (v1.1 needs a separate object-backup design). Provider documents: https://supabase.com/docs/guides/platform/backups . Do not place live dumps in repo, CI artifacts, staging or developer laptops. The scratch restore project is isolated production-grade infrastructure with access logging, no email delivery to real users, and prompt secure disposal after a drill; never send actual restored data to staging.
+
+**Drill cadence:** monthly, **and before every release** (ADR-67). Restore the off-provider copy to the restricted scratch project, check decrypt/hash, row counts and `change_log` checksum, Auth user count and synthetic test account's auth/authorization path, and record restore point, missing fields, elapsed wall-clock time and deletion evidence. Also separately rehearse PITR at a safe point where provider tooling allows; never trigger a destructive production restore just to demonstrate readiness. Keep the drill record access-controlled, with no user content in it. Failure blocks release, initiates remediation and a fresh drill.
+
+**Break glass:** escrow recovery instructions, Supabase organization recovery/admin access, MFA recovery material, independent backup decryption key, CI ownership, Apple signing/App Store Connect access, Android upload key/Play access, Fastlane Match repo/passphrase, domain and support-mail recovery in two independently controlled secure vaults (primary maintainer plus an authorized trusted alternate). Do not put any actual secrets in this document. Assign and test the alternate's *independent* access in a tabletop and after credential rotation; require an incident record and revocation/audit after use. If no authorized alternate or working escrow exists, mark ADR-65 recovery gate NOT MET, not “covered by the solo maintainer.”
 
 ---
 
@@ -272,7 +284,7 @@ Build (CI, tagged RC) → TestFlight INTERNAL (maintainer + up to 100 internal)
         ↓ soak ≥ 5 days, zero S1/S2
                       → App Store submission (full review, 1–3 days typical)
         ↓ approved
-                      → PHASED RELEASE over 7 days: 1% → 2% → 5% → 10% → 20% → 50% → 100%
+                      → v1 **initial release is not eligible for phased update**; release manually after approval. For later version updates, choose Apple's built-in 7-day phased release for automatic updates (ADR-69), monitor and pause as needed; no custom percentage schedule. Source: https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/
 ```
 
 ### 4.2 Android
@@ -317,7 +329,7 @@ Build (CI, tagged RC) → INTERNAL TESTING (maintainer, immediate)
 
 **Versioned sync envelopes (ADR-49).** Push/pull include `protocol_version`; each immutable log row carries `schema_version`. The server rejects an unsupported major version before accepting a batch, with a structured incompatible-protocol response that contains `min_supported_build`. The client retains every queued write, displays the existing update-required/read-only state (without implying loss), and retries only after an update. A supported older minor client persists unknown additive events unchanged and omits them only from projections; after updating, a transactional drift migration rebuilds those projections from the retained log. Raising `min_supported_build` does not rewrite `server_ts` or bypass the two-minor-release/90-day deprecation policy below. Test the N−1 request set for both read and write, unknown-event preservation, and incompatible-major refusal before contracting a protocol shape.
 
-**When the floor is raised:** only when an old client would be *unsafe to sync* — it writes a `change_log` shape the backend no longer accepts, mishandles `server_ts` ordering, or misses a security fix. Not for feature parity. Raising the floor is a production change requiring §2.3 gating, and the deprecation window is **two minor releases or 90 days, whichever is longer**, tracked by client-version telemetry before any contract-phase migration (§2.4).
+**When the floor is raised:** only when an old client would be *unsafe to sync* — it writes a `change_log` shape the backend no longer accepts, mishandles `server_ts` ordering, or misses a security fix. Not for feature parity. Raising the floor is a production change requiring §2.3 gating, and the deprecation window is **two minor releases or 90 days, whichever is longer**. Coarse first-party client-version events are opt-in under REQ-MT-1/ADR-62; they cannot prove absence of unconsenting old clients. Before any contract migration, use a documented compatibility test and safe server-side version negotiation; extend the window if evidence is insufficient (§2.4).
 
 ---
 
@@ -346,15 +358,15 @@ Build (CI, tagged RC) → INTERNAL TESTING (maintainer, immediate)
 | iOS | 6.7" (1290×2796) and 6.5" (1242×2688) — 3–5 each: dashboard bento, ledger with hidden fees, pledges showing net vs expected, guest what-if, change log |
 | Android | Phone screenshots ×4–8 (min 1080px), plus 1024×500 feature graphic and 512×512 icon |
 
-**Age rating answers:** no violence, no sexual content, no profanity, no gambling or simulated gambling, no drug references, no unrestricted web access, no user-generated content shared publicly. Result: **4+ / Everyone**.
+**Age rating is distinct from eligibility.** Complete the actual Apple/Play content questionnaires truthfully (the preliminary content assessment is 4+ / Everyone, subject to store determination). Set **Google Play target audience to 18+**, and require the **18+ self-declaration at signup** (ADR-63, SEC-31); do not claim age verification. Counsel must review the declaration's lawful basis and privacy notice. The listing's content rating does not imply minors are allowed to sign up.
 
 ### 5.3 Privacy labels — pulled from security-plan §6
 
 Transcribed from security-plan.md §6.2 and §6.3; must match the §6.1 data inventory exactly (SEC-39).
 
-**Apple App Privacy:** Contact Info (email, name) — linked, not tracking. Financial Info (budget, pledges, amounts) — linked, not tracking. User Content (supplier/sponsor/guest names, notes) — linked, not tracking. Identifiers (account id) — linked, not tracking. **Usage Data: not collected in v1. Location: not collected** — the self-selected region is declared as User Content, not Location (SEC-41).
+**Apple App Privacy:** Contact Info, Financial Info, User Content and Identifiers — linked, not advertising tracking; **Diagnostics** (Sentry crash/other diagnostic data and any actual performance data) collected when enabled. **Usage Data / Product Interaction** for optional opt-in measurement, including net-view and client-version events, if shipped; mark its actual analytics purpose, linked status and optional collection accurately. Survey answer category is subject to a payload/category audit. Self-selected region is User Content, not GPS Location (SEC-41). No third-party analytics SDK in v1. Apple's definitions explicitly require declaration even when collection is solely for app functionality: https://developer.apple.com/app-store/app-privacy-details/ .
 
-**Google Play Data Safety:** collects Personal (name, email), Financial, and other user content. **No third-party sharing** in the Play sense (Supabase is a processor). Encrypted in transit (SEC-17) ✅. Encrypted at rest on device (SEC-12) ✅. Users can request deletion in-app (SEC-34) ✅. Not used for tracking ✅.
+**Google Play Data Safety:** disclose Personal, Financial, other user content, Sentry crash logs/diagnostics and identifiers actually transmitted, and any optional first-party product interaction/survey collection. Indicate purposes and optionality as implemented. DPO checks Supabase/Sentry processor and user-directed share-sheet handling under Play's definitions; do **not** assert blanket “no sharing” before review. Encryption and deletion claims require their actual SEC-17/12/34 pass evidence, not planned checkmarks. No advertising tracking. Official guidance: https://support.google.com/googleplay/android-developer/answer/10787469 .
 
 **Account deletion path:** SCR-18 account settings offers an in-app deletion request and confirmation (SEC-34), plus a publicly reachable deletion-instructions URL is planned (SEC-40). The alias-based log attribution can render “Former member” without mutating history (ADR-51), but this does **not** decide how a shared plan or historical personal content is erased. The shared-record completion outcome remains counsel-gated on OQ-01/SEC-33/38; no production deletion-flow pass may be claimed before a reviewed, working path exists. This is a release blocker, not a resolved store-submission item.
 
@@ -468,11 +480,11 @@ Example: *"Fixed: the buffer total could show as under-spent when one category w
 | 5 | Offline matrix green | TC-OF-01…17 | 8 entity rows + 9 durability rows; TC-OF-10 string scan finds zero prohibited words | NOT MET |
 | 6 | Device at-rest security on real hardware | TC-SEC-03, TC-SEC-07…10, SEC-12/13/14/16/28 | Simulator results do not count | NOT MET |
 | 7 | Migrations forward/backward + old-client probe | TC-MIG-01…03, §2.4 | Green, and the N−1 replay set passes against production schema | NOT MET |
-| 8 | **Backup verified by an actual restore drill with recorded duration** | TC-BAK-02, SEC-27 | Restore to a scratch project completed within the last 7 days; row counts and `change_log` checksum verified; **wall-clock duration recorded in the drill log**. A drill without a recorded duration is FAIL | NOT MET |
+| 8 | **Backup verified by an actual restore drill with recorded duration** | TC-BAK-02, SEC-27, ADR-67 | Last monthly drill plus **one before each release**, restoring the encrypted off-provider backup (including Auth users) to restricted scratch; row counts, Auth test login and `change_log` checksum verified; elapsed time ≤24 h recorded. A missed drill or unrecorded duration is FAIL | NOT MET |
 | 9 | Zero open S1/S2 defects | testing-plan §9 | Count = 0 | NOT MET |
 | 10 | **Rollback rehearsed once in staging** | §2.6 | A code rollback **and** an additive-migration rollback both performed in staging, with the outcome and duration written up. Not a thought experiment | NOT MET |
 | 11 | Monitoring and alerting live | §7.1 | All named alerts firing correctly, verified by deliberately tripping at least one | NOT MET |
-| 12 | Error tracking with release tagging | §7.2 | Sentry receiving events tagged with version + build + git SHA, **and PII scrubbing verified** (SEC-28) | NOT MET |
+| 12 | Error tracking with release tagging | §7.2, ADR-61 | Sentry EU project verified receiving scrubbed events tagged with version + build + git SHA; US metadata caveat disclosed and **PII scrubbing verified** (SEC-28) | NOT MET |
 | 13 | Support intake channel live | §7.3 | Address reachable, in-app link works, response-time expectation published | NOT MET |
 | 14 | Rollback decision owner named | §7.4 | A named person, reachable, with documented authority | NOT MET |
 | 15 | Secrets audit | SEC-26 | CI secret scan clean; built artifact contains no service-role key | NOT MET |
@@ -482,6 +494,8 @@ Example: *"Fixed: the buffer total could show as under-spent when one category w
 | 19 | Name clearance | §5.6, OQ-09 | Store name availability confirmed on both platforms; domain owned | NOT MET |
 | 20 | Verified checklist preset content | OQ-11, ADR-56, REQ-CK-1 | Before publishing any v1 legal/church applicability or date-offset preset, verify each item with the relevant authority and record its source; otherwise show only user-managed NEEDS VERIFICATION prompts without a claimed preset date. **OQ-11 remains open; preset release is blocked.** | NOT MET |
 | 21 | Private offline export/share | ADR-57/60, SEC-32/42, REQ-EX-2, testing-plan export cases | Project-owner design scope approved under ADR-60, but PDF/CSV and the separate full local-data copy must work offline; privacy preview, single-sponsor scoping and spreadsheet-formula neutralization must pass on both platforms; authenticated server-only retrieval and DPO review of subject/shared-plan access remain required before SEC-32 passes | NOT MET |
+| 22 | Real-data beta privacy and residency | ADR-61..63, SEC-29/30/31/35, OQ-07 | Before any real-couple account: production location approved, notice/lawful bases and 18+ flow signed off by DPO/counsel, consent/withdrawal tested, breach tabletop run; staging synthetic-only | NOT MET |
+| 23 | Recovery independence and budget | ADR-64..67, §8.4 | Pro+PITR active on production with latest recovery point monitored; daily encrypted off-provider backup including Auth users verified; break-glass escrow and monthly/pre-release drill tested; billing alarms active | NOT MET |
 
 **v1.1 is not part of this v1 gate.** A later attachment release separately requires SEC-43/44 Storage RLS, size/MIME, encrypted offline staging and Photos-label PASS before store submission; localization needs ARB fallback and pseudo-localization tile-overflow tests (ADR-58/59). A backlog stub is not a green release gate.
 
@@ -502,13 +516,15 @@ Example: *"Fixed: the buffer total could show as under-spent when one category w
 
 ### 7.2 Error tracking
 
-Sentry, `environment` set per §1, **releases tagged `kasaran@<semver>+<build>` with the git SHA** so a crash maps to an exact artifact.
+Sentry **EU organization** (`de.sentry.io` region endpoint), `environment` set per §1, **releases tagged `kasaran@<semver>+<build>` with the git SHA** so a crash maps to an exact artifact. EU organization selection is irreversible; EU event data at rest is Frankfurt, but some organization/project/usage metadata can reside in the US and user-shared support material is stored in the US. Verify the location in organization settings and approve OQ-07 notice before real beta. Source: https://docs.sentry.io/organization/data-storage-location/ .
 
 **Non-negotiable configuration constraint:** Sentry's default breadcrumbs and context can capture exactly what SEC-28 forbids — peso amounts tied to a user, sponsor and guest names, emails, tokens. A `beforeSend` scrubber must strip these, and **that scrubbing is itself verified** by TC-SEC-10 extended to crash payloads. Shipping Sentry unscrubbed would turn the error tracker into the largest PII leak in the system.
 
+Set `sendDefaultPii=false`; disable request-body capture, session replay, profiling and automatic performance/analytics features unless separately audited and declared. Scrub at capture **before upload**, including stack breadcrumbs, URLs, tags and exception messages; run canary payloads containing known synthetic names, amounts, email and token strings and inspect the received event in Sentry. Disable diagnostics collection if scrub evidence fails. Sentry diagnostics does not grant consent to first-party measurement (ADR-62, security-plan §6.1.1).
+
 ### 7.3 Support intake
 
-Single channel: `support@kasaran.app`, linked from an in-app "Get help" item. Published expectation: response within 2 business days (honest for a solo maintainer — see §8.1). Auto-reply confirms receipt and links the privacy and deletion pages.
+Single channel: `support@kasaran.app`, linked from an in-app "Get help" item and [support FAQ](./support-faq.md) (ADR-66). Published expectation: initial response within 2 business days, **not** a guarantee that a rights request is completed in two days. Auto-reply confirms receipt, points to privacy/deletion instructions, and says not to email passwords, tokens, IDs, guest lists, screenshots or financial details. Verify requester identity via an authenticated in-app workflow or a fresh, expiring, single-use account-bound verification link; never disclose a plan or even confirm another person's membership solely from an email address. Log request ID, category, receipt time, verifier, lawful deadline, escalation and outcome in restricted records; DPO reviews SEC-32 server-only/third-party scope and counsel-gated shared-record erasure (OQ-01). Ex-partner disputes: give neutral safety instructions for either partner's own access/revocation path (SEC-07), do not mediate ownership or share the other party's records; escalate threats, coercion or exposure to the privacy/security incident path without alerting the alleged aggressor by default. Publish the FAQ only after legal review of rights copy.
 
 ### 7.4 Rollback decision owner
 
@@ -559,15 +575,19 @@ Honest numbers, and the reason §3.5 matters:
 
 ### 8.4 Cost monitoring
 
+**Budget policy (ADR-64):** monthly ceiling **USD 200** for Supabase service spending, not a provider-enforced hard cap or an all-in business budget. As of 2026-10-03, official list pricing: Pro organization **$25/month** with **$10/month compute credits**; three Micro projects cost **$10 each**, yielding **$45/month net plan+compute**; production 7-day PITR adds **$100/month**, making a **$145/month hypothetical Micro arithmetic baseline** before variable usage. **But Supabase requires at least Small compute for a PITR project**: Small is **$15/month**, so the feasible production Small + staging/scratch Micro baseline is **$150/month** at full-month occupancy (25 + 15 + 10 + 10 − 10 + 100). A scratch project created only during drills may have lower prorated compute, but do not budget assuming that. PITR may replace daily backups; off-provider backup has separate destination/egress costs. Verify actual invoices, active projects, taxes and usage before approving real beta. Source: https://supabase.com/pricing ; PITR minimum and backup behavior: https://supabase.com/docs/guides/platform/backups .
+
+At **$150 projected month-to-date spend**, warn the maintainer and inspect usage/PITR/project inventory; at **$180**, freeze nonessential load and project creation (never turn off backups/security or discard user data); at **$200**, stop new onboarding and escalate to the owner to approve a funded overage or a safe capacity plan. Protect existing users, exports and recovery; do not disable production mid-session or claim these actions prevent provider charges. Supabase's Pro spend cap applies only to supported usage categories and is **not** this USD 200 policy; monitor billing dashboard and invoice, configure available provider alerts, and reassess forecasts at least weekly during beta. This is a decision threshold, **not a contractual hard cap**.
+
 | Cost | What to watch | Alarm |
 |---|---|---|
-| Supabase | DB size, egress, monthly active users, PITR retention | Email at 70% of any plan quota; the free tier's idle-project pause is a demo hazard (design.md §3) |
-| CI | GitHub Actions minutes, **macOS multiplier ≈ 10×** | Alarm at 70% of the monthly allowance; iOS builds are the dominant cost and are already restricted to RC + nightly (§3.2) |
+| Supabase | Billed project count, production Small compute, PITR, DB size, egress, monthly active users and backup destination | USD 150/180/200 actions above; project/usage alerts; inspect actual bill. Free tier does not meet the three-project/PITR plan. |
+| CI | GitHub Actions minutes, macOS consumption | Alarm at 70% of monthly allowance; Maestro runs on RC only (ADR-68), not nightly; iOS integration test remains nightly unless separately changed |
 | Sentry | Event quota | Alarm at 70%; a crash loop can exhaust a month's quota in hours, so a spike is itself a P1 signal |
 | Apple / Google | Apple Developer USD 99/yr; Google Play USD 25 one-off | Calendar reminder 30 days before Apple renewal — **an expired membership removes the app from sale** |
 | Domain | `kasaran.app` renewal | Auto-renew on; the support, privacy, and deletion URLs all depend on it (§5.6 step 4) |
 
-Reviewed monthly against a stated budget ceiling. For a student-scale project the binding constraints will be macOS CI minutes and Supabase egress, in that order.
+Review actual bill monthly against the USD 200 Supabase policy and monitor projected spend weekly. CI, Sentry, backup destination, domains and store fees are **outside** that ceiling; a future all-in budget needs separate approval. The cost model is an estimate, not a claim that invoices cannot exceed it.
 
 ---
 
@@ -578,6 +598,7 @@ Reviewed monthly against a stated budget ceiling. For a student-scale project th
 | **OQ-07** | **Data residency.** No ADR covers where PH personal data is stored. This plan assumes Supabase `ap-southeast-1` (Singapore); there is no PH region. | Privacy notice (SEC-30) → store submission (§7 row 18) | Accept Singapore and disclose it explicitly in the privacy notice. The alternative — in-country storage — means leaving Supabase and rebuilding auth |
 | **OQ-08** | **Bundled vs remote ruleset.** ADR-15 bundles the allocation ruleset in the binary; with no code OTA, a wrong baseline is stuck for days. | Nothing yet, but it caps incident response (§8.3) | Move to remote-with-bundled-fallback, keeping per-plan ruleset pinning (REQ-AE-3). Requires amending ADR-15 |
 | **OQ-09** | **Name clearance.** ADR-27 decided "Kasaran"; clearance is a separate step — store availability, Play collision, IPOPHIL trademark, domain ownership. | Store submission (§7 row 19) | Run steps 1, 2, and 4 of §5.6 before any other submission work; they are cheap and can invalidate the name |
+| **OQ-12** | **Business model, undecided.** Options: free (no IAP, sustainable cost unfunded); one-time supporter purchase (store IAP review/payment disclosure, preserve core access and no pressure); premium exports/templates (store IAP review, privacy/access inequity and “no upsell” vision tension); planner tier later (new B2B permissions, processor/privacy contracts and payment review). | Monetization, store metadata and privacy review for any paid feature; **not** a license to add v1 upsell | Evaluate sustainability, store rules and “no upsell” vision with owner; do not introduce payment or analytics SDK from this table. |
 
 **Carried forward, unchanged and still counsel-gated:**
 

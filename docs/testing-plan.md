@@ -43,10 +43,10 @@ One Maestro flow set, two targets. Flows live in `e2e/flows/` and are parameteri
 | Widget tests | ✅ | | | | Headless, fast. |
 | Golden snapshots | ✅ (verify) | | ✅ (update) | | Updating goldens is a human judgement; verification is automatic. |
 | `integration_test` | ✅ Android emulator | ✅ iOS simulator | | | Android emulators are cheap on Linux runners; macOS runners are expensive, so iOS runs nightly. |
-| Maestro E2E — MVP scenario | | ✅ both platforms | ✅ | | Too slow for every PR; required nightly and before any RC. |
+| Maestro E2E — MVP scenario | | | ✅ both platforms at RC | | Too slow for every PR; required for release candidates on both platforms, not nightly macOS. |
 | API contract + tenant isolation (§7) | ✅ | | | | **TC-SEC-01 is a release gate-blocker** (SEC-24). Must run on every PR. |
 | Migration forward/backward | ✅ | | | | Cheap, and a bad migration is unrecoverable in the field. |
-| Backup/restore drill | | ✅ weekly | | | Needs a real restore target; measured, not simulated. |
+| Backup/restore drill | | | ✅ monthly and before each release | | Needs a real scratch restore target; measured, not simulated. |
 | SQLCipher file extraction (SEC-12) | | | | ✅ | Requires pulling the DB file off a real device and running `strings`. Simulators do not reproduce real file protection. |
 | Keychain / Keystore key protection (SEC-13) | | | | ✅ | Simulator keychains do not enforce real protection classes. |
 | Cloud auto-backup exclusion (SEC-16) | | | | ✅ | Requires triggering a genuine iCloud / Android Auto Backup and inspecting its contents. Not reproducible on a simulator — this is the single most important real-device test. |
@@ -57,7 +57,7 @@ One Maestro flow set, two targets. Flows live in `e2e/flows/` and are parameteri
 
 ## 2. Traceability matrix
 
-Every REQ ID in `requirements.md` (68 total) appears. Levels: **U** unit, **I** integration, **E** E2E, **M** manual/review, **S** static analysis. Test cases below are planned assertions, not executed results; v1.1 attachment rows are design/backlog gates, not executed upload tests.
+Every REQ ID in `requirements.md` (70 proposed after Prompt 5; 68 before Prompt 5) appears. Levels: **U** unit, **I** integration, **E** E2E, **M** manual/review, **S** static analysis. Test cases below are planned assertions, not executed results; v1.1 attachment rows are design/backlog gates, not executed upload tests.
 
 | REQ ID | Test IDs | Level |
 |---|---|---|
@@ -67,7 +67,7 @@ Every REQ ID in `requirements.md` (68 total) appears. Levels: **U** unit, **I** 
 | REQ-GEN-1 | TC-GEN-01 | S (see §2.1 — runtime-untestable) |
 | REQ-GEN-2 | TC-GEN-02 | U |
 | REQ-GEN-2A | TC-GEN-03, TC-GEN-04 | U + widget |
-| REQ-BS-1 | TC-BS-01, TC-BS-10, TC-BS-11, TC-BS-12 | I + widget |
+| REQ-BS-1 | TC-BS-01, TC-BS-10, TC-BS-11, TC-BS-12, TC-FIX-E1 | U + I + widget |
 | REQ-BS-2 | TC-BS-02 | U + I |
 | REQ-BS-3 | TC-BS-03 | I |
 | REQ-BS-4 | TC-BS-04, TC-BS-09 | U + I |
@@ -86,7 +86,7 @@ Every REQ ID in `requirements.md` (68 total) appears. Levels: **U** unit, **I** 
 | REQ-HF-2 | TC-HF-05, TC-HF-06, TC-HF-09 | U + widget |
 | REQ-HF-3 | TC-HF-07, TC-HF-08, TC-BS-09 | U + I |
 | REQ-PL-1 | TC-PL-13, TC-PL-21, TC-PL-22 | U + I |
-| REQ-PL-2 | TC-PL-10, TC-PL-11, TC-PL-14, TC-PL-20, TC-PL-23 … TC-PL-29 | U |
+| REQ-PL-2 | TC-PL-10, TC-PL-11, TC-PL-14, TC-PL-20, TC-PL-23 … TC-PL-29, TC-FIX-E1 | U + I |
 | REQ-PL-3 | TC-PL-12, TC-PL-15, TC-PL-30 … TC-PL-35 | U |
 | REQ-PL-4 | TC-PL-16, TC-PL-17, TC-PL-36 … TC-PL-38 | U |
 | REQ-PL-5 | TC-PL-18, TC-PL-39 … TC-PL-41 | U + widget |
@@ -98,7 +98,7 @@ Every REQ ID in `requirements.md` (68 total) appears. Levels: **U** unit, **I** 
 | REQ-GM-2 | TC-GM-04, TC-GM-05 | U |
 | REQ-GM-3 | TC-GM-07 | U |
 | REQ-GM-4 | TC-GM-08 | U |
-| REQ-GM-5 | TC-GM-09, TC-GM-10 | U + I |
+| REQ-GM-5 | TC-GM-09, TC-GM-10, TC-FIX-E1 | U + I |
 | REQ-GM-6 [v1] | TC-GM-16 … TC-GM-20 | U + widget |
 | REQ-AE-1 | TC-AE-01, TC-AE-02, TC-AE-03, TC-AE-04 | U |
 | REQ-AE-2 | TC-AE-05, TC-AE-06, **TC-AE-07 (BLOCKED)** | U |
@@ -112,7 +112,7 @@ Every REQ ID in `requirements.md` (68 total) appears. Levels: **U** unit, **I** 
 | REQ-EX-2 [v1] | TC-EX-02 … TC-EX-08 | U + I + widget + M |
 | REQ-LO-1 [v1.1] | TC-LO-01 … TC-LO-04 | U + widget (deferred) |
 | REQ-AT-1 [v1.1 backlog stub] | TC-AT-01 … TC-AT-04 | I + M (deferred design gates, no v1 upload) |
-| REQ-SE-1 | TC-SE-23, TC-SE-42 | I + E |
+| REQ-SE-1 | TC-SE-23, TC-SE-42, TC-SE-45 | I + E |
 | REQ-SE-2 | TC-SE-20, TC-SE-21, TC-SE-24, TC-SE-27 … TC-SE-28, TC-SE-33 … TC-SE-35, TC-SE-39 | U + I |
 | REQ-SE-3 | TC-SE-25, TC-SE-36, TC-SE-39 | U + I |
 | REQ-SE-4 | TC-SE-15, TC-SE-26, TC-SE-28, TC-SE-37 … TC-SE-41 | U + I + E |
@@ -129,8 +129,10 @@ Every REQ ID in `requirements.md` (68 total) appears. Levels: **U** unit, **I** 
 | REQ-AI-4 | — | Out of v1 scope (post-launch payments, ADR-28; ID retained) |
 | REQ-AI-5 | — | Out of v1 scope (AI phase) |
 | REQ-EX-1 | TC-EX-01 | M (see §2.1) |
+| REQ-MT-1 [v1] | TC-MT-01 … TC-MT-05 | U + I + M |
+| REQ-SV-1 [v1] | TC-SV-01 … TC-SV-03 | I + widget + M |
 
-**Coverage:** 60 v1 REQ IDs have mapped test specifications (55 existing plus five Prompt 4 IDs); two v1.1 IDs have deferred cases, five REQ-AI-1…5 are out of v1, and REQ-EX-1 is review-only: 60 + 2 + 5 + 1 = 68. REQ-CK-1's unverified legal/church preset oracle is **BLOCKED (OQ-11)**, not counted as a passing case. Five tracked historical limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 and UT-10…11 have executable redirects. Authored cases are not passing implementation tests until code exists.
+**Coverage (specified, not executed):** the older 48/54 claim is superseded by the audited totals below. With the two Prompt 5 requirements, **62 v1 REQ IDs have mapped test specifications** (60 pre-Prompt-5 + REQ-MT-1 + REQ-SV-1); two v1.1 IDs have deferred cases, five REQ-AI-1…5 are out of v1, and REQ-EX-1 is review-only: **62 + 2 + 5 + 1 = 70 distinct REQ IDs**. REQ-SE-1 gains a clause and an additional test but no new REQ ID. All 46 previously mapped-but-undefined IDs now have rows in §4.6A. This count is conditional on the owning requirements edit landing with the two proposed IDs. REQ-CK-1's unverified legal/church preset oracle is **BLOCKED (OQ-11)**, not counted as a passing case. Five tracked historical limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 and UT-10…11 have executable redirects. Authored cases are not passing implementation tests until code exists.
 
 ### 2.1 Untestable-as-written and resolved testability gaps
 
@@ -154,16 +156,16 @@ UT-1, UT-2, and UT-7…9 remain static/manual, unresolved, or meta-level limitat
 
 **These are the authority for expected values.** Tests assert against these hand-computed numbers, never against whatever the implementation returns.
 
-**Specified here, not yet committed as test data.** In phase 07, implement `test/fixtures/FIX-A.json` through `FIX-D.json` as version-controlled, human-readable inputs for the domain tests. No JSON fixture or test code is created by this spec-only revision. **Changing any FIX-A/B/C expected value requires an explicit justification in the PR description**, naming the requirement or ADR that changed. The figures in this document are the authority; code conforms to them.
+**Specified here, not yet committed as test data.** In phase 07, implement `test/fixtures/FIX-A.json` through `FIX-E.json` as version-controlled, human-readable inputs for the domain tests. No JSON fixture or test code is created by this spec-only revision. **Changing any FIX-A/B/C expected value requires an explicit justification in the PR description**, naming the requirement or ADR that changed. The figures in this document are the authority; code conforms to them.
 
-### 3.0 Rules applied to all four fixtures
+### 3.0 Rules applied to all five fixtures
 
 Stated once here, applied identically everywhere (this is the rounding-drift guard of §4):
 
 1. **Storage:** all money as integer centavos (REQ-GEN-1). ₱2,400.00 → `240000`.
 2. **Rounding:** half-up to 2 dp, applied **only at display** (REQ-GEN-2). Intermediate arithmetic never rounds.
 3. **Allocation:** baseline percentages from ADR-10 — Catering & Venue 40, Photo & Video 15, Attire & Styling 10, Coordination 10, Entourage & Misc 5, Buffer 20. Rounding remainder → Buffer (REQ-AE-1 cl. 6).
-4. **Regional index does NOT change allocation shares** (ADR-11, REQ-AE-2 cl. 1). Metro 1.00 / Provincial 0.85 / Destination 1.20 affect *expected total cost* and *rate suggestions* only. Per-category skew defaults to 1.0, so **all four fixtures produce identical allocation percentages despite different regions.** A naive implementation that scales shares by the index will fail TC-AE-05 — that is the point.
+4. **Regional index does NOT change allocation shares** (ADR-11, REQ-AE-2 cl. 1). Metro 1.00 / Provincial 0.85 / Destination 1.20 affect *expected total cost* and *rate suggestions* only. Per-category skew defaults to 1.0, so **all five fixtures produce identical allocation percentages despite different regions.** A naive implementation that scales shares by the index will fail TC-AE-05 — that is the point.
 5. **Net out-of-pocket = gross − eligible receipt amounts** (ADR-22 / D2, ADR-37–39); partial and withdrawn pledges' received portions count. The unreceived remainder of active tentative/confirmed pledges is *expected*; confirmed remaining is exposure. Gifts reduce only the separate net-after-gifts figure.
 6. **Crew meals never scale with guest count** (REQ-GM-4). They scale with crew headcount only.
 7. **Buffer remaining** = Buffer allocation − Σ overruns of non-Buffer categories. Under-spend in one category does **not** offset an overrun in another (REQ-AE-6 cl. 3).
@@ -552,6 +554,50 @@ Buffer: 70,000 − max(0, 200,000 − 140,000) − max(0, 40,000 − 35,000)
 Budget headroom: 350,000 − 310,000 = 40,000.
 ```
 
+### 3.4A FIX-E — sub-₱30K civil wedding (new additive fixture)
+
+**All rates and amounts are couple-entered illustrative test operands, not a price recommendation or reference-cost benchmark.** Civil ceremony; 20 invited driving guests, guest cap 25; regional selection NCR (index 1.00). Budget **₱28,000.00 = 2,800,000 centavos**, accepted without a minimum-price warning (REQ-BS-1 cl. 3). Ceremony civil only changes church-aircon hint copy. All six hidden-fee decisions are explicitly dismissed with actor/time, each contributes zero; no prompt was silently initialized to ₱0. There is no expected-total-cost or legal-fee assertion (OQ-04/OQ-11). No starter-template suggestion creates an amount.
+
+| Category | Allocation (centavos) | Peso display | Live entries (centavos) |
+|---|---:|---:|---|
+| Catering & Venue | 1,120,000 | ₱11,200.00 | User-entered catering rate 35,000 × 20 guests = 700,000; venue 200,000 |
+| Photo & Video | 420,000 | ₱4,200.00 | Photo 300,000 |
+| Attire & Styling | 280,000 | ₱2,800.00 | Attire 250,000 |
+| Coordination | 280,000 | ₱2,800.00 | Coordination 200,000 |
+| Entourage & Misc | 140,000 | ₱1,400.00 | Favors rate 5,000 × 20 guests = 100,000 |
+| Buffer | 560,000 | ₱5,600.00 | None |
+| **Total** | **2,800,000** | **₱28,000.00** | **Gross 1,750,000** |
+
+One confirmed cash pledge has value **300,000 centavos / ₱3,000.00**, with one recorded partial receipt **100,000 centavos / ₱1,000.00**. No other pledge, gift, deposit or payment. A pledge receipt is not a fabricated payment. The remaining confirmed portion is expected support and exposure; it does not reduce net until received.
+
+| Expected figure | 20 guests | After preview/commit +5 → 25 guests |
+|---|---:|---:|
+| Gross | **1,750,000 / ₱17,500.00** | **1,950,000 / ₱19,500.00** |
+| Net out-of-pocket | **1,650,000 / ₱16,500.00** | **1,850,000 / ₱18,500.00** |
+| Remaining expected / confirmed exposure | **200,000 / ₱2,000.00** each | **200,000 / ₱2,000.00** each |
+| Per-head cost | **87,500 / ₱875.00** | **78,000 / ₱780.00** |
+| Marginal per added guest | — | **40,000 / ₱400.00** |
+| Buffer remaining | **560,000 / ₱5,600.00 (100%)** | **560,000 / ₱5,600.00 (100%)** |
+| Under budget | **1,050,000 / ₱10,500.00** | **850,000 / ₱8,500.00** |
+| Over cap | No (20 ≤ 25) | No (25 ≤ 25) |
+
+```text
+All amounts below are integer centavos; divide by 100 ONLY for peso display.
+allocation = 2,800,000 × [40,15,10,10,5,20] / 100
+           = [1,120,000,420,000,280,000,280,000,140,000,560,000]; sum 2,800,000.
+base gross = (35,000×20 + 200,000) + 300,000 + 250,000 + 200,000 + 5,000×20
+           = 900,000 + 300,000 + 250,000 + 200,000 + 100,000 = 1,750,000.
+net = 1,750,000 − 100,000 eligible receipt = 1,650,000.
+expected = exposure = 300,000 − 100,000 = 200,000.
+overruns = sum(max(0, live_category − allocation_category)) = 0;
+buffer = 560,000 − 0 = 560,000; headroom = 2,800,000 − 1,750,000 = 1,050,000.
++5 gross = (35,000×25 + 200,000) + 300,000 + 250,000 + 200,000 + 5,000×25
+         = 1,075,000 + 300,000 + 250,000 + 200,000 + 125,000 = 1,950,000.
++5 net = 1,950,000 − 100,000 = 1,850,000; delta gross = 200,000;
+marginal = 200,000 / 5 = 40,000; per-head = 1,950,000 / 25 = 78,000.
+All five categories remain within allocation; buffer stays 560,000.
+```
+
 ### 3.5 Fixture test IDs
 
 | TC ID | Asserts | Level |
@@ -563,8 +609,9 @@ Budget headroom: 350,000 − 310,000 = 40,000.
 | TC-FIX-C1 | FIX-C @ 300: all figures, incl. negative buffer / breach | U |
 | TC-FIX-C2 | FIX-C @ 325, incl. over-budget and over-cap | U |
 | TC-FIX-D1 | FIX-D all expected figures, three schedule allocations, refund, overdue balance, partial/withdrawn/in-kind receipts, and gifts at the fixed evaluation date | U |
+| TC-FIX-E1 | FIX-E @ 20 and @ 25: exact centavo allocation, gross/net, remaining support/exposure, per-head and marginal cost, buffer/headroom, no invented price or fee; civil hints never dismiss a fee automatically | U + I |
 | TC-PL-19 | FIX-C net = ₱335,750.00 exactly; explicitly not 250,750 or 190,750 | U |
-| TC-AE-05 | FIX-A / FIX-B / FIX-C / FIX-D allocation percentages are identical | U |
+| TC-AE-05 | FIX-A / FIX-B / FIX-C / FIX-D / FIX-E allocation percentages are identical | U |
 
 ### 3.6 Prompt 4 worked examples — append-only overlays (not edits to FIX-A/B/C/D)
 
@@ -608,7 +655,7 @@ All run as pure Dart in `domain/` — no widget tree, no database, no network.
 | TC-AE-02 | Ruleset validation: baselines summing to anything other than 10000 bp are **rejected at load** (REQ-AE-1 cl. 4) |
 | TC-AE-03 | Rounding remainder assigned entirely to Buffer; Σ allocations == total budget **exactly**, tested across budgets ₱1 … ₱9,999,999 in a property test |
 | TC-AE-04 | Worked example: ₱350,000 NCR → 140,000 / 52,500 / 35,000 / 35,000 / 17,500 / 70,000 |
-| TC-AE-05 | **Regional index does not alter shares** — FIX-A/B/C percentages identical (ADR-11) |
+| TC-AE-05 | **Regional index does not alter shares** — FIX-A/B/C/D/E percentages identical (ADR-11) |
 | TC-AE-06 | Per-category skew *does* alter shares, and renormalises so Σ == budget exactly |
 | TC-AE-07 | **BLOCKED — budget adequacy.** No assertion. `reference_costs` unpopulated (OQ-04, UT-2). Authored so the gap is visible; must not be given a guessed expected value. |
 | TC-AE-08 | Ruleset pinning: publishing a new ruleset leaves existing plans numerically unchanged (REQ-AE-3 cl. 2) |
@@ -674,6 +721,59 @@ The old findings are retained for provenance; both now have testable expected re
 | TC-BS-09 | Selecting Bohol resolves to Provincial index 0.85 for cost indexing **but** `is_destination = true` enables the unfilled OOT prompt. Boracay/Palawan/Siargao resolve to Destination 1.20 and enable it; NCR 1.00 does not default it. No selection writes a fee amount. Assert the selected index/flag and prompt state, **not** expected total cost while benchmarks remain unpopulated (OQ-04; REQ-BS-4 cl. 4, REQ-HF-3, ADR-29). |
 | TC-LG-14 | Notes live counter advances on every edit, accepts exactly 2,000 characters, refuses the 2,001st typed/pasted character without truncating existing text, and allows editing after deletion. Persisted value is at most 2,000 characters (REQ-LG-1 cl. 8, ADR-33). |
 | TC-HF-09 | Each of six hidden fees maps to its fixed category: crew meals/church aircon/corkage/venue power → Catering & Venue, OOT/overtime → Coordination. Every fee has a read-only category label; attempts to reclassify fail. Entries remain separate attributable lines, not merged into a single category entry (REQ-HF-2 cl. 7, 9). |
+
+### 4.6A Previously mapped but undefined cases (planned)
+
+These stable IDs were already present in §2; this table supplies their missing decidable definitions. Levels: U unit, I integration, E E2E, M manual/review, S static. No row is an executed test.
+
+| ID | Asserts | Level | REQ clause |
+|---|---|---|---|
+| TC-PLT-01 | Inspect iOS and Android artifacts built from one Flutter codebase; web-only build cannot satisfy either target. | M | REQ-PLT-1 cl. 1–3 |
+| TC-PLT-02 | Offline local write commits before network replay; offline local read needs no request; SQLite integer column round-trips signed centavos; dependency inspection confirms drift/sqflite. | I + M | REQ-PLT-2 cl. 1–4 |
+| TC-PLT-03 | Existing active plan blocks a second creation and names the existing plan; joining as second partner does not consume an additional account plan. | I | REQ-PLT-3 cl. 1–3 |
+| TC-BS-01 | Four mandatory fields reject omission; accepts ₱28,000 and above ₱500,000 without warning, any calendar date and cap zero; valid setup allocates and routes to six fee prompts. | I + widget | REQ-BS-1 cl. 1–7 |
+| TC-BS-02 | For 0, -5000 and abc budget, inline reason names budget; date/cap/region retained; no completed plan persists. | I | REQ-BS-2 cl. 1–5 |
+| TC-BS-03 | With fixed device date, past wedding date warns with date; confirm saves, decline restores prior date; overdue schedule still evaluates. | I | REQ-BS-3 cl. 1–4 |
+| TC-BS-04 | Every configured region maps once to Metro 1.00, Provincial 0.85 or Destination 1.20; index and destination flag versioned independently; selecting region creates no ledger row and never changes shares. | U + I | REQ-BS-4 cl. 1–6 |
+| TC-BS-05 | Cap is never a rate multiplier; count above cap displays both counts without blocking edits; cap can change after setup. | U + widget | REQ-BS-5 cl. 1–4 |
+| TC-BS-06 | Changing setup preserves overrides, ledger, fees, pledges and guests; multi-category preview cancel writes nothing; Apply recomputes and attributes change. | I | REQ-BS-6 cl. 1–5 |
+| TC-LG-01 | Validate category taxonomy, supplier 1–200 characters, nonnegative flat estimate and optional actual, entry subtype, and required/nullable fields. | U + I | REQ-LG-1 cl. 1–4, 7 |
+| TC-LG-02 | Reject blank/201-character supplier and negative estimate/actual; retain valid notes up to 2,000 and reject overflow per TC-LG-14. | U + widget | REQ-LG-1 cl. 2–4, 8 |
+| TC-LG-03 | Each partner can create/read/update a ledger entry offline; each write attributed in activity; no field is partner-read-only. | I | REQ-LG-2 cl. 1–2 |
+| TC-LG-04 | Delete requires confirmation; cancel leaves entry and totals intact; confirm tombstones it and removes all live contribution immediately with actor attribution. | I | REQ-LG-2 cl. 2–4 |
+| TC-LG-05 | Estimate ₱50,000 contributes gross until actual ₱62,000 replaces it; clearing actual restores ₱50,000; detail labels both and non-colour cue marks difference. | U + widget | REQ-LG-3 cl. 1–5 |
+| TC-LG-06 | Positive payment rows minus refund rows derive deposit; never update a cumulative field; balance=max(0,effective−deposit); plan paid and outstanding totals follow immediately. | U + I | REQ-LG-4 cl. 1–3 |
+| TC-LG-07 | Overpayment preserves paid sum, shows warning and zero balance; refund/discount distinction leaves gross unchanged for payments but changes actual/gross for discount; no transfer initiated. | U + I | REQ-LG-4 cl. 2–5 |
+| TC-LG-08 | Paid at zero balance wins regardless of old due dates; positive balance with unpaid past date is overdue ahead of due soon. | U | REQ-LG-5 cl. 1–2 |
+| TC-LG-09 | Fixed local date: unpaid due today/at reminder endpoint is due soon, beyond window pending; partial-paid marker coexists; UI cannot set status. | U + widget | REQ-LG-5 cl. 3–5 |
+| TC-LG-10 | Offline read recomputes status without persisted field; device clock differences cause no sync conflict; undated virtual balance remains pending. | U + I | REQ-LG-5 cl. 6–7 |
+| TC-LG-11 | Variance = effective−allocated in centavos; percentage half-up to one decimal, including negative variance; positive actual with zero allocation suppresses percentage. | U | REQ-LG-6 cl. 1–3 |
+| TC-LG-12 | Over/under variance has non-colour cues and updates in same operation after estimate, actual or allocation edit. | U + widget | REQ-LG-6 cl. 4–5 |
+| TC-HF-01 | Setup creates precisely six distinct prompted-unfilled fee decisions with no amount=0 and no fee entry amount. | I | REQ-HF-1 cl. 1–2 |
+| TC-HF-02 | Each fee may be filled or dismissed; dismissal persists actor and timestamp and contributes zero gross. | I | REQ-HF-1 cl. 3–4, 7 |
+| TC-HF-03 | Any untouched fee appears as an outstanding dashboard risk, distinguishable from filled zero or dismissed. | I + widget | REQ-HF-1 cl. 2, 5 |
+| TC-HF-04 | Attempt to complete with untouched fees is blocked and names every untouched category, not just first. | I + widget | REQ-HF-1 cl. 6 |
+| TC-HF-05 | Crew supplier count×meal rate, OOT travel+lodging+per-diem, aircon flat, multiple typed corkage lines sum in integer centavos. | U | REQ-HF-2 cl. 1–4 |
+| TC-HF-06 | Overtime supplier hourly rate×hours and venue generator+surcharge+electrical components sum independently; each fee is attributable and crew meals ignore guest count. | U + widget | REQ-HF-2 cl. 5–8 |
+| TC-HF-07 | Palawan/Boracay/Siargao/Bohol destination flags enable OOT unfilled prompt despite Bohol Provincial index 0.85; NCR leaves optional prompt available. | U + I | REQ-HF-3 cl. 1–2 |
+| TC-HF-08 | OOT default creates no amount and is dismissible with actor/timestamp even when destination-flagged. | I | REQ-HF-3 cl. 3–4 |
+| TC-PL-13 | Reject blank/201-character sponsor, invalid role/type, negative value and oversize item description; either partner can CRUD a valid pledge. | U + I | REQ-PL-1 cl. 1, 3–5, 7 |
+| TC-PL-15 | Expected support for active tentative/confirmed equals max(0,value−receipts), with withdrawn excluded and no contribution to net before receipt. | U | REQ-PL-3 cl. 1, 3, 6 |
+| TC-PL-17 | No outstanding confirmed portion displays ₱0.00 (not blank), and exposure remains visually distinct from gross/net/expected. | U + widget | REQ-PL-4 cl. 3 and main |
+| TC-GM-01 | Guest RSVP accepts confirmed/invited/tentative explicitly, tier accepts Tier 1/2 and defaults Tier 2; independent edits preserve other axis. | U + I | REQ-GM-1 cl. 1–5 |
+| TC-GM-02 | Driving count breaks down tiers within designated RSVP; crew stays separate; default invited and one rate across tiers independently asserted by TC-GM-14/15. | U | REQ-GM-1 cl. 6–10 |
+| TC-GM-09 | Absolute and delta what-if show gross/net/category before/after and integer-centavo marginal cost; exceeding cap warns but calculates. | U + widget | REQ-GM-5 cl. 1–4 |
+| TC-GM-10 | Preview neither writes nor syncs; discard retains byte-identical state; commit updates driving count and totals; reduction names Tier 2-first cuts. | I | REQ-GM-5 cl. 5–9 |
+| TC-SE-10 | Either partner, including non-creator, may remove the other without consent; only target loses server access and plan survives. | I + E | REQ-SE-6 cl. 1–2, 8 |
+| TC-SE-11 | After removal, server denies target both push and pull, including replayed prior token; unaffected partner retains access. | I | REQ-SE-6 cl. 2–3, 6 |
+| TC-SE-12 | Removal writes an immutable event with acting member and server timestamp; second device displays attribution. | I | REQ-SE-6 cl. 4 |
+| TC-SE-13 | Removed partner retains already-synced offline local copy; future server pull/push is denied; no claimed forced remote wipe. | I + E | REQ-SE-6 cl. 3, 5–7; REQ-OF-5 cl. 4 |
+| TC-SE-14 | Former partner edits while offline after removal: no post-removal write becomes visible on surviving plan; local pending data is not silently discarded. | I | REQ-SE-6 cl. 3, 5–6 |
+| TC-SE-15 | Entry and plan-wide Activity list creates/edits/deletes with actor, timestamp, field and typed old/new money values; loser remains superseded. | I + E | REQ-SE-4 cl. 1–3 |
+| TC-SE-16 | Creator delete requires explicit second confirmation; non-creator delete refused with reason. | I | REQ-SE-5 cl. 1–3 |
+| TC-SE-17 | Defensive removal never requests the other partner’s affirmation or ownership-transfer confirmation; existing access stops immediately server-side. | I + E | REQ-SE-6 cl. 1–3; REQ-SE-5 cl. 5 |
+| TC-SE-18 | Pending transfer preserves both partners’ access; ownership changes only after both affirm; both lifecycle actions logged with actor. | I | REQ-SE-5 cl. 4, 6, 8–9 |
+| TC-SE-19 | Opposed removal with equal server timestamp resolves by stable device id, retains losing action superseded with actor, never leaves zero members. | I | REQ-SE-6 cl. 9–11 |
 
 ### 4.7 Money-flow clause-level acceptance cases (planned)
 
@@ -790,6 +890,22 @@ Every value in §3.6 is a hand-specified oracle. Run v1 cases offline on both pl
 
 **Project-brief §4 four-test gate per feature.** Deterministic: AE-16/19, GM-16/18, TM-01, CK-01/02 (verified preset BLOCKED), EX-03/08, LO-01, AT-01/03 (deferred). Explainable: AE-20, GM-20, TM-03, CK-05, EX-02/04, LO-04, AT-02. No money movement: AE-20, GM-20, TM-04, CK-04/05, EX-05, LO-02, AT-04; historical payment records and fee ledger entries never initiate transfers. No supplier recommendation: AE-20, GM-20, TM-04, CK-05, EX-04, LO-03, AT-04. All are planned test cases; OQ-11 preset and v1.1 gates retain their blocked/deferred status.
 
+### 4.9 Prompt 5 opt-in measurement, survey and age declaration (planned)
+
+Test oracles below use the proposed REQ-MT-1 and REQ-SV-1 clauses; align clause numbers and exact notice copy with the final requirements/security decision before implementation. A survey response is **optional**, not an onboarding gate, and neither analytics nor a third-party analytics SDK is permitted in v1. Account-level age declaration is not a date-of-birth collection rule. Manual reviews check the published notices, store labels and lawful-basis counsel gate; they cannot assert that counsel approval has happened.
+
+| ID | Asserts | Level | REQ clause |
+|---|---|---|---|
+| TC-MT-01 | Fresh install/account defaults measurement opt-in off; no metric event is emitted merely by signup, plan creation, dashboard view or survey dismissal; core planning works identically without opt-in. | I | REQ-MT-1 cl. 1–2 |
+| TC-MT-02 | Aggregate hidden-fee prompt decisions from existing prompt state and derive co-editing from already-synced change-log member aliases and wedding date only where disclosed/authorized; do not infer opt-in from existing records, transmit raw names, token or budget to a measurement sink, or double-count sync replay. | U + I | REQ-MT-1 cl. 2–3 |
+| TC-MT-03 | Figure-view event (e.g. net expanded) occurs only after explicit opt-in; payload allowlist excludes plan ID, name, monetary amount, email, invite token and note; no third-party analytics SDK or background analytics request in v1. | I + M | REQ-MT-1 cl. 1, 3–4 |
+| TC-MT-04 | Withdrawal prevents new optional events, remains independent of planning and can be changed in-app; queued but not yet sent optional events are discarded and retention/deletion of already received events follows the approved notice; no implicit re-consent on reinstall/sign-in. | I + M | REQ-MT-1 cl. 1, 4–5 |
+| TC-MT-05 | Review consent notice, lawful-basis decision, data inventory, Apple/Play declarations and Sentry diagnostic distinction against actual payload/retention/region before beta/release; BLOCKED until counsel and disclosures are approved, not a claim of legal compliance. | M | REQ-MT-1 cl. 5–6 |
+| TC-SV-01 | One optional in-app survey invitation is shown at the specified trigger, offers Skip/Not now, and never blocks budgeting, offline use or export; no repeated prompt after recorded completion. | I + widget | REQ-SV-1 cl. 1–2 |
+| TC-SV-02 | Survey submission requires explicit action, has only approved fields, and no answer is inferred from dismissal; when participation is opt-in, default off and withdrawal prevents future collection; test offline pending/duplicate replay only if survey storage is specified. | I | REQ-SV-1 cl. 2–4 |
+| TC-SV-03 | Inspect survey notice, retention, access and privacy-label inventory before beta; skip yields no survey response and a completed response is not used as evidence of partner consent to metrics. Counsel-dependent lawful basis remains BLOCKED. | M | REQ-SV-1 cl. 3–5 |
+| TC-SE-45 | Signup requires an explicit unchecked “I am 18 or older” declaration before account creation on both platforms; absent/unchecked declaration blocks signup with accessible explanation, checked succeeds, no birth date inferred or silently collected; review privacy notice, Play 18+ audience and counsel legal-basis gate. | I + widget + M | REQ-SE-1 cl. 9 (proposed) |
+
 ---
 
 ## 5. Sync & conflict tests
@@ -893,11 +1009,11 @@ Every v1 entity, airplane mode, expected **end state** stated.
 
 | TC ID | Attempt | Expected |
 |---|---|---|
-| TC-SEC-01 | Automated cross-tenant suite (existing): user of plan X attempts read / update / delete on every plan-scoped table of plan Y, incl. forged `plan_id` pull | Every attempt denied by RLS. **Runs on every PR; blocks the RC** |
+| TC-SEC-01 | Automated cross-tenant suite (existing): user of plan X attempts read / update / delete on every plan-scoped table of plan Y, including measurement consent/events and survey consent/responses if persisted, plus forged `plan_id` pull/event binding | Every attempt denied by RLS or authenticated server validation. **Runs on every PR once migrations exist; blocks the RC** |
 | TC-SEC-02 | Removed member replays last valid token (existing) | Denied identically to a never-member |
 | TC-SEC-04 | Enumeration: request a valid-but-foreign `plan_id` vs a nonexistent one | **Responses indistinguishable** — foreign plans must not be distinguishable from nonexistent ones, or existence leaks |
 | TC-SEC-05 | Direct REST bypass of the app layer | RLS denies; app-layer checks are not the only control (SEC-22) |
-| TC-SEC-06 | Policy coverage | Every v1 plan-scoped table, including new `checklist_items`, has a policy **and** `FORCE ROW LEVEL SECURITY`; a new table without one fails CI. v1.1 attachments also require metadata-table and Storage object-policy checks before release (SEC-43). | SEC-22, SEC-23, SEC-43 |
+| TC-SEC-06 | Policy coverage | Every v1 plan-scoped table, including new `checklist_items` and any persisted consent/measurement/survey rows, has a plan-membership policy **and** `FORCE ROW LEVEL SECURITY`; a new table without one fails CI. v1.1 attachments also require metadata-table and Storage object-policy checks before release (SEC-43). | SEC-22, SEC-23, SEC-43 |
 
 Maps to **SEC-07, SEC-09, SEC-22, SEC-23, SEC-24, SEC-25**.
 
@@ -916,7 +1032,7 @@ Maps to **SEC-07, SEC-09, SEC-22, SEC-23, SEC-24, SEC-25**.
 | TC ID | Asserts |
 |---|---|
 | TC-BAK-01 | Backups encrypted at rest; restore requires project owner + MFA (SEC-27) |
-| TC-BAK-02 | **Measured restore drill, run weekly:** restore the most recent backup to a scratch project, verify row counts and a checksum of `change_log` against source, and **record wall-clock restore time in the drill log**. Pass condition: restore completes, data verifies, and the measured time is recorded. A drill with no recorded duration is a FAIL |
+| TC-BAK-02 | **Measured restore drill, run monthly and before each release:** restore the most recent backup to a scratch project, verify row counts and a checksum of `change_log` against source, and **record wall-clock restore time in the drill log**. Pass condition: restore completes, data verifies, and the measured time is recorded. A drill with no recorded duration is a FAIL |
 
 ### 7.4 Device at-rest security — real device only
 
@@ -976,8 +1092,8 @@ Countable. Every line is pass/fail, no partial.
 
 | # | Criterion | Measure |
 |---|---|---|
-| 1 | REQ coverage | **60 v1 REQ IDs mapped; every shippable clause has a passing case**, including Prompt 4 cases in §4.8 and a separate full SEC-32 copy (TC-EX-08). Five REQ-AI IDs and two v1.1 IDs are out of v1; REQ-EX-1 requires completed manual review. Do not declare REQ-AE-2 adequacy or REQ-CK-1 verified presets passed while OQ-04/OQ-11 are open; those capabilities cannot ship as verified. |
-| 2 | Fixtures | **All four original fixtures match expected values exactly**: FIX-A/B/C each at base and +25 guests, FIX-D at its fixed date — 9/9 fixture/related TCs green (TC-FIX-A1…D1, TC-PL-19, TC-AE-05). Additionally §3.6 overlays have their own Prompt 4 case assertions; no original fixture expected output is replaced. |
+| 1 | REQ coverage | **62 v1 REQ IDs mapped (70 total REQ IDs)**; every shippable clause must have a passing case, including Prompt 4 cases in §4.8, Prompt 5 consent/survey/age cases in §4.9, and a separate full SEC-32 copy (TC-EX-08). These are specified tests, **not** current passing results. Five REQ-AI IDs and two v1.1 IDs are out of v1; REQ-EX-1 requires completed manual review. Do not declare REQ-AE-2 adequacy or REQ-CK-1 verified presets passed while OQ-04/OQ-11 are open; those capabilities cannot ship as verified. |
+| 2 | Fixtures | **All five fixture specifications must match expected values exactly**: FIX-A/B/C each at base and +25 guests, FIX-D at its fixed date, FIX-E at 20 and 25 guests — 10/10 fixture/related **planned** TCs (TC-FIX-A1…E1, TC-PL-19, TC-AE-05). Additionally §3.6 overlays have their own Prompt 4 case assertions; no original FIX-A–D expected output is replaced. |
 | 3 | Defects | **Zero open S1. Zero open S2.** |
 | 4 | Sync matrix | **Every TC-SE row in §5 green on both iOS and Android**; TC-SE-40/41 assert alias/request mechanics only, not counsel-blocked shared erasure |
 | 5 | Offline matrix | **Every entity row in §6.1 and durability/protocol row in §6.2 green**; the string scan in TC-OF-10 finds zero prohibited words |
@@ -986,7 +1102,7 @@ Countable. Every line is pass/fail, no partial.
 | 7b | Device at-rest security | TC-SEC-03, TC-SEC-07…10 green **on physical hardware** — simulator results do not count |
 | 8 | E2E | **TC-E2E-01 all 20 steps + offline gate green on both platforms** |
 | 9 | Migrations and sync protocol | TC-MIG-01…05 and TC-API-06…09 green; shared erasure remains blocked under OQ-01 |
-| 10 | Restore drill | TC-BAK-02 completed within the last 7 days **with a recorded restore duration** |
+| 10 | Restore drill | TC-BAK-02 completed during the current monthly cycle **and before this release**, with a recorded restore duration |
 | 11 | Rounding | TC-GEN-05 drift guard green; no cent gained or lost over 1,000 iterations |
 | 12 | Static money check | TC-GEN-01 lint clean — zero `double` in money paths |
 | 13 | Prompt 4 privacy and verification | TC-EX-03/04/08 demonstrate CSV neutralization, independent PDF name redaction and **full** personal-data copy; TC-CK-01/05 expose NEEDS VERIFICATION and no unverified due-date preset. Neither redacted summary nor four curated CSVs alone satisfy SEC-32. |

@@ -237,6 +237,31 @@ void main() {
 
   // ─── TC-API-02: Authenticated success ────────────────────────────────────
   group('TC-API-02 — Authenticated success', () {
+    for (final limit in <String>['1', '100', '1000']) {
+      test(
+        'sync_pull: positive limit $limit accepted by phase-04 stub',
+        () async {
+          skipIfOffline();
+          final r = await http.get(
+            _fn('sync_pull').replace(
+              queryParameters: <String, String>{
+                'plan_id': _planId,
+                'since_server_ts': '0',
+                'limit': limit,
+              },
+            ),
+            headers: _auth(),
+          );
+          expect(r.statusCode, 200);
+          final b = jsonDecode(r.body) as Map<String, dynamic>;
+          expect(b['rows'], isEmpty);
+          expect(b['next_cursor'], isNull);
+          expect(b['has_more'], isFalse);
+          expect(b.containsKey('_stub'), isFalse);
+        },
+      );
+    }
+
     test('sync_push: 200 with accepted + server_ts_high', () async {
       skipIfOffline();
       final r = await http.post(_fn('sync_push'),
@@ -272,6 +297,8 @@ void main() {
       expect(b['rows'], isA<List<dynamic>>());
       expect(b.containsKey('next_cursor'), isTrue);
       expect(b.containsKey('has_more'), isTrue);
+      expect(b.containsKey('_stub'), isFalse,
+          reason: 'The public response must match the documented envelope');
     });
 
     test('sync_pull: phase-04 stub returns empty rows', () async {
@@ -381,6 +408,48 @@ void main() {
 
   // ─── TC-API-05: Malformed pull query rejected ─────────────────────────────
   group('TC-API-05 — Malformed pull query rejected', () {
+    for (final limit in <String>[
+      '0',
+      '-1',
+      '1001',
+      '1.5',
+      '1e2',
+      'abc',
+      '',
+      ' 1',
+      '999999999999999999999999999999999999999999',
+    ]) {
+      test('invalid limit "$limit" → 400', () async {
+        skipIfOffline();
+        final r = await http.get(
+          _fn('sync_pull').replace(
+            queryParameters: <String, String>{
+              'plan_id': _planId,
+              'since_server_ts': '0',
+              'limit': limit,
+            },
+          ),
+          headers: _auth(),
+        );
+        expect(r.statusCode, 400, reason: 'limit=$limit');
+        expect(
+          (jsonDecode(r.body) as Map<String, dynamic>)['error'],
+          contains('limit'),
+        );
+      });
+    }
+
+    test('repeated limit → 400', () async {
+      skipIfOffline();
+      final r = await http.get(
+        Uri.parse(
+          '${_fn('sync_pull')}?plan_id=$_planId&since_server_ts=0&limit=1&limit=1000',
+        ),
+        headers: _auth(),
+      );
+      expect(r.statusCode, 400);
+    });
+
     test('missing plan_id → 400', () async {
       skipIfOffline();
       final r = await http.get(
