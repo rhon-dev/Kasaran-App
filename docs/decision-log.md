@@ -133,6 +133,7 @@ Short history, for anyone tracing the name's status changes:
 | ADR-57 | Offline, on-device PDF/CSV export uses an explicit privacy preview and OS share sheet, never live links; sponsor statements are scoped to a single pledge. Spreadsheet-dangerous CSV cells are neutralized, and exported copies cannot be remotely recalled. | DECIDED | 2026-10-03 | SEC-32/42, REQ-EX-2, SCR-23 |
 | ADR-58 | v1 stays English; v1.1 adds user-selectable Taglish/Filipino ARB resources while money/date display remains en_PH and branded/cultural terms remain unchanged. Pseudo-localization tests narrow bento tiles. | DECIDED (v1.1) | 2026-10-03 | REQ-LO-1, ux-spec §8.4, SCR-18 |
 | ADR-59 | v1.1 photo attachments are a backlog-only private Storage design with plan-scoped bucket RLS, configurable size/MIME limits, encrypted offline staging and explicit photo privacy-label review. No OCR or v1 upload. | DECIDED (v1.1 stub) | 2026-10-03 | REQ-AT-1, SEC-43/44, development-phases |
+| ADR-60 | The project owner approves ADR-57's proposed SEC-32 full-data export design scope. This is design approval only: implementation, server-only retrieval and DPO review of subject/third-party access remain required before SEC-32 can pass. | DECIDED (design approval only) | 2026-10-03 | ADR-57, REQ-EX-2.5, SEC-32, TC-EX-08 |
 
 ---
 
@@ -153,6 +154,8 @@ Short history, for anyone tracing the name's status changes:
 **ADR-58.** Ship v1 English-only with Philippine peso/date formatting. In v1.1 add locale resources for English, Taglish and Filipino with explicit fallback; retain the product, Ninong/Ninang, PSA/CENOMAR, local acronyms and user-entered text as-is. Pseudo-localized bento text must retain legible values and accessible full-form labels. No machine translation at runtime.
 
 **ADR-59.** v1.1 attachment *backlog stub*, not a live promise: private plan-scoped bucket policies; an attachment metadata event refers to a ledger entry or pledge receipt (a contract photo attaches to a ledger entry), and inaccessible, unsynced bytes are never represented as uploaded. Local pending photos remain encrypted and separately queued, with configured maximum bytes and allowed MIME types to be approved before implementation. Update the Photos privacy declaration before shipping; no OCR, public URL or forced remote wipe.
+
+**ADR-60.** The project owner accepts the proposed distinct machine-readable full-data export in ADR-57/REQ-EX-2.5, including the local history inventory and explicit as-of-last-sync limits. This approval does not assert that an export exists or that a redacted summary is sufficient. The authenticated retrieval path for server-only account data and DPO review of the requesting subject's access to shared-plan and other contributors' personal fields remain open. Keep SEC-32 and its release gate NOT MET until the implementation and TC-EX-08 pass and the DPO records the reviewed scope. OQ-01 erasure is separate and unchanged.
 
 | Feature and target | Deterministic | Explainable | No money movement | No supplier recommendation |
 |---|---|---|---|---|
