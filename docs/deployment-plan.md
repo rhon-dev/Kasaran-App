@@ -17,7 +17,7 @@ Both preconditions are met, so this is a single-option plan for Supabase and the
 
 Neither triggers the stop condition, but both change what this plan can promise.
 
-**(a) There is no data residency ADR.** §2 was requested "including region and its relation to the data residency ADR." I searched the doc set: no residency decision exists. I have not invented one. §2.2 states what this plan *assumes*, why it matters legally, and logs it as **OQ-07** for you to decide. It is not a blocker for staging, but it must be settled before the privacy notice is published, because SEC-30 requires disclosing data recipients and locations.
+**(a) Technical data region is chosen; legal approval is not.** ADR-72 selects Supabase production `ap-southeast-1` (Singapore). This fixes the infrastructure planning assumption, not the cross-border legal basis, processor review or privacy notice. OQ-07 remains open until DPO/counsel review; SEC-29/30 and the real-data beta gate still block collection. Staging remains synthetic-only.
 
 **(b) Flutter store-release constraint.** ADR-12 selects Flutter for iOS and Android. The first-party Flutter release pipeline does not provide code OTA; Dart release builds are AOT-compiled. **Client code fixes require a store release.** §3.5 describes the available backend and configuration levers, and §8 uses store-review latency rather than promising an instant client hotfix.
 
@@ -39,7 +39,7 @@ Neither triggers the stop condition, but both change what this plan can promise.
 | Client build pointed at it | Debug build, `--dart-define=ENV=local` | Internal TestFlight / Play internal track | App Store / Play production |
 | Crash reporting | Disabled | Sentry EU organization, `environment=staging`, synthetic-only payloads | Sentry **EU (Frankfurt event storage)** organization, `environment=production`, scrubbed diagnostics; US metadata caveat (§7.2) |
 
-> **Phase 04 descope note (OQ-07):** Staging project creation in `ap-southeast-1` was authorised as a staging-only descope, but its project reference is not yet recorded; authorization does not prove creation. The production project is **deferred** until OQ-07 (data residency) is resolved. See §2.2 and `decision-log.md`. This blocks the real-data beta (phase 20), privacy notice (SEC-30) and phase 21 submission.
+> **Phase 04 descope note (ADR-72/OQ-07):** Staging project creation in `ap-southeast-1` was authorised as a staging-only descope, but its project reference is not yet recorded; authorization does not prove creation. ADR-72 selects Singapore as the intended production region, **not** legal or real-data approval. Production provisioning for real beta remains deferred until OQ-07's DPO/counsel processor, transfer and notice review and the other pre-beta gates pass. See §2.2 and `decision-log.md`.
 
 ### 1.1 Production data is never copied to staging
 
@@ -53,7 +53,7 @@ Neither triggers the stop condition, but both change what this plan can promise.
 
 If a production bug cannot be reproduced from synthetic data, the fix is to **extend the generator**, not to copy production. A production-only bug is investigated via logs (which carry UUIDs only, never content — SEC-28) and by asking the affected user directly.
 
-**Real-data beta (ADR-63):** invited couples use the separately controlled **production** Supabase project and production app configuration, not staging, scratch or local. Create/enable this only after OQ-07 residency is decided and SEC-29/30/31/35 are demonstrated PASS, including an approved pre-signup privacy notice, lawful-basis review, 18+ declaration, versioned acknowledgement and incident runbook. SEC-27/28 and the production PITR/off-provider backup are also PASS before accepting real records. If any approval is missing, test only with synthetic accounts and do not invite real couples. A scratch restore of real data is production-equivalent restricted recovery infrastructure, not staging; delete it promptly after the validated drill.
+**Real-data beta (ADR-63):** invited couples use the separately controlled **production** Supabase project and production app configuration, not staging, scratch or local. Create/enable this only after ADR-72's chosen Singapore location receives OQ-07 DPO/counsel processor, transfer and notice approval and SEC-29/30/31/35 are demonstrated PASS, including an approved pre-signup privacy notice, lawful-basis review, 18+ declaration, versioned acknowledgement and incident runbook. SEC-27/28 and the production PITR/off-provider backup are also PASS before accepting real records. If any approval is missing, test only with synthetic accounts and do not invite real couples. A scratch restore of real data is production-equivalent restricted recovery infrastructure, not staging; delete it promptly after the validated drill.
 
 ---
 
@@ -72,16 +72,16 @@ The backend surface is deliberately thin (design.md §2.4): two idempotent endpo
 | Auth config | Providers, token TTL (SEC-03), email templates | Declarative config in `supabase/config.toml`, reviewed in PR |
 | Feature flags / min-client | A small `app_config` table (§3.6, §4.4) | Data change, no deploy |
 
-### 2.2 Region — and the residency gap
+### 2.2 Region — technical choice and outstanding residency review
 
-**Proposed region: `ap-southeast-1` (Singapore) for Supabase.** OQ-07 is still open; do not create a production project for real beta before approving its location. Local-first sync reduces latency sensitivity; no unverified round-trip estimate is promised.
+**Chosen technical region: `ap-southeast-1` (Singapore) for Supabase (ADR-72).** OQ-07 remains open for DPO/counsel approval of cross-border processing and processor disclosures. This choice does not create a production project or permit real-data beta. Local-first sync reduces latency sensitivity; no unverified round-trip estimate is promised.
 
-**There is no Supabase region in the Philippines.** So Philippine personal data will be stored outside the country. This is a decision with legal weight and **no ADR currently covers it** (see §0.1a):
+**There is no Supabase region in the Philippines in the current provider region list.** Philippine personal data would therefore be stored outside the country under the chosen architecture; ADR-72 is an infrastructure choice, not a legal conclusion:
 
-- Cross-border processing and controller obligations require DPO/counsel review; this plan is not a legal opinion or residency approval.
-- **SEC-30 requires the privacy notice to state recipients and locations.** It cannot be approved until OQ-07 decides Singapore for Supabase and discloses Sentry's selected EU organization: diagnostic events at rest in **Frankfurt, Germany**, while Sentry says some account/project/usage/integration metadata may be stored in the **US** regardless of region and shared support material is stored there. EU organization location cannot later be changed; use a region-specific endpoint and verify settings before sending any real event. Source: https://docs.sentry.io/organization/data-storage-location/ .
+- Cross-border processing, processor terms and controller safeguards require documented DPO/counsel review. Neither region selection nor a signup checkbox establishes a lawful basis.
+- **SEC-30 requires the privacy notice to state recipients and locations.** Draft it for Supabase Singapore and Sentry's selected EU organization: diagnostic events at rest in **Frankfurt, Germany**, while Sentry says some account/project/usage/integration metadata may be stored in the **US** regardless of region and shared support material is stored there. DPO/counsel must approve the recipient, transfer, retention and notice language before publication. Use a region-specific endpoint and verify settings before sending any real event. Sources: https://supabase.com/docs/guides/platform/regions ; https://docs.sentry.io/organization/data-storage-location/ .
 
-**Logged as OQ-07 — data residency.** Options: approve Singapore with the Sentry EU/US caveat in the notice, or choose an alternative reviewed by counsel and the owner. Do not imply that an in-country option is available on the current Supabase setup; a different infrastructure design would be needed. OQ-07 gates the real-data beta, privacy notice and store submission (SEC-30, §5.1).
+**OQ-07 remains open for legal and notice review, not region selection.** Until those reviews and SEC-29–31/35 pass, do not provision a real-data beta or invite real couples. An in-country alternative would require a separately designed and reviewed infrastructure change; do not claim it is available in this setup.
 
 ### 2.3 CI/CD stages, in order, with gates
 
@@ -344,7 +344,7 @@ Build (CI, tagged RC) → INTERNAL TESTING (maintainer, immediate)
 | Category | **Lifestyle** — deliberately not Finance (§5.3) |
 | Age rating | 4+ (iOS) / Everyone (Android). §5.2 |
 | Support URL | Required. Must be live before submission |
-| Privacy policy URL | Required. **Blocked on OQ-07** — must name the data location (§2.2, SEC-30) |
+| Privacy policy URL | Required. **Blocked on OQ-07 DPO/counsel transfer and notice review** — ADR-72 selected Singapore, but the live notice must accurately disclose approved recipients/locations (§2.2, SEC-30) |
 | Account deletion URL | Required by both stores (SEC-40) |
 | Languages | English (ux-spec §8.4) |
 | Devices | iPhone only in v1; iPad not declared. No device-location permission requested (SEC-41) |
@@ -490,11 +490,11 @@ Example: *"Fixed: the buffer total could show as under-spent when one category w
 | 15 | Secrets audit | SEC-26 | CI secret scan clean; built artifact contains no service-role key | NOT MET |
 | 16 | Store privacy labels match inventory | SEC-39, §5.3 | Submitted labels diffed against security-plan §6.1; zero mismatch | NOT MET |
 | 17 | Account deletion path live | SEC-34, SEC-40 | In-app deletion works end-to-end; public URL live | NOT MET |
-| 18 | Privacy notice published | SEC-30 | Live URL naming data location — **blocked on OQ-07** | NOT MET |
+| 18 | Privacy notice published | SEC-30, ADR-72/OQ-07 | Live URL naming the chosen Singapore/Sentry locations and DPO/counsel-approved recipients and transfers; technical region choice alone is insufficient | NOT MET |
 | 19 | Name clearance | §5.6, OQ-09 | Store name availability confirmed on both platforms; domain owned | NOT MET |
 | 20 | Verified checklist preset content | OQ-11, ADR-56, REQ-CK-1 | Before publishing any v1 legal/church applicability or date-offset preset, verify each item with the relevant authority and record its source; otherwise show only user-managed NEEDS VERIFICATION prompts without a claimed preset date. **OQ-11 remains open; preset release is blocked.** | NOT MET |
 | 21 | Private offline export/share | ADR-57/60, SEC-32/42, REQ-EX-2, testing-plan export cases | Project-owner design scope approved under ADR-60, but PDF/CSV and the separate full local-data copy must work offline; privacy preview, single-sponsor scoping and spreadsheet-formula neutralization must pass on both platforms; authenticated server-only retrieval and DPO review of subject/shared-plan access remain required before SEC-32 passes | NOT MET |
-| 22 | Real-data beta privacy and residency | ADR-61..63, SEC-29/30/31/35, OQ-07 | Before any real-couple account: production location approved, notice/lawful bases and 18+ flow signed off by DPO/counsel, consent/withdrawal tested, breach tabletop run; staging synthetic-only | NOT MET |
+| 22 | Real-data beta privacy and residency | ADR-61..63/72, SEC-29/30/31/35, OQ-07 | Before any real-couple account: Singapore technical choice documented, cross-border processor/transfer and notice approved by DPO/counsel, lawful bases and 18+ flow signed off, consent/withdrawal tested, breach tabletop run; staging synthetic-only | NOT MET |
 | 23 | Recovery independence and budget | ADR-64..67, §8.4 | Pro+PITR active on production with latest recovery point monitored; daily encrypted off-provider backup including Auth users verified; break-glass escrow and monthly/pre-release drill tested; billing alarms active | NOT MET |
 
 **v1.1 is not part of this v1 gate.** A later attachment release separately requires SEC-43/44 Storage RLS, size/MIME, encrypted offline staging and Photos-label PASS before store submission; localization needs ARB fallback and pseudo-localization tile-overflow tests (ADR-58/59). A backlog stub is not a green release gate.
@@ -595,7 +595,7 @@ Review actual bill monthly against the USD 200 Supabase policy and monitor proje
 
 | # | Question | Blocks | Recommendation |
 |---|---|---|---|
-| **OQ-07** | **Data residency.** No ADR covers where PH personal data is stored. This plan assumes Supabase `ap-southeast-1` (Singapore); there is no PH region. | Privacy notice (SEC-30) → store submission (§7 row 18) | Accept Singapore and disclose it explicitly in the privacy notice. The alternative — in-country storage — means leaving Supabase and rebuilding auth |
+| **OQ-07** | **Transfer/notice approval remains open.** ADR-72 selects Supabase `ap-southeast-1` (Singapore) as the technical production region; this does not approve cross-border basis or create a project. Sentry EU/possible US metadata remains a separate processor disclosure. | DPO/counsel-approved privacy notice (SEC-29/30), real-data beta, then store submission (§7 row 18) | Review processor agreements, recipients, transfer safeguards, retention and accurate notice; keep the real-data gate closed until signed off |
 | **OQ-08** | **Bundled vs remote ruleset.** ADR-15 bundles the allocation ruleset in the binary; with no code OTA, a wrong baseline is stuck for days. | Nothing yet, but it caps incident response (§8.3) | Move to remote-with-bundled-fallback, keeping per-plan ruleset pinning (REQ-AE-3). Requires amending ADR-15 |
 | **OQ-09** | **Name clearance.** ADR-27 decided "Kasaran"; clearance is a separate step — store availability, Play collision, IPOPHIL trademark, domain ownership. | Store submission (§7 row 19) | Run steps 1, 2, and 4 of §5.6 before any other submission work; they are cheap and can invalidate the name |
 | **OQ-12** | **Business model, undecided.** Options: free (no IAP, sustainable cost unfunded); one-time supporter purchase (store IAP review/payment disclosure, preserve core access and no pressure); premium exports/templates (store IAP review, privacy/access inequity and “no upsell” vision tension); planner tier later (new B2B permissions, processor/privacy contracts and payment review). | Monetization, store metadata and privacy review for any paid feature; **not** a license to add v1 upsell | Evaluate sustainability, store rules and “no upsell” vision with owner; do not introduce payment or analytics SDK from this table. |
