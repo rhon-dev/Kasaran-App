@@ -33,7 +33,7 @@ Neither triggers the stop condition, but both change what this plan can promise.
 | API path | `/v1/sync/*` | `/v1/sync/*` | `/v1/sync/*` |
 | Database instance | Local Postgres in Docker, ephemeral | Dedicated Supabase project `ap-southeast-1`, separate from prod | **DEFERRED — OQ-07 OPEN.** Production region = residency decision, irreversible post-creation. |
 | Auth tenant | Local Supabase Auth, throwaway users | Staging Auth project — **separate user pool**, no prod identities | **DEFERRED** |
-| Seeded data policy | Synthetic inputs for FIX-A…D (testing-plan §3), once implemented as version-controlled test data, loaded on `db reset` | **Synthetic only** — generated from the same four specified fixtures plus a generator for volume | **None.** Real user data only |
+| Seeded data policy | Synthetic inputs for FIX-A…E (testing-plan §3), once implemented as version-controlled test data, loaded on `db reset` | **Synthetic only** — generated from the same five specified fixtures plus a generator for volume | **None.** Real user data only |
 | Migrations applied | Automatically on reset | Automatically on merge to `main` | Manually gated (§2.3) |
 | Who can access | The maintainer, locally only | Maintainer + any future collaborator; credentials in CI secrets | **Maintainer only.** MFA required (SEC-27) |
 | Client build pointed at it | Debug build, `--dart-define=ENV=local` | Internal TestFlight / Play internal track | App Store / Play production |
@@ -47,7 +47,7 @@ Neither triggers the stop condition, but both change what this plan can promise.
 
 **What staging uses instead:**
 
-1. **The four specified fixtures** (FIX-A NCR, FIX-B Boracay, FIX-C Iloilo and FIX-D money flows), once implemented as version-controlled inputs, as the canonical synthetic plans. Their expected values are hand-computed in testing-plan §3; staging must assert against that spec, not generated output. Explicitly applied FIX-C rebalance and FIX-A affordable-guest cases are additional expected results; baseline FIX-A/B/C fixture values do not change (ADR-53/54).
+1. **The five specified fixtures** (FIX-A NCR, FIX-B Boracay, FIX-C Iloilo, FIX-D money flows and FIX-E civil micro-wedding), once implemented as version-controlled inputs, as the canonical synthetic plans. Their expected values are hand-computed in testing-plan §3; staging must assert against that spec, not generated output. Explicitly applied FIX-C rebalance and FIX-A affordable-guest cases are additional expected results; baseline FIX-A/B/C fixture values do not change (ADR-53/54).
 2. **A synthetic volume generator** for load-shaped data: N plans × M ledger entries × K change-log rows, with names drawn from a fixed fake-name list, amounts from plausible ranges, and Ninong/Ninang roles distributed realistically. Deterministic from a seed so bugs reproduce.
 3. **Synthetic pairing sets** — pre-paired two-account plans for testing shared editing and removal, including the demo pair used for store review (§5.4).
 
@@ -88,7 +88,7 @@ The backend surface is deliberately thin (design.md §2.4): two idempotent endpo
 ```
 ① PR opened
    ├─ dart analyze + money-path lint          gate: zero violations (TC-GEN-01)
-   ├─ domain unit tests incl. FIX-A…D plus explicit rebalance/guest previews
+   ├─ domain unit tests incl. FIX-A…E plus explicit rebalance/guest previews
    ├─ widget tests + golden verify            gate: no unreviewed golden diff
    ├─ integration_test (Android emulator)     gate: green
    ├─ TENANT ISOLATION SUITE                  gate: TC-SEC-01 green — BLOCKING
@@ -474,7 +474,7 @@ Example: *"Fixed: the buffer total could show as under-spent when one category w
 | # | Requirement | Source | Pass condition | Status |
 |---|---|---|---|---|
 | 1 | Tenant isolation suite green in CI | TC-SEC-01, SEC-24 | Cross-tenant read/write/delete and forged-`plan_id` pull all denied; suite blocks the pipeline | NOT MET |
-| 2 | All fixture calculations exact | testing-plan §3, §4 (FIX-A…D; TC-PL-19, TC-AE-05 and new rebalance/guest cases) | All specified assertions green; pre-action FIX-C net remains ₱335,750.00; only explicit Apply changes allocations, not net or the pinned baseline | NOT MET |
+| 2 | All fixture calculations exact | testing-plan §3, §4 (FIX-A…E; TC-PL-19, TC-AE-05 and new rebalance/guest cases) | All specified assertions green; pre-action FIX-C net remains ₱335,750.00; only explicit Apply changes allocations, not net or the pinned baseline | NOT MET |
 | 3 | Full MVP E2E on both platforms | TC-E2E-01 | 20/20 steps + offline gate, iOS and Android | NOT MET |
 | 4 | Sync conflict matrix green both platforms | testing-plan §5 (10 rows) | 10/10, incl. clock-skew TC-SE-20 and the LWW/removal asymmetry | NOT MET |
 | 5 | Offline matrix green | TC-OF-01…17 | 8 entity rows + 9 durability rows; TC-OF-10 string scan finds zero prohibited words | NOT MET |
@@ -575,7 +575,7 @@ Honest numbers, and the reason §3.5 matters:
 
 ### 8.4 Cost monitoring
 
-**Budget policy (ADR-64):** monthly ceiling **USD 200** for Supabase service spending, not a provider-enforced hard cap or an all-in business budget. As of 2026-10-03, official list pricing: Pro organization **$25/month** with **$10/month compute credits**; three Micro projects cost **$10 each**, yielding **$45/month net plan+compute**; production 7-day PITR adds **$100/month**, making a **$145/month hypothetical Micro arithmetic baseline** before variable usage. **But Supabase requires at least Small compute for a PITR project**: Small is **$15/month**, so the feasible production Small + staging/scratch Micro baseline is **$150/month** at full-month occupancy (25 + 15 + 10 + 10 − 10 + 100). A scratch project created only during drills may have lower prorated compute, but do not budget assuming that. PITR may replace daily backups; off-provider backup has separate destination/egress costs. Verify actual invoices, active projects, taxes and usage before approving real beta. Source: https://supabase.com/pricing ; PITR minimum and backup behavior: https://supabase.com/docs/guides/platform/backups .
+**Budget policy (ADR-64):** monthly ceiling **USD 200** for Supabase service spending, not a provider-enforced hard cap or an all-in business budget. As of 2026-10-03, official list pricing: Pro organization **$25/month** with **$10/month compute credits**; PITR requires at least Small compute, so the production **Small $15/month** plus synthetic staging/scratch **two Micro $10/month each** gives **$50/month net plan+compute** ($25 + $15 + $10 + $10 − $10). Seven-day production PITR adds **about $100/month**, making a **$150/month** fixed baseline before variable usage. A scratch project created only during drills may have lower prorated compute, but do not budget assuming that. PITR may replace daily backups; off-provider backup has separate destination/egress costs. Verify actual invoices, active projects, taxes and usage before approving real beta. Source: https://supabase.com/pricing ; PITR minimum and backup behavior: https://supabase.com/docs/guides/platform/backups .
 
 At **$150 projected month-to-date spend**, warn the maintainer and inspect usage/PITR/project inventory; at **$180**, freeze nonessential load and project creation (never turn off backups/security or discard user data); at **$200**, stop new onboarding and escalate to the owner to approve a funded overage or a safe capacity plan. Protect existing users, exports and recovery; do not disable production mid-session or claim these actions prevent provider charges. Supabase's Pro spend cap applies only to supported usage categories and is **not** this USD 200 policy; monitor billing dashboard and invoice, configure available provider alerts, and reassess forecasts at least weekly during beta. This is a decision threshold, **not a contractual hard cap**.
 

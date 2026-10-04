@@ -57,7 +57,7 @@ One Maestro flow set, two targets. Flows live in `e2e/flows/` and are parameteri
 
 ## 2. Traceability matrix
 
-Every REQ ID in `requirements.md` (70 proposed after Prompt 5; 68 before Prompt 5) appears. Levels: **U** unit, **I** integration, **E** E2E, **M** manual/review, **S** static analysis. Test cases below are planned assertions, not executed results; v1.1 attachment rows are design/backlog gates, not executed upload tests.
+Every **70 currently defined** REQ ID in `requirements.md` appears. Levels: **U** unit, **I** integration, **E** E2E, **M** manual/review, **S** static analysis. Test cases below are planned assertions, not executed results; v1.1 attachment rows are design/backlog gates, not executed upload tests.
 
 | REQ ID | Test IDs | Level |
 |---|---|---|
@@ -129,10 +129,10 @@ Every REQ ID in `requirements.md` (70 proposed after Prompt 5; 68 before Prompt 
 | REQ-AI-4 | — | Out of v1 scope (post-launch payments, ADR-28; ID retained) |
 | REQ-AI-5 | — | Out of v1 scope (AI phase) |
 | REQ-EX-1 | TC-EX-01 | M (see §2.1) |
-| REQ-MT-1 [v1] | TC-MT-01 … TC-MT-05 | U + I + M |
+| REQ-MT-1 [v1] | TC-MT-01 … TC-MT-07 | U + I + M |
 | REQ-SV-1 [v1] | TC-SV-01 … TC-SV-03 | I + widget + M |
 
-**Coverage (specified, not executed):** the older 48/54 claim is superseded by the audited totals below. With the two Prompt 5 requirements, **62 v1 REQ IDs have mapped test specifications** (60 pre-Prompt-5 + REQ-MT-1 + REQ-SV-1); two v1.1 IDs have deferred cases, five REQ-AI-1…5 are out of v1, and REQ-EX-1 is review-only: **62 + 2 + 5 + 1 = 70 distinct REQ IDs**. REQ-SE-1 gains a clause and an additional test but no new REQ ID. All 46 previously mapped-but-undefined IDs now have rows in §4.6A. This count is conditional on the owning requirements edit landing with the two proposed IDs. REQ-CK-1's unverified legal/church preset oracle is **BLOCKED (OQ-11)**, not counted as a passing case. Five tracked historical limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 and UT-10…11 have executable redirects. Authored cases are not passing implementation tests until code exists.
+**Coverage (specified, not executed):** the older 48/54 claim is superseded by the audited totals below. The two Prompt 5 REQs are now defined: **62 v1 REQ IDs have mapped test specifications** (60 pre-Prompt-5 + REQ-MT-1 + REQ-SV-1); two v1.1 IDs have deferred cases, five REQ-AI-1…5 are out of v1, and REQ-EX-1 is review-only: **62 + 2 + 5 + 1 = 70 distinct REQ IDs**. REQ-SE-1 gains a clause and an additional test but no new REQ ID. All 46 previously mapped-but-undefined IDs now have rows in §4.6A. REQ-CK-1's unverified legal/church preset oracle is **BLOCKED (OQ-11)**, not counted as a passing case. Five tracked historical limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 and UT-10…11 have executable redirects. Authored cases are not passing implementation tests until code exists.
 
 ### 2.1 Untestable-as-written and resolved testability gaps
 
@@ -892,7 +892,7 @@ Every value in §3.6 is a hand-specified oracle. Run v1 cases offline on both pl
 
 ### 4.9 Prompt 5 opt-in measurement, survey and age declaration (planned)
 
-Test oracles below use the proposed REQ-MT-1 and REQ-SV-1 clauses; align clause numbers and exact notice copy with the final requirements/security decision before implementation. A survey response is **optional**, not an onboarding gate, and neither analytics nor a third-party analytics SDK is permitted in v1. Account-level age declaration is not a date-of-birth collection rule. Manual reviews check the published notices, store labels and lawful-basis counsel gate; they cannot assert that counsel approval has happened.
+Test oracles below map to the defined REQ-MT-1 and REQ-SV-1 clauses. Exact notice copy still needs DPO/counsel approval before real-data collection. Survey response is **optional**, not an onboarding gate, and no third-party analytics SDK is permitted in v1. Age declaration is not date-of-birth collection. Manual reviews inspect published notices, labels and lawful basis; no approval is claimed.
 
 | ID | Asserts | Level | REQ clause |
 |---|---|---|---|
@@ -901,10 +901,12 @@ Test oracles below use the proposed REQ-MT-1 and REQ-SV-1 clauses; align clause 
 | TC-MT-03 | Figure-view event (e.g. net expanded) occurs only after explicit opt-in; payload allowlist excludes plan ID, name, monetary amount, email, invite token and note; no third-party analytics SDK or background analytics request in v1. | I + M | REQ-MT-1 cl. 1, 3–4 |
 | TC-MT-04 | Withdrawal prevents new optional events, remains independent of planning and can be changed in-app; queued but not yet sent optional events are discarded and retention/deletion of already received events follows the approved notice; no implicit re-consent on reinstall/sign-in. | I + M | REQ-MT-1 cl. 1, 4–5 |
 | TC-MT-05 | Review consent notice, lawful-basis decision, data inventory, Apple/Play declarations and Sentry diagnostic distinction against actual payload/retention/region before beta/release; BLOCKED until counsel and disclosures are approved, not a claim of legal compliance. | M | REQ-MT-1 cl. 5–6 |
+| TC-MT-06 | At setup completion record one immutable budget snapshot as integer centavos; on wedding-day observation compare only final *actual* gross against that snapshot for consenting plans. A later budget edit cannot rewrite baseline; partial actuals or missing snapshot make result unknown rather than estimate-based success or failure; duplicate sync never adds a second observation. | U + I | REQ-MT-1 cl. 2 |
+| TC-MT-07 | For each of metrics 1, 2, 3 and 5, use eligible consented-plan denominator only and exclude plans missing required setup snapshot, prompt transition time, accepted edit time or consent. Report cohort size, exclusions and opt-in selection bias; suppress publication below DPO-approved aggregation floor rather than guessing a numeric floor or treating unknown as No. | U + M | REQ-MT-1 cl. 2, 5–6 |
 | TC-SV-01 | One optional in-app survey invitation is shown at the specified trigger, offers Skip/Not now, and never blocks budgeting, offline use or export; no repeated prompt after recorded completion. | I + widget | REQ-SV-1 cl. 1–2 |
-| TC-SV-02 | Survey submission requires explicit action, has only approved fields, and no answer is inferred from dismissal; when participation is opt-in, default off and withdrawal prevents future collection; test offline pending/duplicate replay only if survey storage is specified. | I | REQ-SV-1 cl. 2–4 |
+| TC-SV-02 | Survey Submit requires selected Yes/No/Prefer not to say and separate default-off survey opt-in; Skip/Not now create no answer or metric consent. Offline opted-in submission queues once under stable response ID and replays exactly once; repeated delivery never duplicates it. A second partner's later submission is rejected as Already answered without replacing first response; withdrawal prevents new uploads. | I | REQ-SV-1 cl. 2–4 |
 | TC-SV-03 | Inspect survey notice, retention, access and privacy-label inventory before beta; skip yields no survey response and a completed response is not used as evidence of partner consent to metrics. Counsel-dependent lawful basis remains BLOCKED. | M | REQ-SV-1 cl. 3–5 |
-| TC-SE-45 | Signup requires an explicit unchecked “I am 18 or older” declaration before account creation on both platforms; absent/unchecked declaration blocks signup with accessible explanation, checked succeeds, no birth date inferred or silently collected; review privacy notice, Play 18+ audience and counsel legal-basis gate. | I + widget + M | REQ-SE-1 cl. 9 (proposed) |
+| TC-SE-45 | Signup requires an explicit unchecked “I am 18 or older” declaration before account creation on both platforms; absent/unchecked declaration blocks signup with accessible explanation, checked succeeds, no birth date inferred or silently collected; review privacy notice, Play 18+ audience and counsel legal-basis gate. | I + widget + M | REQ-SE-1 cl. 9 |
 
 ---
 
@@ -989,6 +991,8 @@ Every v1 entity, airplane mode, expected **end state** stated.
 ---
 
 ## 7. Backend
+
+**Contract maturity:** `supabase/functions/sync_pull` remains a phase-04 authenticated **GET** stub with `since_server_ts`, bounded optional `limit` (default 100, accepted 1–1000), and an empty result. `test/api/contract/sync_contract_test.dart` exercises that legacy stub; its passing smoke tests do **not** satisfy versioned `POST /sync/pull` with `{protocol_version, plan_id, cursor, limit}`, committed paging and membership in TC-API-02/06/07/08 or SEC-24. Phase 08 replaces the stub with the §2.4 protocol and requires those tests against real RLS rows. These are separate stages, not competing live contracts; do not ship the GET stub as the final protocol.
 
 | TC ID | Area | Asserts | Maps to |
 |---|---|---|---|

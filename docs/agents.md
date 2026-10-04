@@ -210,7 +210,7 @@
 
 **Inputs** — `deployment-plan.md` §7–8, `security-plan.md` §7, `testing-plan.md` §10, live alert config.
 
-**Definition of Done** — Every checklist row PASS with a named evidence source (TC or SEC ID); rollback rehearsed once in staging with a recorded duration; restore drill completed within 7 days with a recorded duration; rollback decision owner named and reachable.
+**Definition of Done** — Every checklist row PASS with a named evidence source (TC or SEC ID); rollback rehearsed once in staging with a recorded duration; restore drill completed on the ADR-67 cadence (monthly and before each release) with a recorded duration; rollback decision owner named and reachable.
 
 *Follow-up:* the readiness gate table currently lives in `deployment-plan.md` §7 (owned by DevOps). It should be **extracted** into `go-live-checklist.md` when this agent is activated, so the two files do not overlap.
 
@@ -307,7 +307,7 @@ Every file in `docs/` and every top-level source module maps to **exactly one** 
 | `fastlane/` | DevOps/Release | |
 | `CHANGELOG.md` ⚠ | DevOps/Release | |
 | `ai/` ⚠ | AI/ML | **Must not exist in a v1 build.** Excludes payments — see below |
-| `payments/` ⚠ | Backend | Post-launch phase 25 (REQ-AI-4, ADR-28). **Security is a mandatory reviewer.** Must not exist in a v1 build |
+| `payments/` ⚠ | Backend | Post-launch phase 22 in the 24-phase index (formerly 25) (REQ-AI-4, ADR-28). **Security is a mandatory reviewer.** Must not exist in a v1 build |
 
 **Two boundaries worth restating**, because they are the ones most likely to be violated:
 

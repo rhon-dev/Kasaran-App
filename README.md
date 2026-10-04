@@ -12,7 +12,7 @@
 
 `pubspec.yaml`, `lib/`, `test/`, platform projects, GitHub Actions CI, Fastlane, and the `no_float_money` custom lint are present alongside `docs/`.
 
-The build sequence is defined in `docs/development-phases.md`; the phase index still has an unresolved one-sitting/phase-cap issue, and phase bodies 01–06 are written. A written phase body is not evidence that all its exit criteria have been met.
+The build sequence is defined in `docs/development-phases.md`: 24 milestones, detailed bodies 01–08, and an unresolved conflict between the old one-sitting-per-phase promise and multi-sitting data/sync phases. Phase 01–04 source exists but all four remain **partial**; phase 04 lacks a verified staging project reference under OQ-07. A written phase body does not prove its exit criteria passed.
 
 ---
 
@@ -49,6 +49,7 @@ Prospective features specified in `docs/requirements.md` (with earlier user stor
 - **Rule-based allocation engine** `v1` — deterministic, explainable default allocation with regional cost modifiers and manual overrides; separate explicit before/after rebalance against committed amounts, preserving override locks and showing any remaining shortfall. No AI or change to baseline fixtures without an apply.
 - **Requirements checklist** `v1` — couple-managed state and optional manually entered fee-to-ledger for PSA and church/civil paperwork; preset applicability and due-date offsets are **NEEDS VERIFICATION / blocked on OQ-11**, not universal legal or church advice.
 - **Offline export and share** `v1` — on-device PDF budget summary and single-sponsor statement, separate ledger/payment/pledge/guest CSVs, guest/sponsor-name privacy toggles for shared PDF, CSV formula neutralization, and OS share sheet. A separate full machine-readable local personal-data copy includes history and labels missing server-only fields; SEC-32 completion needs DPO review. No live links; recipients' copies cannot be recalled.
+- **Consent-based success measurement and survey** `v1 design, blocked until review` — separate default-off opt-ins for first-party cohort metrics and one skippable post-wedding survey; no third-party analytics SDK. Existing sync permission never authorizes silent measurement. Sentry diagnostics has separate notice/label review (ADR-61/62; SEC-29–31).
 - **Shared editing + offline sync** `v1` — two partners on one plan, full offline use, field-level last-write-wins with a visible, immutable change log.
 
 ### Deferred — not in v1
@@ -113,8 +114,8 @@ The routes and backend endpoints are scaffolds; do not mistake their presence fo
 
 The `docs/` package is a full planning set — from problem framing through requirements, design, UX, security, testing, and deployment. The build itself is sequenced in **[docs/development-phases.md](docs/development-phases.md)**:
 
-- The phase **index** (27 phases: foundation → auth → data layer → sync engine → features → hardening → QA → beta → UAT → launch → payments → AI) is **awaiting approval**.
-- Phase **bodies** are written for **phases 01–06** (batch 1); later batches are pending. The current code scaffolds phases 01–04.
+- The phase **index** has **24 milestones** (foundation, features, hardening, QA, internal beta, production, separate post-launch payments/AI and v1.1 backlog handoff). It maps each REQ once; the former literal one-sitting-per-phase rule remains an explicit planning conflict (ADR-70).
+- Phase **bodies** are written for **phases 01–08**; 07–08 have bounded sittings and TC-linked exits, while 09–24 still need bodies. The phase 01–04 scaffolds are **partial**, not certified; staging project reference remains pending OQ-07.
 - Decisions are tracked in `docs/decision-log.md` across three tiers: **givens (GIV)**, **open questions (OQ)**, and **decisions (ADR)**.
 
 ---

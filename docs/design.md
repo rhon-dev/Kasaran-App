@@ -168,6 +168,8 @@ Both are expensive to reverse. See sections 7.3 and 7.4.
 
 ### 2.4 Push and pull
 
+**Stage boundary:** the phase-04 `sync_pull` function is an authenticated empty-result GET stub (`since_server_ts`, optional `limit` default 100, valid 1–1000). It is *not* this versioned POST/cursor protocol, does not enforce live tenant membership yet, and cannot establish TC-API-02/SEC-24. Phase 08 must replace the stub, implement server-limited committed paging and adapt its tests; do not deploy the legacy GET as the production sync API.
+
 Two operations, both idempotent:
 
 ```

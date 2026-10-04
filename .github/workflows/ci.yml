@@ -22,8 +22,8 @@ env:
 # Job: secret-scan
 # Runs gitleaks over full history on every push/PR.
 # SEC-26: service-role keys, signing credentials, and .env values must never
-# appear in source. The gate deliberately fails on a dummy secret (phase 04
-# task 8) to prove the scanner is wired correctly.
+# appear in source. The historical phase-04 probe is suppressed only by its
+# exact fingerprint; a new finding at that path still fails the gate.
 # deployment-plan §2.5.
 # ---------------------------------------------------------------------------
 jobs:
@@ -126,8 +126,8 @@ jobs:
 # then runs the Dart contract test suite against the local instance.
 #
 # deployment-plan §2.3 gate: zero failures required.
-# TC-API-01, TC-API-02, TC-API-04, TC-API-05 must pass.
-# TC-API-03 (idempotency) is deferred to phase 08.
+# Phase-04 GET/push stub smoke tests are not full TC-API-01/02/04/05.
+# Versioned POST/cursor acceptance and tenant isolation remain phase-08 gates.
 # ---------------------------------------------------------------------------
   contract-tests:
     name: API contract tests
@@ -168,10 +168,21 @@ jobs:
         # are auto-loaded by the edge-runtime container.
         run: echo "Edge functions served by supabase start"
 
-      - name: Run contract tests
-        run: flutter test test/api/contract/ --reporter=expanded
-        # The contract tests skip gracefully when the local instance is not
-        # reachable, but in CI it will be running — all tests must execute.
+      - name: Run contract tests (zero skips)
+        shell: bash
+        run: |
+          flutter test test/api/contract/ --reporter=json > "$RUNNER_TEMP/contract.jsonl"
+          python3 - "$RUNNER_TEMP/contract.jsonl" <<'PY'
+          import json
+          import sys
+
+          events = [json.loads(line) for line in open(sys.argv[1]) if line.strip().startswith('{')]
+          done = [e for e in events if e.get('type') == 'testDone']
+          if not done or any(e.get('result') != 'success' or e.get('skipped') for e in done):
+              sys.exit('Contract suite must execute without failures or skips')
+          print(f'Contract smoke tests executed without skips: {len(done)}')
+          PY
+        # Phase-04 smoke success is not future versioned POST/tenant acceptance.
 
       - name: Stop Supabase
         if: always()
@@ -332,6 +343,13 @@ jobs:
               echo "ERROR: service-role marker in $artifact — SEC-26 violation"
               rm -rf "$extracted"
               return 1
+            else
+              status=$?
+              if [ "$status" -ne 1 ]; then
+                echo "ERROR: artifact scan failed for $artifact (grep exit $status)"
+                rm -rf "$extracted"
+                return 1
+              fi
             fi
             rm -rf "$extracted"
           }
