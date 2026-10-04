@@ -426,7 +426,7 @@ Supporting choices: category **Lifestyle**, not Finance. No payment SDK in the d
 | 4 | Domain and social handle availability (`kasaran.app` used above for demo emails — must actually be owned) | **Yes** — the support, privacy, and deletion URLs depend on owning a domain |
 | 5 | Confirm no existing PH wedding-services brand uses the name | No, advisory |
 
-Logged as **OQ-09**. Steps 1, 2, and 4 are hard submission blockers; the decided name does not survive contact with a collision.
+Logged as **OQ-09**. As of 2026-10-04 the owner reports no domain owned; `kasaran.app` is only an example, not an approved address. Steps 1, 2, and 4 are hard submission blockers; the decided name does not survive contact with a collision.
 
 ---
 
