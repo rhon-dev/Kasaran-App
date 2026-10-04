@@ -729,7 +729,7 @@ These stable IDs were already present in §2; this table supplies their missing 
 | ID | Asserts | Level | REQ clause |
 |---|---|---|---|
 | TC-PLT-01 | Inspect iOS and Android artifacts built from one Flutter codebase; web-only build cannot satisfy either target. | M | REQ-PLT-1 cl. 1–3 |
-| TC-PLT-02 | Offline local write commits before network replay; offline local read needs no request; SQLite integer column round-trips signed centavos; dependency inspection confirms drift/sqflite. | I + M | REQ-PLT-2 cl. 1–4 |
+| TC-PLT-02 | Offline local write commits before network replay (phase 08); offline local read needs no request (phase 05 open/read probe, plan reads after phase 07); SQLite integer column round-trips signed centavos; dependency inspection confirms SQLite via `drift` or `sqflite` (`drift` + pinned `sqlite3` native assets under ADR-74). Phase-05 probe alone does **not** pass the plan-entity/write-before-sync clauses. | I + M | REQ-PLT-2 cl. 1–4 |
 | TC-PLT-03 | Existing active plan blocks a second creation and names the existing plan; joining as second partner does not consume an additional account plan. | I | REQ-PLT-3 cl. 1–3 |
 | TC-BS-01 | Four mandatory fields reject omission; accepts ₱28,000 and above ₱500,000 without warning, any calendar date and cap zero; valid setup allocates and routes to six fee prompts. | I + widget | REQ-BS-1 cl. 1–7 |
 | TC-BS-02 | For 0, -5000 and abc budget, inline reason names budget; date/cap/region retained; no completed plan persists. | I | REQ-BS-2 cl. 1–5 |

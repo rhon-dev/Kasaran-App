@@ -194,7 +194,7 @@ Run a **daily encrypted, authenticated off-provider logical export** of producti
 
 ### 3.1 Flutter project and native dependencies
 
-**ADR-12 locks Flutter.** The iOS and Android platform projects build native SQLCipher-backed SQLite dependencies (SEC-12, via `drift` and `sqlcipher_flutter_libs`). Build and signing jobs must compile and link those native libraries on their respective platform toolchains.
+**ADR-12 locks Flutter; ADR-74 selects the phase-05 encryption implementation.** iOS and Android bundle the pinned `sqlite3` native asset selected by the `sqlite3mc` hook and opened through `drift` (SEC-12's permitted equivalent page-level cipher), instead of the older `sqlcipher_flutter_libs` pairing. Build/signing jobs must obtain and link the correct native assets on both platform toolchains; a release that cannot fetch them must fail rather than switch to plaintext SQLite.
 
 ### 3.2 Build tooling decision: **Fastlane** (+ GitHub Actions)
 
@@ -202,7 +202,7 @@ Fastlane is the chosen Flutter iOS and Android release orchestrator, with GitHub
 
 | Criterion | Assessment |
 |---|---|
-| **Native SQLite encryption module** | Fastlane runs the real `flutter build ipa` / `appbundle` on a real toolchain, so SQLCipher's native compilation and linking work normally. Any hosted service that abstracts the native build would be a liability here. |
+| **Native SQLite encryption module** | Fastlane runs the real `flutter build ipa` / `appbundle` on a real toolchain; the pinned SQLite3MultipleCiphers native asset must be fetched, bundled and verified on each target (ADR-74). A successful Dart analyzer run alone does not prove native encryption or an iOS build. |
 | **Solo maintainer** | Fastlane's value is exactly the tedium a solo maintainer cannot afford: `match` for certificate/profile sync, `pilot` for TestFlight upload, `supply` for Play publishing. One `fastlane release` replaces a dozen manual portal steps that are easy to get wrong at 1 a.m. Cost: a Ruby dependency and occasional Xcode-upgrade breakage. |
 | **CI cost** | GitHub Actions: Android builds on Linux runners (cheap, generous free minutes). iOS builds require macOS runners at roughly 10× the minute multiplier — so iOS builds run **only on tagged release candidates and nightly**, never per PR. This is the single biggest CI cost lever. |
 

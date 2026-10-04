@@ -55,6 +55,11 @@ void main() {
     );
     expect(attemptedHttp, 0);
     final bytes = await file.readAsBytes();
+    final key = await keyStore.read() ?? (throw StateError('Device key missing'));
+    expect(
+      utf8.decode(bytes, allowMalformed: true),
+      isNot(contains(key)),
+    );
     expect(
       utf8.decode(bytes.take(16).toList(), allowMalformed: true),
       isNot('SQLite format 3\u0000'),
