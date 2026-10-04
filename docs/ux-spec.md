@@ -93,6 +93,8 @@ Field sources cite entities and derived calculations from design.md sections 1.4
 **Expiry copy:** the invite expires exactly 7 days after issuance; the expired state says so and does not offer acceptance (REQ-SE-1 clauses 4, 5).
 **Nav in:** deep link or SCR-01 paste. **Nav out:** SCR-06, SCR-01.
 
+**Phase 06 implementation boundary (2026-10-04; target states above remain requirements):** SCR-01 renders sign-in/sign-up, an unchecked 18+ checkbox, a synthetic-local notice placeholder and post-auth Start/Join buttons. Verified users first await a server membership lookup; lookup failure blocks protected routes rather than pretending the account has no plan. Start reaches the SCR-03 placeholder, not a working create-plan form. SCR-02 accepts a pasted `kasaran://accept/{token}` URL or a routed token through the same client RPC call; both use the SQL RPC's 32-lowercase-hex token format. Success refreshes membership lookup. It does not yet render inviter/plan summary, decline, distinct invalid/expired/revoked/used states from end to end, replay progress or successful navigation to SCR-06. No real-data notice or finished eight-state matrix is implied by these partial widgets; see `testing-plan.md` §2.0.
+
 ### SCR-03 Setup: Budget & Date
 **Regions:** step indicator (1 of 3); total budget field; wedding date field; validation slot; next.
 **Fields:** `plans.total_budget_cents`, `plans.wedding_date`.
@@ -252,6 +254,8 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 **Sync-error is not a data-integrity state.** A failed push means writes are still queued locally and intact (REQ-OF-5 clause 4). Copy must never imply loss. See section 7.
 
 ### 3.2 Matrix
+
+The SCR-01/02 rows below are **specified target states**, not implemented-state attestations; the Phase 06 boundary under SCR-02 lists the current gaps. In particular, the present SCR-02 error response must not be counted as a fully verified set of expired/revoked/used UI states, and the replay row depends on phase 08 sync.
 
 | Screen | First-run empty | Populated | Loading | Offline + pending | Sync error | Conflict just resolved | Partner removed | Calculation invalid |
 |---|---|---|---|---|---|---|---|---|

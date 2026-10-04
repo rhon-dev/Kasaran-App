@@ -1,5 +1,6 @@
 // Production go_router route tree. SCR-19 lives only under More.
-import 'package:flutter/foundation.dart';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
@@ -31,6 +32,8 @@ import 'package:kasaran/ui/shell/app_tab_shell.dart';
 /// long-term replacement for the custom scheme.
 abstract final class Routes {
   static const signIn = '/sign-in';
+  static const planCheck = '/plan-check';
+  static const invitePaste = '/invite/accept';
   static const inviteAccept = '/invite/accept/:token';
   static const onboardingBudgetDate = '/onboarding/budget-date';
   static const onboardingGuestRegion = '/onboarding/guest-region';
@@ -61,14 +64,14 @@ class _RouterRefresh extends ChangeNotifier {
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh();
   ref.listen(authStateProvider, (_, _) => refresh.refresh());
-  ref.listen(hasActivePlanProvider, (_, _) => refresh.refresh());
+  ref.listen(planAccessProvider, (_, _) => refresh.refresh());
   final router = GoRouter(
     initialLocation: Routes.signIn,
     refreshListenable: refresh,
     redirect: (_, state) => _redirect(
       state,
       ref.read(authStateProvider),
-      ref.read(hasActivePlanProvider),
+      ref.read(planAccessProvider),
     ),
     routes: _buildRoutes(),
   );
@@ -79,7 +82,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return router;
 });
 
-String? _redirect(GoRouterState state, AuthState auth, bool hasActivePlan) {
+String? _redirect(GoRouterState state, AuthState auth, PlanAccess planAccess) {
   final uri = state.uri;
   // Android/iOS deliver kasaran://accept/<token>, not /invite/accept/<token>.
   // Match the scheme and host explicitly rather than treating every /<token>
@@ -91,18 +94,25 @@ String? _redirect(GoRouterState state, AuthState auth, bool hasActivePlan) {
     return '/invite/accept/${Uri.encodeComponent(uri.pathSegments.single)}';
   }
   final path = uri.path;
-  if (path.startsWith('/invite/accept/')) return null;
+  if (path == Routes.invitePaste || path.startsWith('${Routes.invitePaste}/')) {
+    return null;
+  }
   switch (auth) {
     case AuthState.unauthenticated:
     case AuthState.unverified:
       return path == Routes.signIn ? null : Routes.signIn;
     case AuthState.authenticated:
-      if (!hasActivePlan) {
-        return path.startsWith('/onboarding')
-            ? null
-            : Routes.onboardingBudgetDate;
+      if (planAccess == PlanAccess.loading || planAccess == PlanAccess.error) {
+        return path == Routes.planCheck ? null : Routes.planCheck;
       }
-      if (path == Routes.signIn || path.startsWith('/onboarding')) {
+      if (planAccess == PlanAccess.none) {
+        return path == Routes.signIn || path.startsWith('/onboarding')
+            ? null
+            : Routes.signIn;
+      }
+      if (path == Routes.signIn ||
+          path == Routes.planCheck ||
+          path.startsWith('/onboarding')) {
         return Routes.dashboard;
       }
       return null;
@@ -114,6 +124,16 @@ List<RouteBase> _buildRoutes() => [
     path: Routes.signIn,
     name: 'sign-in',
     builder: (_, _) => const Scr01SignIn(),
+  ),
+  GoRoute(
+    path: Routes.planCheck,
+    name: 'plan-check',
+    builder: (_, _) => const _PlanCheckScreen(),
+  ),
+  GoRoute(
+    path: Routes.invitePaste,
+    name: 'invite-paste',
+    builder: (_, _) => const Scr02InviteAcceptance(token: ''),
   ),
   GoRoute(
     path: Routes.inviteAccept,
@@ -259,3 +279,30 @@ List<RouteBase> _buildRoutes() => [
         Scr11ExplainFigure(figureKey: state.pathParameters['key'] ?? ''),
   ),
 ];
+
+class _PlanCheckScreen extends ConsumerWidget {
+  const _PlanCheckScreen();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(planAccessProvider);
+    return Scaffold(
+      body: Center(
+        child: status == PlanAccess.loading
+            ? const CircularProgressIndicator()
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Your plan could not be checked. Reconnect and retry.',
+                  ),
+                  TextButton(
+                    onPressed: () => ref.invalidate(currentPlanIdProvider),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}

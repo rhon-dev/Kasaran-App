@@ -7,10 +7,13 @@ import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
 import 'package:kasaran/ui/router/app_router.dart';
 import 'package:kasaran/ui/screens/placeholder_screen.dart';
+import 'package:kasaran/ui/screens/scr_01_sign_in.dart';
 import 'package:kasaran/ui/screens/scr_02_invite_acceptance.dart';
 
 final _auth = NotifierProvider<_AuthController, AuthState>(_AuthController.new);
-final _plan = NotifierProvider<_PlanController, bool>(_PlanController.new);
+final _plan = NotifierProvider<_PlanController, PlanAccess>(
+  _PlanController.new,
+);
 
 class _AuthController extends Notifier<AuthState> {
   @override
@@ -19,11 +22,11 @@ class _AuthController extends Notifier<AuthState> {
   set value(AuthState next) => state = next;
 }
 
-class _PlanController extends Notifier<bool> {
+class _PlanController extends Notifier<PlanAccess> {
   @override
-  bool build() => false;
+  PlanAccess build() => PlanAccess.none;
 
-  set value(bool next) => state = next;
+  set value(PlanAccess next) => state = next;
 }
 
 Future<(ProviderContainer, GoRouter)> _pump(
@@ -34,12 +37,14 @@ Future<(ProviderContainer, GoRouter)> _pump(
   final container = ProviderContainer(
     overrides: [
       authStateProvider.overrideWith((ref) => ref.watch(_auth)),
-      hasActivePlanProvider.overrideWith((ref) => ref.watch(_plan)),
+      planAccessProvider.overrideWith((ref) => ref.watch(_plan)),
     ],
   );
   addTearDown(container.dispose);
   container.read(_auth.notifier).value = auth;
-  container.read(_plan.notifier).value = plan;
+  container.read(_plan.notifier).value = plan
+      ? PlanAccess.member
+      : PlanAccess.none;
   final router = container.read(appRouterProvider);
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -78,7 +83,7 @@ void main() {
             .token,
         'token-123',
       );
-      _expectScreen('SCR-02');
+      expect(find.text('Join my partner’s plan'), findsOneWidget);
     },
   );
 
@@ -107,7 +112,7 @@ void main() {
     );
     router.go(Routes.dashboard);
     await tester.pumpAndSettle();
-    _expectScreen('SCR-01');
+    expect(find.byType(Scr01SignIn), findsOneWidget);
     expect(router.routeInformationProvider.value.uri.path, Routes.signIn);
   });
 
@@ -119,17 +124,20 @@ void main() {
     );
     router.go(Routes.dashboard);
     await tester.pumpAndSettle();
-    _expectScreen('SCR-01');
+    expect(find.byType(Scr01SignIn), findsOneWidget);
   });
 
-  testWidgets('authenticated user without a plan enters onboarding', (
-    tester,
-  ) async {
-    final (_, router) = await _pump(tester, plan: false);
-    router.go(Routes.dashboard);
-    await tester.pumpAndSettle();
-    _expectScreen('SCR-03');
-  });
+  testWidgets(
+    'verified planless account sees Start or Join before onboarding',
+    (tester) async {
+      final (_, router) = await _pump(tester, plan: false);
+      router.go(Routes.dashboard);
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, Routes.signIn);
+      expect(find.text('Start our plan'), findsOneWidget);
+      expect(find.text("Join my partner's plan"), findsOneWidget);
+    },
+  );
 
   testWidgets('auth change refreshes the same router without losing location', (
     tester,
@@ -142,14 +150,31 @@ void main() {
     container.read(_auth.notifier).value = AuthState.authenticated;
     expect(container.read(authStateProvider), AuthState.authenticated);
     await tester.pumpAndSettle();
-    _expectScreen('SCR-03');
+    expect(find.text('Start our plan'), findsOneWidget);
     expect(identical(container.read(appRouterProvider), router), isTrue);
-    container.read(_plan.notifier).value = true;
-    expect(container.read(hasActivePlanProvider), isTrue);
+    container.read(_plan.notifier).value = PlanAccess.member;
+    expect(container.read(planAccessProvider), PlanAccess.member);
     await tester.pumpAndSettle();
     _expectScreen('SCR-06');
     expect(identical(container.read(appRouterProvider), router), isTrue);
   });
+
+  testWidgets(
+    'unknown plan membership blocks protected routes and Start/Join',
+    (tester) async {
+      final (container, router) = await _pump(tester, plan: false);
+      container.read(_plan.notifier).value = PlanAccess.loading;
+      router.go(Routes.dashboard);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
+      expect(find.text('Start our plan'), findsNothing);
+      container.read(_plan.notifier).value = PlanAccess.error;
+      await tester.pumpAndSettle();
+      expect(find.textContaining('could not be checked'), findsOneWidget);
+      expect(find.text('Start our plan'), findsNothing);
+    },
+  );
 
   testWidgets('all production SCR routes resolve to their screens', (
     tester,
