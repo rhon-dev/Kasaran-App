@@ -42,7 +42,7 @@ Short history, for anyone tracing the name's status changes:
 2. The decision-maker later clarified that naming should sit in the *givens* tier as **intentionally unresolved**, not a settled decision. GIV-07 was set to UNRESOLVED, OQ-06 opened, and problem-brief.md was softened to "working name; provisional."
 3. **The decision-maker has now confirmed (2026-09-14): "Kasaran really is the name."** Naming is **resolved**. GIV-07 is RESOLVED, **OQ-06 is closed**, and this is logged as **ADR-27**. problem-brief.md is re-locked to a final-name statement.
 
-"Kasaran" is the final product name, adopted as a distinct, ownable mark (the "roughness" vs "kasalan"/wedding nuance was acknowledged and set aside). Downstream docs may treat the name as final and it is cleared for logo/domain.
+"Kasaran" is the final product name, adopted as a distinct, ownable mark (the "roughness" vs "kasalan"/wedding nuance was acknowledged and set aside). Downstream docs may treat the name as final for design; the original “cleared for logo/domain” assertion is historical and is limited by ADR-71/OQ-09 (external clearance unverified).
 
 ---
 
@@ -101,7 +101,7 @@ Short history, for anyone tracing the name's status changes:
 | ADR-24 (D4) | Simultaneous mutual removal has a deterministic winner: order by the D1 server timestamp, tiebreak on stable id. No undefined "whoever syncs first". | DECIDED | 2026-09-14 | ADR-21, REQ-SE-6 (cl. 9–11), SEC-07, TC-SE-22 |
 | ADR-25 (D5) | Retired/merged requirement IDs are recorded in a redirect appendix (requirements §14), never left as hollow live "reserved" clauses. | DECIDED | 2026-09-14 | requirements §14, REQ-SE-5 (cl. 5) |
 | ADR-26 (D6) | Shared-record erasure test cases are left UN-STUBBED and marked blocked-pending-counsel, with no asserted expected value. A guessed expected result is forbidden. | DECIDED (process rule) | 2026-09-14 | testing-plan §5, SEC-33, SEC-38, OQ-01 |
-| ADR-27 | **Final product name is Kasaran.** Confirms and closes the naming question. Adopted as a distinct, ownable mark; cleared for logo/domain. Supersedes ADR-06 (working-name-only) and closes OQ-06; GIV-07 RESOLVED. | DECIDED | 2026-09-14 | GIV-07, OQ-06, ADR-06, problem-brief |
+| ADR-27 | **Final product name is Kasaran.** Confirms and closes the naming question. Adopted as a distinct, ownable mark; historical “cleared for logo/domain” wording does not establish external clearance (qualified by ADR-71/OQ-09). Supersedes ADR-06 (working-name-only) and closes OQ-06; GIV-07 RESOLVED. | DECIDED (external-clearance implication superseded by ADR-71) | 2026-09-14 | GIV-07, OQ-06, ADR-06, ADR-71, problem-brief |
 | ADR-28 | **Payments (REQ-AI-4) is its own post-launch phase, pulled out of the AI tail entirely.** Originally assigned phase 25; ADR-70 consolidates the index and moves the same payment scope to phase 22. Backend owns it, Security reviews it; the ID `REQ-AI-4` remains historical. | DECIDED, phase number revised by ADR-70 | 2026-09-14 | REQ-AI-4, development-phases phase 22, agents.md, OQ-10, ADR-70 |
 | ADR-29 | Bohol retains Provincial cost tier (0.85) but has `is_destination = true`. OOT defaulting uses the destination flag, not the tier; the tier only selects the cost index. | DECIDED | 2026-10-02 | REQ-BS-4, REQ-HF-3, design §4.2 |
 | ADR-30 | Refines ADR-14: bento shorthand at or above ₱1M always shows exactly two decimal million digits, truncated toward zero (`₱1.00M`, `₱1.20M`, `₱1.25M`). | DECIDED | 2026-10-02 | ADR-14, REQ-GEN-2A, TC-GEN-03 |
@@ -145,12 +145,13 @@ Short history, for anyone tracing the name's status changes:
 | ADR-68 | Replace nightly macOS Maestro with release-candidate-only Maestro; do not silently cancel the separately specified nightly iOS integration run. | DECIDED | 2026-10-03 | deployment-plan §3.2/§8.4 |
 | ADR-69 | Replace custom seven-step iOS phased rollout with Apple's default phased automatic update for eligible version updates; initial release needs manual approval, not phasing. | DECIDED | 2026-10-03 | deployment-plan §5/§7 |
 | ADR-70 | Consolidate the 27-milestone development index to 24 without changing the meaning of any REQ. Merge old 20+21 into beta 20, 22+23+24 into production 21, move separate payments 25 to 22 and AI 26+27 to 23; use 24 only for v1.1 backlog handoff. Treat phases as milestones with testable sittings, noting unresolved conflict with the old one-sitting-per-phase rule. | DECIDED (literal one-sitting rule unresolved) | 2026-10-03 | ADR-28, development-phases index/self-validation, OQ-10 |
+| ADR-71 | Clarify ADR-27: Kasaran remains the decision-maker's chosen product name and may be used in design, but “cleared for logo/domain” did not establish domain ownership, trademark clearance or store approval. External clearance stays blocked on OQ-09; this supersedes only ADR-27's external-clearance implication, not the product-name choice. | DECIDED (external clearance pending) | 2026-10-04 | ADR-27, OQ-09, deployment-plan §5 |
 
 ---
 
 ## Decision narratives
 
-## ADR-61–69 — Launch readiness and solo maintenance
+## ADR-61–71 — Launch readiness and solo maintenance
 
 **ADR-61.** Sentry diagnoses crashes and client versions, not product engagement. Scrub amounts, names, addresses, tokens and invite URLs from diagnostics. Disable collection until processor terms, retention, privacy notice and both store labels pass review. Choose EU event storage in Frankfurt; disclose that some metadata and support material may be stored in the US. OQ-07 stays open.
 
@@ -167,6 +168,8 @@ Short history, for anyone tracing the name's status changes:
 **ADR-67–69.** Keep daily backups; drill restores monthly and before each release. Run Maestro on release candidates only; keep the distinct nightly integration test unless a later decision changes it. Use Apple's default phased automatic-update rollout for eligible updates, not a custom percentage schedule. None proves a drill or release has run.
 
 **ADR-70.** The old 27-phase sequence exceeded its 20–26 cap and split beta, store submission and monitoring into overlapping owners. Merge downstream milestones, retain one owner per REQ, and move ADR-28 payments to the new phase 22 without moving payments into v1 or AI. Phase 24 is a v1.1 planning handoff, not shipped functionality. Phase bodies 07/08 have bounded sittings; the original literal one-sitting-per-phase promise cannot simultaneously hold for the 24-milestone index and remains flagged for plan-owner approval rather than called validated.
+
+**ADR-71.** ADR-27 settled the internal product-name choice and authorizes use of Kasaran in design. Its “cleared for logo/domain” phrase is not evidence of domain control, trademark availability, or store approval. Keep that historical wording with this correction; check ownership, legal clearance and platform requirements under OQ-09 before launch.
 
 ## ADR-53–59 — Competitive features without benchmarks or supplier brokering
 

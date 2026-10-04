@@ -46,7 +46,7 @@ A couple planning their own wedding in the Philippines:
 
 ## Naming note (decided)
 
-**Name: Kasaran (final).** Confirmed by the decision-maker (decision-log ADR-27, GIV-07 resolved, OQ-06 closed). For the record, "kasaran" reads closer to "roughness/coarseness" in Filipino while "kasalan" means wedding — this was raised, acknowledged, and set aside. The decision is to proceed with **Kasaran** as the brand, treating it as a distinct, ownable mark rather than a literal Tagalog word. Cleared for logo/domain.
+**Name: Kasaran (final).** Confirmed by the decision-maker (decision-log ADR-27, GIV-07 resolved, OQ-06 closed). For the record, "kasaran" reads closer to "roughness/coarseness" in Filipino while "kasalan" means wedding — this was raised, acknowledged, and set aside. The decision is to proceed with **Kasaran** as the brand, treating it as a distinct, ownable mark rather than a literal Tagalog word. Chosen for product and logo design only; domain ownership, trademark and store clearance remain unverified under ADR-71/OQ-09.
 
 ## Confirmed decisions (locked for Prompt 2)
 
@@ -57,6 +57,6 @@ A couple planning their own wedding in the Philippines:
 5. **Hidden-fee launch set:** Confirmed and expanded — crew meals, OOT fees, church aircon premiums, corkage, **plus overtime charges and venue power fees.**
 6. **Sponsorship model:** Confirmed — show gross event total and net couple out-of-pocket, with pledge status (confirmed vs. tentative).
 
-7. **Name:** **Kasaran** — final (decision-log ADR-27). The "roughness" vs. "kasalan/wedding" nuance was acknowledged and set aside; adopted as a distinct brand mark. Cleared for logo/domain.
+7. **Name:** **Kasaran** — final (decision-log ADR-27). The "roughness" vs. "kasalan/wedding" nuance was acknowledged and set aside; adopted as a distinct brand mark. Chosen for product and logo design only; domain ownership, trademark and store clearance remain unverified under ADR-71/OQ-09.
 
 *All scoping decisions locked, including the product name (Kasaran, decision-log ADR-27). No open naming item.*
