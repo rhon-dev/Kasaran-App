@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kasaran/data/repositories/plan_membership_repository.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
+import 'package:kasaran/ui/router/app_router.dart';
 
 /// The custom-scheme link and pasted link enter the same server acceptance path.
 /// No unowned HTTPS host is treated as an invitation (OQ-09).
@@ -107,6 +109,15 @@ class _InviteAcceptanceState extends ConsumerState<Scr02InviteAcceptance> {
               FilledButton(
                 onPressed: _submitting ? null : _accept,
                 child: const Text('Accept invitation'),
+              ),
+              TextButton(
+                onPressed: _submitting
+                    ? null
+                    : () {
+                        _pastedLink.clear();
+                        context.go(Routes.signIn);
+                      },
+                child: const Text('Decline invitation'),
               ),
             ],
             if (_joined) const Text('You joined your partner’s plan.'),

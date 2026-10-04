@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kasaran/data/repositories/plan_membership_repository.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
@@ -82,6 +83,43 @@ void main() {
     expect(fake.accepted, _token);
     expect(find.textContaining(_token), findsNothing);
     expect(find.textContaining('joined'), findsOneWidget);
+  });
+
+  testWidgets('declining invite returns to start choice without accepting', (
+    tester,
+  ) async {
+    final fake = _FakeMembership();
+    final router = GoRouter(
+      initialLocation: '/invite/accept/$_token',
+      routes: [
+        GoRoute(
+          path: '/invite/accept/:token',
+          builder: (_, state) => Scr02InviteAcceptance(
+            token: state.pathParameters['token']!,
+          ),
+        ),
+        GoRoute(
+          path: '/sign-in',
+          builder: (_, _) => const Scaffold(body: Text('Start or join')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          planMembershipRepositoryProvider.overrideWith((ref) => fake),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Decline invitation'));
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/sign-in');
+    expect(fake.accepted, isNull);
+    expect(find.textContaining(_token), findsNothing);
   });
 
   testWidgets('successful acceptance refreshes membership lookup', (
