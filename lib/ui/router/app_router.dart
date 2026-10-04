@@ -95,6 +95,12 @@ String? _redirect(GoRouterState state, AuthState auth, PlanAccess planAccess) {
   }
   final path = uri.path;
   if (path == Routes.invitePaste || path.startsWith('${Routes.invitePaste}/')) {
+    if (auth == AuthState.authenticated) {
+      if (planAccess == PlanAccess.loading || planAccess == PlanAccess.error) {
+        return Routes.planCheck;
+      }
+      if (planAccess == PlanAccess.member) return Routes.dashboard;
+    }
     return null;
   }
   switch (auth) {

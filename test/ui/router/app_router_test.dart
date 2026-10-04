@@ -102,6 +102,23 @@ void main() {
     },
   );
 
+  testWidgets('member cannot open another plan invitation', (tester) async {
+    final (_, router) = await _pump(tester);
+    router.go('kasaran://accept/token-123');
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
+    expect(find.byType(Scr02InviteAcceptance), findsNothing);
+  });
+
+  testWidgets('unknown membership cannot open invitation', (tester) async {
+    final (container, router) = await _pump(tester, plan: false);
+    container.read(_plan.notifier).value = PlanAccess.error;
+    router.go('kasaran://accept/token-123');
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
+    expect(find.byType(Scr02InviteAcceptance), findsNothing);
+  });
+
   testWidgets('unauthenticated protected route redirects to sign-in', (
     tester,
   ) async {
