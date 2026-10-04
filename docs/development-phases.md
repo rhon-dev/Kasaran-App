@@ -395,8 +395,10 @@ A phase is a milestone with several independently testable **sittings**, not a p
 | No-passcode warning | Manual: run on an emulator with no device passcode | Warning shown exactly once |
 | Schema version | `flutter test test/data/db/schema_version_test.dart` | Reports version 1 with zero application tables |
 
-**TC IDs that must pass:** TC-PLT-02, TC-SEC-09
+**TC coverage split:** Phase 05 can exercise TC-PLT-02's SQLite-engine, signed-centavo and offline open/read foundation, but **cannot pass the entire TC-PLT-02** before plan entities and write-before-sync exist (phases 07–08). TC-SEC-09's Android no-passcode warning is testable on the current emulator; iOS device-bound accessibility and warning remain unverified without an iOS target. Do not mark either full TC green from host or Android-only evidence.
 *(TC-SEC-07 and TC-SEC-08 are authoritative only on physical hardware per `testing-plan.md` §7.4. The developer-machine equivalents above are the phase-05 gate; the binding hardware verification belongs to phase 18 and is not claimed here.)*
+
+**Execution evidence (2026-10-04; local/synthetic only, not phase sign-off):** `flutter analyze --no-pub` and the independent Flutter tests passed with no Supabase; Android 16 emulator passed encrypted reopen/offline and startup/no-passcode integration checks, a debug APK build, built-manifest `allowBackup=false` inspection, and a copied 4096-byte startup DB rejected by stock `sqlite3` with no SQLite header. Host tests cover missing/wrong key and integer centavos. The first full-suite attempt failed because Supabase was stopped; after starting it, 30 API contract cases returned 503 because the local Edge worker could not resolve a JSR dependency, while independent tests passed. This is an environment/network blocker, **not** a green full suite. No iOS simulator/Xcode target was available; iOS backup attributes, native keychain protection, device backup contents, physical-device key inspection and a separate-process persisted-value test remain unverified. Production use and entire-phase completion claims are withheld. See ADR-74.
 
 **Non-goals** — must not touch:
 - Any application table or entity — identity tables are phase 06, budget entities are phase 07.
