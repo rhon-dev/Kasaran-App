@@ -362,8 +362,8 @@ A phase is a milestone with several independently testable **sittings**, not a p
 
 **Tasks**
 
-1. Add `drift`, `sqlite3_flutter_libs`, and `sqlcipher_flutter_libs` dependencies with pinned versions.
-2. Implement `platform/db/encrypted_database.dart` — generate the SQLCipher key on first run, store it in the iOS Keychain / Android Keystore, and retrieve it on subsequent opens (SEC-13).
+1. Add pinned `drift` and `sqlite3` native assets with the `sqlite3mc` page cipher (ADR-74 supersedes the older `sqlite3_flutter_libs` + `sqlcipher_flutter_libs` dependency pairing); fail closed if the cipher is missing.
+2. Implement `platform/db/encrypted_database.dart` — generate a page-cipher key on first run, store it in the iOS Keychain / Android Keystore, and retrieve it on subsequent opens (SEC-13).
 3. Set the Keychain accessibility to `WhenUnlockedThisDeviceOnly` and use the Android Keystore without a weakened fallback; surface a one-time warning on a device with no passcode (SEC-14).
 4. Create `data/db/app_database.dart` — the `drift` database class at schema version 1 with **no application tables** (drift's internal versioning is sufficient; application entities are phases 06 and 07).
 5. Exclude the database file and key from cloud backup: iOS `isExcludedFromBackup` plus `NSFileProtectionComplete`; Android `android:allowBackup="false"` or an explicit backup-rules exclusion (SEC-16).
@@ -377,7 +377,7 @@ A phase is a milestone with several independently testable **sittings**, not a p
 - `platform/db/encrypted_database.dart`
 - `data/db/app_database.dart` (schema version 1, no application tables)
 - `data/repositories/repository.dart` (base interface)
-- iOS `Info.plist` and Android `AndroidManifest.xml` / backup-rules changes for backup exclusion
+- iOS `AppDelegate.swift` local-security channel (runtime backup exclusion and Complete file protection) and Android `AndroidManifest.xml` / native channel changes for backup exclusion and device-lock inspection
 - `integration_test/db/encrypted_store_test.dart`
 - `test/data/db/schema_version_test.dart`
 

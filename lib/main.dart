@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kasaran/platform/db/encrypted_database.dart';
+import 'package:kasaran/platform/db/local_store_bootstrap.dart';
+import 'package:kasaran/ui/local_store_gate.dart';
 import 'package:kasaran/ui/router/app_router.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  final security = PlatformLocalDeviceSecurity();
   runApp(
-    // ProviderScope is the Riverpod root — must wrap the entire widget tree.
-    const ProviderScope(
-      child: KasaranApp(),
+    LocalStoreGate(
+      open: () async => LocalStoreBootstrap(
+        await getApplicationSupportDirectory(),
+        PlatformDatabaseKeyStore(),
+        security,
+      ).open(),
+      markWarningShown: security.markLockWarningShown,
+      // ProviderScope is the Riverpod root of the application router.
+      child: const ProviderScope(child: KasaranApp()),
     ),
   );
 }

@@ -19,6 +19,7 @@
 
 | Screen ID | Name | Purpose | Entry points | REQ IDs satisfied |
 |---|---|---|---|---|
+| SYS-01 | Secure local-store startup | Open encrypted DB before router; block on key/cipher/protection failure; warn once if no device lock | Cold start, before SCR-01 | REQ-PLT-2, SEC-12–16, ADR-74 |
 | SCR-01 | Sign In / Sign Up | Authenticate; unchecked 18+ declaration; first-run Start / Join choice | Cold start, unauthenticated | REQ-SE-1 (9), ADR-52/63 |
 | SCR-02 | Invite Acceptance | Join via deep link or pasted invite URL | Invite deep link; SCR-01 join choice | REQ-SE-1 (3,4,5,6), SEC-05, ADR-52 |
 | SCR-03 | Setup: Budget & Date | Capture total budget, wedding date | After sign-up; SCR-18 | REQ-BS-1, REQ-BS-2, REQ-BS-3, REQ-GEN-2 |
@@ -74,6 +75,9 @@ Ruleset asset validation (REQ-AE-1 clause 4) is correctly non-UI: baselines sum 
 ## 2. Per-screen specification
 
 Field sources cite entities and derived calculations from design.md sections 1.4 and 4. **Derived** means computed on read and never stored, per design.md 1.4.
+
+### SYS-01 Secure local-store startup
+**Loading:** show local progress while the page cipher, secure key and protected app-support path open. Do not wait on a network request. **No device lock:** show the one-time advisory above SCR-01: “Your device has no device lock. Set a passcode or biometric lock to protect your financial data.” Continue only after “I understand”; remember acknowledgement in device-bound secure storage. **Failure:** if cipher, key, protected path or device-lock check fails, do not mount the router, do not wipe or recreate an existing database, and show “The secure local store could not open. Your data was not reset. Unlock the device and try again.” No plaintext fallback, no automatic reset, no suggestion that unsynced data was recovered. Phase 05 contains no plan entities yet; the system state is not a new plan screen.
 
 ### SCR-01 Sign In / Sign Up
 **Regions:** brand block; form; primary action; alternate-mode link; error slot; after authentication with no plan, explicit first-run choice.
@@ -251,6 +255,7 @@ Eight states per screen. **N/A** means the state cannot occur, with the reason g
 
 | Screen | First-run empty | Populated | Loading | Offline + pending | Sync error | Conflict just resolved | Partner removed | Calculation invalid |
 |---|---|---|---|---|---|---|---|---|
+| SYS-01 | First encrypted DB created with a new device-bound key; no app tables | Existing encrypted DB opens only with original key; router then mounts | Local-only key, cipher and file-protection checks; progress, no network | Same as online: local read available when key opens | Missing key, cipher, protection or device-lock check blocks router; never wipe/reset | N/A | N/A | No passcode: one-time advisory requiring acknowledgement; failure retains existing data without recovery claim |
 | SCR-01 | Post-auth Start/Join; new sign-up declaration unchecked | Existing plan → SCR-06; checked declaration on new signup | Auth request in flight | Sign-in blocked; message states connection needed and no data is at risk | Auth failure distinct from sync; unchecked/under-18 declaration blocks signup | N/A — pre-plan | N/A | N/A |
 | SCR-02 | Paste invite URL or accept deep link; no plan created yet | Valid invite summary | Replay progress with row count | Accept blocked; invite requires connection; token retained | Replay interrupted; resumes from committed cursor, local rows retained (ADR-48) | N/A — no local writes yet | Invite revoked; names reason | Invalid/expired/used token names reason and cannot accept |
 | SCR-03 | Default state | Pre-filled when reached from SCR-18 | N/A — local only | Badge only; setup fully available (REQ-OF-1) | Badge only; no blocking | N/A — single-partner phase | N/A | Invalid budget per REQ-BS-2; past date per REQ-BS-3 |
