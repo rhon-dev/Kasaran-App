@@ -40,6 +40,7 @@ dependencies:
   sqlite3: 3.5.0
   flutter_secure_storage: 11.2.0
   path_provider: 2.1.6
+  supabase_flutter: 2.18.0
 
 # Drift's native executor must use an encrypted SQLite implementation. The
 # legacy sqlite3_flutter_libs/sqlcipher_flutter_libs packages are obsolete with

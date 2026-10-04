@@ -430,8 +430,8 @@ A phase is a milestone with several independently testable **sittings**, not a p
 
 1. Integrate Supabase Auth for sign-up, sign-in, mandatory email verification and an explicit 18+ declaration; block plan creation and joining until verification (SEC-01, SEC-02). `supabase/config.toml`'s `enable_confirmations = false` is **local-only**: stage/prod deployment configuration MUST set `enable_confirmations = true` and test the unverified-account denial. Counsel must verify the age/legal-basis copy before real beta.
 2. Implement session handling: store access and refresh tokens in Keychain/Keystore (SEC-19), rotate refresh tokens on use, and invalidate server-side on sign-out (SEC-03, SEC-04).
-3. Write the migration creating the identity and access tables from `design.md` §4.1 — `users`, `plans`, `plan_members`, `invites`. (`lifecycle_confirmations` belongs to phase 16.)
-4. Enable and force RLS on those four tables, with membership resolved through `plan_members` keyed to the authenticated user (SEC-22, SEC-23 scoped to identity tables).
+3. Write the migration creating the identity and access tables from `design.md` §4.1 — `users`, `plans`, `plan_member_aliases`, `plan_members`, `invites`. (`lifecycle_confirmations` belongs to phase 16.)
+4. Enable and force RLS on those five tables, with membership resolved through `plan_members` keyed to the authenticated user (SEC-22, SEC-23 scoped to identity tables).
 5. Enforce one active plan per account (REQ-PLT-3): a database constraint or trigger, plus a client-side block whose message names the existing active plan.
 6. Enforce the two-partner cap: at most two `plan_members` rows per plan, by trigger (REQ-SE-1 cl. 1).
 7. Implement invite issue, accept, and revoke: 128-bit CSPRNG token, **hash only** stored in `invites.token_hash`, 7-day expiry, single-use (REQ-SE-1 cl. 3–5; SEC-05, SEC-06).
@@ -441,15 +441,25 @@ A phase is a milestone with several independently testable **sittings**, not a p
 
 > **Sitting boundary:** Auth/sessions (tasks 1–2, 9-partial, 10) and pairing/membership (tasks 3–8) are separately testable sittings within phase 06. The 24-phase index no longer equates a milestone with one sitting.
 
-**Deliverables**
+**Working-tree inventory (2026-10-04; implementation in progress, not a phase exit):**
 
-- `supabase/migrations/0001_identity_and_access.sql` (users, plans, plan_members, invites + RLS)
-- `data/repositories/auth_repository.dart`, `data/repositories/plan_membership_repository.dart`
-- `ui/screens/scr_01_sign_in.dart`, `ui/screens/scr_02_invite_acceptance.dart` (real implementations)
-- `ui/router/auth_guard.dart` (real, replacing the phase-03 stub)
-- `platform/secure_storage/token_store.dart`
-- `test/data/repositories/auth_repository_test.dart`, `test/data/repositories/plan_membership_repository_test.dart`
-- `integration_test/auth/pairing_test.dart`
+| Slice | Present in this branch | Still not demonstrated / not wired |
+|---|---|---|
+| Auth/session | `main.dart` initializes Supabase after the encrypted local-store gate; `auth_repository.dart` uses Supabase Auth and an unchecked-adult policy; `auth_provider.dart` derives verified/unverified state; `token_store.dart` supplies secure-storage adapters for session JSON and PKCE. Fake-gateway and widget tests exist. | Real verification-link round trip, refresh-token reuse/TTL and server-side revocation probes, physical Keychain/Keystore and backup inspection, and stage/prod confirmation settings. The displayed privacy notice is explicitly a synthetic-local placeholder, not counsel-approved copy. |
+| Server identity/pairing | `0001_identity_and_access.sql` defines five public identity/access tables (`users`, `plans`, `plan_member_aliases`, `plan_members`, `invites`), forced RLS, denied direct mutations, one-membership/two-member checks, and `create_plan`, `issue_invite`, `accept_invite`, `revoke_invite` RPCs. A rebuilt disposable local Supabase instance applied the migration from an empty volume; all eleven synthetic identity tests then passed, including distinct-invite concurrency, email changes and invalid reminder offsets. | The local subset is not stage deploy, full TC-SEC-01, or a production-safe rollback. Foreign-plan list reads return `200 []`; this must be indistinguishable from a nonexistent-plan list response (§7.1). Exercise the full negative matrix before calling TC-SEC-01 passed. |
+| Client pairing | SCR-01 offers Start/Join; an asynchronous `planAccessProvider` checks server membership after verified Auth and blocks protected routes on lookup error or loading. SCR-02 paste/custom-scheme parsing matches the SQL token format (32 lowercase hex), calls `accept_invite`, and refreshes membership after success; focused router/widget tests passed locally. | SCR-03 remains a placeholder, so Start cannot submit `create_plan`; no app-level issue/revoke, client-side named-existing-plan message, invite summary, decline, first replay, or post-accept dashboard navigation is implemented. Full re-pair-after-reinstall is unverified. The fake-backed parity test is not an end-to-end invite verdict. |
+
+This inventory distinguishes bounded local test results from unverified phase exit criteria. Use `testing-plan.md` §2.0's evidence distinctions; do not mark TC-PLT-03, TC-SE-23/42/45 or TC-SEC-01 passed from a partial local run.
+
+**Target deliverables** (paths below are planned outputs, not an inventory of files already verified):
+
+- `supabase/migrations/0001_identity_and_access.sql` (five tables including `plan_member_aliases`, RLS and pairing RPCs; clean disposable-local replay passed, remote deploy pending)
+- `lib/data/repositories/auth_repository.dart`, `lib/data/repositories/plan_membership_repository.dart` (present, bounded)
+- `lib/ui/screens/scr_01_sign_in.dart`, `lib/ui/screens/scr_02_invite_acceptance.dart` (partial; §inventory above)
+- `lib/ui/providers/auth_provider.dart`, `lib/ui/providers/plan_provider.dart` and `lib/ui/router/app_router.dart` (reactive Auth and async plan-access guards present; lookup and errors need on-device verification)
+- `lib/platform/secure_storage/token_store.dart` (adapter present; device verification pending)
+- `test/data/repositories/auth_repository_test.dart`, `test/ui/screens/scr_01_sign_in_test.dart`, `test/ui/screens/scr_02_invite_acceptance_test.dart`, `test/api/identity/test_identity.py` (sources present; no full TC verdict)
+- Plan-membership repository test and on-device `integration_test/auth/pairing_test.dart` (not yet present)
 
 **Exit Criteria**
 
@@ -481,7 +491,7 @@ A phase is a milestone with several independently testable **sittings**, not a p
 - Budget setup or onboarding content beyond the auth guard redirect (phase 09).
 - **No AI code, no AI dependencies.**
 
-**Rollback:** Revert the phase commits and roll back `0001_identity_and_access.sql`. The migration is purely additive — four new tables and their policies — so the down-migration drops them cleanly per `deployment-plan.md` §2.6. Staging holds synthetic data only, so no user data is at risk. Any auth keys created should be rotated.
+**Rollback:** For local synthetic development, revert the phase code and reset the disposable local database only after confirming it contains no retained work. The current migration adds five public tables, functions, triggers and an Auth trigger; there is no verified down-migration or rehearsed remote rollback. Dropping identity tables after accounts or invitations exist would destroy data and cannot be described as clean. Any staging rollback needs a reviewed, rehearsed migration/backup procedure per `deployment-plan.md` §2.6; production deployment is deferred. Rotate any affected auth keys after a real exposure, not merely because a local migration was reverted.
 
 **Open questions to resolve before starting:** None blocking this phase directly.
 *Inherited:* if phase 04 was descoped to staging-only under OQ-07, this phase runs against staging only, and the production identity migration is deferred with it.

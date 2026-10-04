@@ -1,18 +1,48 @@
-// ui/providers/plan_provider.dart
-//
-// Stub active-plan state provider.
-//
-// Phase 03: always returns false (no active plan) so the router redirects an
-// authenticated-but-plan-less user to the onboarding wizard. Phase 07 wires
-// this to the real repository once the data layer exists.
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kasaran/ui/providers/auth_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show SupabaseClient, Supabase;
 
-/// Whether the authenticated user has an active wedding plan.
-///
-/// Stub for phase 03 — always false.
-/// Phase 07 replaces this with a provider backed by the plan repository.
-final hasActivePlanProvider = Provider<bool>((ref) =>
-    // Phase 03 stub: no active plan. Override in widget tests that need the
-    // authenticated + has-plan path (tab shell).
-    false);
+enum PlanAccess { loading, none, member, error }
+
+// ignore: one_member_abstracts
+abstract interface class PlanMembershipLookup {
+  Future<String?> currentPlanId();
+}
+
+final class SupabasePlanMembershipLookup implements PlanMembershipLookup {
+  const SupabasePlanMembershipLookup(this.client);
+  final SupabaseClient client;
+
+  @override
+  Future<String?> currentPlanId() async {
+    final uid = client.auth.currentUser?.id;
+    if (uid == null) throw StateError('Signed-in account required');
+    final row = await client
+        .from('plan_members')
+        .select('plan_id')
+        .eq('user_id', uid)
+        .maybeSingle();
+    return row?['plan_id'] as String?;
+  }
+}
+
+final planMembershipLookupProvider = Provider<PlanMembershipLookup>(
+  (ref) => SupabasePlanMembershipLookup(Supabase.instance.client),
+);
+
+/// A failed network read is not proof that the account has no plan.
+final currentPlanIdProvider = FutureProvider<String?>((ref) async {
+  if (ref.watch(authStateProvider) != AuthState.authenticated) return null;
+  return ref.watch(planMembershipLookupProvider).currentPlanId();
+});
+
+final planAccessProvider = Provider<PlanAccess>((ref) {
+  if (ref.watch(authStateProvider) != AuthState.authenticated) {
+    return PlanAccess.none;
+  }
+  final lookup = ref.watch(currentPlanIdProvider);
+  if (lookup.hasError) return PlanAccess.error;
+  if (!lookup.hasValue) return PlanAccess.loading;
+  return lookup.requireValue == null ? PlanAccess.none : PlanAccess.member;
+});
