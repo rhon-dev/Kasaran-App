@@ -94,9 +94,8 @@ void main() {
       routes: [
         GoRoute(
           path: '/invite/accept/:token',
-          builder: (_, state) => Scr02InviteAcceptance(
-            token: state.pathParameters['token']!,
-          ),
+          builder: (_, state) =>
+              Scr02InviteAcceptance(token: state.pathParameters['token']!),
         ),
         GoRoute(
           path: '/sign-in',
@@ -130,6 +129,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWithValue('user-1'),
         planMembershipRepositoryProvider.overrideWith((ref) => fake),
         planMembershipLookupProvider.overrideWith((ref) => lookup),
       ],

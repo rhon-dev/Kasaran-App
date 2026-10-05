@@ -33,7 +33,11 @@ final planMembershipLookupProvider = Provider<PlanMembershipLookup>(
 
 /// A failed network read is not proof that the account has no plan.
 final currentPlanIdProvider = FutureProvider<String?>((ref) async {
-  if (ref.watch(authStateProvider) != AuthState.authenticated) return null;
+  final userId = ref.watch(authUserIdProvider);
+  if (ref.watch(authStateProvider) != AuthState.authenticated ||
+      userId == null) {
+    return null;
+  }
   return ref.watch(planMembershipLookupProvider).currentPlanId();
 });
 
@@ -41,7 +45,12 @@ final planAccessProvider = Provider<PlanAccess>((ref) {
   if (ref.watch(authStateProvider) != AuthState.authenticated) {
     return PlanAccess.none;
   }
+  if (ref.watch(authUserIdProvider) == null) {
+    final identity = ref.watch(authIdentityStateProvider);
+    return identity.hasError ? PlanAccess.error : PlanAccess.loading;
+  }
   final lookup = ref.watch(currentPlanIdProvider);
+  if (lookup.isLoading) return PlanAccess.loading;
   if (lookup.hasError) return PlanAccess.error;
   if (!lookup.hasValue) return PlanAccess.loading;
   return lookup.requireValue == null ? PlanAccess.none : PlanAccess.member;

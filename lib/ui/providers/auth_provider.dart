@@ -33,3 +33,47 @@ final authStateProvider = Provider<AuthState>((ref) {
     _ => AuthState.unauthenticated,
   };
 });
+
+/// Verification status alone cannot distinguish two verified accounts.
+abstract interface class AuthIdentitySource {
+  String? get currentUserId;
+  Stream<String?> get onUserChanged;
+}
+
+final class SupabaseAuthIdentitySource implements AuthIdentitySource {
+  const SupabaseAuthIdentitySource(this.auth);
+  final GoTrueClient auth;
+
+  @override
+  String? get currentUserId => auth.currentUser?.id;
+
+  @override
+  Stream<String?> get onUserChanged =>
+      auth.onAuthStateChange.map((event) => event.session?.user.id);
+}
+
+final authIdentitySourceProvider = Provider<AuthIdentitySource?>((ref) {
+  try {
+    return SupabaseAuthIdentitySource(Supabase.instance.client.auth);
+    // Widget-only tests mount without calling main.
+    // ignore: avoid_catching_errors
+  } on AssertionError {
+    return null;
+  }
+});
+
+final authIdentityStateProvider = StreamProvider<String?>((ref) async* {
+  final source = ref.watch(authIdentitySourceProvider);
+  if (source == null) return;
+  yield source.currentUserId;
+  yield* source.onUserChanged;
+});
+
+/// Null when identity is unknown or the Auth stream fails.
+final authUserIdProvider = Provider<String?>((ref) {
+  final identity = ref.watch(authIdentityStateProvider);
+  if (identity.isLoading || identity.hasError || !identity.hasValue) {
+    return null;
+  }
+  return identity.requireValue;
+});

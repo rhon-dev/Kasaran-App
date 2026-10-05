@@ -303,7 +303,10 @@ class _PlanCheckScreen extends ConsumerWidget {
                     'Your plan could not be checked. Reconnect and retry.',
                   ),
                   TextButton(
-                    onPressed: () => ref.invalidate(currentPlanIdProvider),
+                    onPressed: () {
+                      ref.invalidate(authIdentityStateProvider);
+                      ref.invalidate(currentPlanIdProvider);
+                    },
                     child: const Text('Retry'),
                   ),
                 ],
