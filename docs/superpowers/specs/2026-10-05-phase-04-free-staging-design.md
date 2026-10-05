@@ -1,0 +1,28 @@
+# Phase 04 Free Synthetic Staging — Bounded Design
+
+**Decision:** Owner approved an isolated Free Supabase organization and a synthetic-only Kasaran staging project in `ap-southeast-1`. This is a temporary infrastructure sitting (ADR-76), not a change to ADR-64's paid-Pro target, ADR-72's Singapore technical production choice, or OQ-07's legal/release gate. ADR-75 is reserved by the separate open SCR-03 PR #13, so this branch uses the next unused ID without renumbering. No paid plan, production project, real-couple record, AI feature, supplier recommendation, or money movement is authorized.
+
+## Current boundary
+
+The repository already contains local `supabase/config.toml`, authenticated empty `sync_push`/`sync_pull` Edge stubs, local contract tests and a CI contract job. No Kasaran staging project is listed in the accessible account; three unrelated projects are inactive. Phase 04 has local evidence but no recorded staging reference. Existing local config sets `[auth.email] enable_confirmations = false` for development. Never push this config to hosted staging. The existing Edge pull stub uses a legacy GET envelope; `design.md` §2.4's versioned POST cursor contract remains later work. Do not call the stubs a complete sync implementation.
+
+## Provisioning and secrets
+
+1. Work on an independent Phase 04 branch from `origin/main`; PR #13's SCR-03 work is unrelated and remains open. Create a separate Kasaran organization with no paid upgrade. Before creating a project, check that its billing plan is Free, or stop. Create one Free staging project in `ap-southeast-1`; independently read its region, organization and status. If Free eligibility or billing cannot be verified, stop before the billable action and ask the owner.
+2. Generate a strong unique database password without printing it and store it in the user's macOS Keychain, indexed by staging project; never store it in the repo, PR, terminal transcript or an unprotected file. Keep Supabase management credentials and any service-role key out of the app, docs, logs and chat. Use a restrictive temporary file only if the CLI or test runner requires one; clean it after use. The project reference is not itself a secret and may be recorded.
+3. Deploy only the existing empty `sync_push` and `sync_pull` functions to the staging project. Do not run `supabase db push`, `supabase config push`, seed import, or client release. No identity migration or plan records are needed for this bounded smoke run. A remote migration requires the complete tenant-negative suite and a backup-backed rollback rehearsal per `deployment-plan.md` §1.
+
+## Verification and failure behavior
+
+- Read hosted Auth settings and assert email confirmation enabled, token TTL at most 3600 seconds and refresh-token rotation. If these cannot be verified, report a blocker; do not infer stage settings from local config or weaken them to make smoke tests pass.
+- Exercise both functions with no bearer and an invalid bearer. For authenticated smoke, provision a synthetic verified account using an authorized server-side process that does **not** expose the service-role key to a client or local test source. If that process is unavailable while CI is billing-blocked, leave the authenticated subset unverified; do not weaken hosted email confirmation or improvise a real mailbox. Assert 401 for unauthenticated calls, 200 with explicitly empty envelopes only when a valid bearer is available, and 4xx for malformed push only after authentication. Decode a synthetic issued JWT to check `exp - iat` when one is available. Never print tokens, credentials, URLs bearing credentials, full request/response bodies, or real emails.
+- Verify exact deployment by listing remote functions and checking the target project reference; read the same project back after any state-changing action. If provisioning succeeds but deploy or tests fail, retain the project for diagnosis and report partial state. Do not delete or downgrade it silently.
+- Record only non-secret org/project reference and observed pass/fail evidence in `docs/deployment-plan.md`, `docs/development-phases.md` and `docs/testing-plan.md`. Do not mark full TC-API-01/02/03/05, SEC-24, paid-Pro readiness, remote CI or phase exit PASS from stub smoke tests. Preserve OQ-07 and real-user beta gates.
+
+## Alternatives rejected for this sitting
+
+- **Paid Pro organization now:** matches ADR-64's eventual target but authorizes ongoing subscription and compute charges not approved for this sitting.
+- **Free staging in the existing organization:** could later combine billing and unrelated inactive projects if that organization is upgraded. Isolation in a new organization is safer.
+- **Local-only:** avoids cloud side effects but cannot establish the missing staging reference or remote contract evidence.
+
+The v1 four tests are satisfied: deterministic request validation and empty responses, explainable errors and evidence, no money movement, and no supplier recommendation. No AI code is introduced.
