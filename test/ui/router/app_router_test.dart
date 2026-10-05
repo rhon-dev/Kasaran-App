@@ -9,6 +9,7 @@ import 'package:kasaran/ui/router/app_router.dart';
 import 'package:kasaran/ui/screens/placeholder_screen.dart';
 import 'package:kasaran/ui/screens/scr_01_sign_in.dart';
 import 'package:kasaran/ui/screens/scr_02_invite_acceptance.dart';
+import 'package:kasaran/ui/screens/scr_17_shared_access.dart';
 
 final _auth = NotifierProvider<_AuthController, AuthState>(_AuthController.new);
 final _plan = NotifierProvider<_PlanController, PlanAccess>(
@@ -211,7 +212,6 @@ void main() {
       '/pledges/edit/abc123': 'SCR-15',
       Routes.more: 'SCR-16',
       Routes.moreChangeLog: 'SCR-16',
-      Routes.moreSharedAccess: 'SCR-17',
       Routes.morePlanSettings: 'SCR-18',
       Routes.moreSyncDetail: 'SCR-19',
     };
@@ -221,6 +221,13 @@ void main() {
       _expectScreen(entry.value);
       expect(router.routeInformationProvider.value.uri.path, entry.key);
     }
+    router.go(Routes.moreSharedAccess);
+    await tester.pumpAndSettle();
+    expect(find.byType(Scr17SharedAccess), findsOneWidget);
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      Routes.moreSharedAccess,
+    );
   });
 
   testWidgets('onboarding screens remain reachable without a plan', (
