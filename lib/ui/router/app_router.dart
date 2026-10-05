@@ -36,8 +36,9 @@ abstract final class Routes {
   static const invitePaste = '/invite/accept';
   static const inviteAccept = '/invite/accept/:token';
   static const onboardingBudgetDate = '/onboarding/budget-date';
-  static const onboardingGuestRegion = '/onboarding/guest-region';
-  static const onboardingHiddenFees = '/onboarding/hidden-fees';
+  static const onboardingGuestRegion = '/onboarding/budget-date/guest-region';
+  static const onboardingHiddenFees =
+      '/onboarding/budget-date/guest-region/hidden-fees';
   static const dashboard = '/dashboard';
   static const ledger = '/ledger';
   static const ledgerEntry = '/ledger/entry/:id';
