@@ -65,21 +65,38 @@ class _Scr03SetupBudgetDateState extends ConsumerState<Scr03SetupBudgetDate> {
     if (isPastWeddingDate(date, ref.read(setupTodayProvider))) {
       final accepted = await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Past wedding date'),
-          content: Text(
-            'Your wedding date is ${_date.text}. Continue with this date?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Go back'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Continue'),
-            ),
-          ],
+        builder: (dialogContext) => Consumer(
+          builder: (context, dialogRef, _) {
+            final active = identical(
+              dialogRef.watch(setupDraftProvider),
+              draft,
+            );
+            return AlertDialog(
+              title: Text(active ? 'Past wedding date' : 'Account changed'),
+              content: Text(
+                active
+                    ? 'Your wedding date is ${draft.dateInput}. Continue with this date?'
+                    : 'This draft no longer belongs to the current account.',
+              ),
+              actions: active
+                  ? [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        child: const Text('Go back'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        child: const Text('Continue'),
+                      ),
+                    ]
+                  : [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        child: const Text('Close'),
+                      ),
+                    ],
+            );
+          },
         ),
       );
       // A->B->A may have the same account ID but a different draft instance.

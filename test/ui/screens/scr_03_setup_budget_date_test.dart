@@ -157,9 +157,10 @@ void main() {
       expect(find.text('Past wedding date'), findsOneWidget);
       container.read(_user.notifier).value = 'B';
       await tester.pump();
+      expect(find.textContaining('2027-01-01'), findsNothing);
       container.read(_user.notifier).value = 'A';
       await tester.pump();
-      await tester.tap(find.text('Continue'));
+      await tester.tap(find.text('Close'));
       await tester.pumpAndSettle();
       expect(container.read(setupDraftProvider).acceptedDate, isNull);
       expect(

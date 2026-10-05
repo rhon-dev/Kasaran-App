@@ -158,6 +158,27 @@ void main() {
     },
   );
 
+  testWidgets('sign-out hides an open past-date prompt and erases its draft', (
+    tester,
+  ) async {
+    final (container, router) = await _pump(tester, plan: false);
+    final keepRouterWatched = container.listen(appRouterProvider, (_, _) {});
+    addTearDown(keepRouterWatched.close);
+    await tester.tap(find.text('Start our plan'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('setup-budget')), '123');
+    await tester.enterText(find.byKey(const Key('setup-date')), '2020-01-01');
+    await tester.tap(find.byKey(const Key('setup-next')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2020-01-01'), findsWidgets);
+    container.read(_auth.notifier).value = AuthState.unauthenticated;
+    await tester.pumpAndSettle();
+    expect(container.read(setupDraftProvider).ownerId, isNull);
+    expect(find.textContaining('2020-01-01'), findsNothing);
+    expect(find.text('Continue'), findsNothing);
+    expect(router.routeInformationProvider.value.uri.path, Routes.signIn);
+  });
+
   testWidgets(
     'identity reload hides and erases SCR-03 draft through production router',
     (tester) async {
