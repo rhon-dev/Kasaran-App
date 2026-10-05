@@ -24,6 +24,41 @@ class _PlanController extends Notifier<String> {
   set value(String next) => state = next;
 }
 
+final _identity = NotifierProvider<_IdentityController, String>(
+  _IdentityController.new,
+);
+
+class _IdentityController extends Notifier<String> {
+  @override
+  String build() => 'user-1';
+  set value(String next) => state = next;
+}
+
+class _FakeAuthIdentitySource implements AuthIdentitySource {
+  final changes = StreamController<String?>.broadcast();
+  String? userId = 'user-1';
+
+  @override
+  String? get currentUserId => userId;
+
+  @override
+  Stream<String?> get onUserChanged => changes.stream;
+
+  Future<void> dispose() => changes.close();
+}
+
+class _ChangingIdentityLookup implements PlanMembershipLookup {
+  _ChangingIdentityLookup(this.userId);
+  final String Function() userId;
+  int calls = 0;
+
+  @override
+  Future<String?> currentPlanId() async {
+    calls++;
+    return userId() == 'user-1' ? 'plan-1' : 'plan-2';
+  }
+}
+
 class _FakeInvitations implements InvitationRepository {
   final token = List.filled(32, 'a').join();
   int issueCalls = 0;
@@ -85,6 +120,119 @@ class _FakeInvitations implements InvitationRepository {
 }
 
 void main() {
+  test('account identity provider follows user-ID events', () async {
+    final source = _FakeAuthIdentitySource();
+    final container = ProviderContainer(
+      overrides: [authIdentitySourceProvider.overrideWithValue(source)],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await source.dispose();
+    });
+    final first = Completer<void>();
+    final second = Completer<void>();
+    final subscription = container.listen(authUserIdProvider, (_, next) {
+      if (next == 'user-1' && !first.isCompleted) first.complete();
+      if (next == 'user-2' && !second.isCompleted) second.complete();
+    }, fireImmediately: true);
+    addTearDown(subscription.close);
+    await first.future.timeout(const Duration(seconds: 2));
+    source.changes.add('user-2');
+    await second.future.timeout(const Duration(seconds: 2));
+    expect(container.read(authUserIdProvider), 'user-2');
+  });
+
+  test('identity refresh never exposes the previous account ID', () async {
+    final source = _FakeAuthIdentitySource();
+    final container = ProviderContainer(
+      overrides: [
+        authStateProvider.overrideWithValue(AuthState.authenticated),
+        authIdentitySourceProvider.overrideWithValue(source),
+        planMembershipLookupProvider.overrideWithValue(
+          _ChangingIdentityLookup(() => 'user-1'),
+        ),
+      ],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await source.dispose();
+    });
+    final known = Completer<void>();
+    final subscription = container.listen(authUserIdProvider, (_, next) {
+      if (next == 'user-1' && !known.isCompleted) known.complete();
+    }, fireImmediately: true);
+    addTearDown(subscription.close);
+    await known.future.timeout(const Duration(seconds: 2));
+    source.userId = 'user-2';
+    container.invalidate(authIdentityStateProvider);
+    expect(container.read(authUserIdProvider), isNull);
+    expect(container.read(planAccessProvider), PlanAccess.loading);
+  });
+
+  test(
+    'verified status defers plan access without known account identity',
+    () async {
+      final lookup = _ChangingIdentityLookup(() => 'user-1');
+      final container = ProviderContainer(
+        overrides: [
+          authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          authUserIdProvider.overrideWithValue(null),
+          planMembershipLookupProvider.overrideWithValue(lookup),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(currentPlanIdProvider.future);
+      expect(container.read(planAccessProvider), PlanAccess.loading);
+      expect(lookup.calls, 0);
+    },
+  );
+
+  test('identity stream failure blocks plan access as an error', () async {
+    final source = _FakeAuthIdentitySource();
+    final lookup = _ChangingIdentityLookup(() => 'user-1');
+    final container = ProviderContainer(
+      overrides: [
+        authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authIdentitySourceProvider.overrideWithValue(source),
+        planMembershipLookupProvider.overrideWithValue(lookup),
+      ],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await source.dispose();
+    });
+    final known = Completer<void>();
+    final lost = Completer<void>();
+    final subscription = container.listen(authUserIdProvider, (previous, next) {
+      if (next == 'user-1' && !known.isCompleted) known.complete();
+      if (previous == 'user-1' && next == null && !lost.isCompleted) {
+        lost.complete();
+      }
+    }, fireImmediately: true);
+    addTearDown(subscription.close);
+    await known.future.timeout(const Duration(seconds: 2));
+    source.changes.addError(StateError('synthetic identity failure'));
+    await lost.future.timeout(const Duration(seconds: 2));
+    expect(container.read(planAccessProvider), PlanAccess.error);
+  });
+
+  test('membership lookup refreshes when verified account changes', () async {
+    late ProviderContainer container;
+    final lookup = _ChangingIdentityLookup(() => container.read(_identity));
+    container = ProviderContainer(
+      overrides: [
+        authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
+        planMembershipLookupProvider.overrideWith((ref) => lookup),
+      ],
+    );
+    addTearDown(container.dispose);
+    expect(await container.read(currentPlanIdProvider.future), 'plan-1');
+    container.read(_identity.notifier).value = 'user-2';
+    expect(await container.read(currentPlanIdProvider.future), 'plan-2');
+    expect(lookup.calls, 2);
+  });
+
   testWidgets('failed metadata read blocks issue until retry succeeds', (
     tester,
   ) async {
@@ -93,6 +241,7 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
@@ -115,6 +264,7 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
@@ -133,6 +283,7 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
@@ -152,6 +303,7 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
@@ -174,6 +326,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
@@ -207,6 +360,7 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
@@ -230,6 +384,7 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
@@ -264,6 +419,7 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
@@ -288,6 +444,7 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
+          authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
@@ -308,6 +465,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
@@ -332,6 +490,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         authStateProvider.overrideWith((ref) => ref.watch(_auth)),
+        authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
@@ -359,6 +518,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         authStateProvider.overrideWith((ref) => ref.watch(_auth)),
+        authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
@@ -395,6 +555,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => ref.watch(_plan)),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
@@ -429,6 +590,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => ref.watch(_plan)),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
@@ -458,11 +620,143 @@ void main() {
     expect(find.textContaining(fake.token), findsNothing);
   });
 
+  testWidgets('verified account switch clears a prior account link', (
+    tester,
+  ) async {
+    final fake = _FakeInvitations();
+    final container = ProviderContainer(
+      overrides: [
+        authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
+        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        invitationRepositoryProvider.overrideWithValue(fake),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: Scr17SharedAccess()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Issue invitation'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(fake.token), findsOneWidget);
+    container.read(_identity.notifier).value = 'user-2';
+    await tester.pumpAndSettle();
+    expect(find.textContaining(fake.token), findsNothing);
+    container.read(_identity.notifier).value = 'user-1';
+    await tester.pumpAndSettle();
+    expect(find.textContaining(fake.token), findsNothing);
+  });
+
+  testWidgets('late issue response cannot reveal after account A-B-A switch', (
+    tester,
+  ) async {
+    final fake = _FakeInvitations()..pendingIssue = Completer<IssuedInvite>();
+    final container = ProviderContainer(
+      overrides: [
+        authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
+        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        invitationRepositoryProvider.overrideWithValue(fake),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: Scr17SharedAccess()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Issue invitation'));
+    await tester.pump();
+    container.read(_identity.notifier).value = 'user-2';
+    await tester.pump();
+    container.read(_identity.notifier).value = 'user-1';
+    await tester.pump();
+    fake.pendingIssue!.complete(
+      IssuedInvite(
+        id: 'invite-late-account',
+        expiresAt: DateTime.utc(2030),
+        token: fake.token,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining(fake.token), findsNothing);
+  });
+
+  testWidgets('late revoke failure does not appear for another account', (
+    tester,
+  ) async {
+    final fake = _FakeInvitations()
+      ..pendingRevoke = Completer<void>()
+      ..failRevoke = true;
+    final container = ProviderContainer(
+      overrides: [
+        authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
+        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        invitationRepositoryProvider.overrideWithValue(fake),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: Scr17SharedAccess()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Issue invitation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Revoke invitation'));
+    await tester.pump();
+    container.read(_identity.notifier).value = 'user-2';
+    await tester.pump();
+    fake.pendingRevoke!.complete();
+    await tester.pumpAndSettle();
+    expect(find.textContaining(fake.token), findsNothing);
+    expect(find.textContaining('Could not revoke invitation'), findsNothing);
+  });
+
+  testWidgets('late issue failure does not appear for another account', (
+    tester,
+  ) async {
+    final fake = _FakeInvitations()..pendingIssue = Completer<IssuedInvite>();
+    final container = ProviderContainer(
+      overrides: [
+        authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
+        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        invitationRepositoryProvider.overrideWithValue(fake),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: Scr17SharedAccess()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Issue invitation'));
+    await tester.pump();
+    container.read(_identity.notifier).value = 'user-2';
+    await tester.pump();
+    fake.pendingIssue!.completeError(StateError('synthetic issue failure'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Could not issue invitation'), findsNothing);
+  });
+
   testWidgets('plan change drops an already issued link', (tester) async {
     final fake = _FakeInvitations();
     final container = ProviderContainer(
       overrides: [
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
+        authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => ref.watch(_plan)),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],

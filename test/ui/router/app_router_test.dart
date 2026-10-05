@@ -1,4 +1,6 @@
 // Tests the production router with auth/plan overrides, not a copied route tree.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +30,44 @@ class _PlanController extends Notifier<PlanAccess> {
   PlanAccess build() => PlanAccess.none;
 
   set value(PlanAccess next) => state = next;
+}
+
+final _user = NotifierProvider<_UserController, String>(_UserController.new);
+
+class _UserController extends Notifier<String> {
+  @override
+  String build() => 'user-1';
+
+  set value(String next) => state = next;
+}
+
+class _PendingMembershipLookup implements PlanMembershipLookup {
+  final requests = <Completer<String?>>[];
+
+  @override
+  Future<String?> currentPlanId() {
+    final request = Completer<String?>();
+    requests.add(request);
+    return request.future;
+  }
+}
+
+class _RetryIdentitySource implements AuthIdentitySource {
+  final changes = StreamController<String?>.broadcast();
+  String? userId;
+
+  @override
+  String? get currentUserId => userId;
+
+  @override
+  Stream<String?> get onUserChanged => changes.stream;
+
+  Future<void> dispose() => changes.close();
+}
+
+class _RetryMembershipLookup implements PlanMembershipLookup {
+  @override
+  Future<String?> currentPlanId() async => 'plan-1';
 }
 
 Future<(ProviderContainer, GoRouter)> _pump(
@@ -67,6 +107,88 @@ void _expectScreen(String id) {
 }
 
 void main() {
+  testWidgets(
+    'account switches defer protected routes until membership reload',
+    (tester) async {
+      final lookup = _PendingMembershipLookup();
+      final container = ProviderContainer(
+        overrides: [
+          authStateProvider.overrideWithValue(AuthState.authenticated),
+          authUserIdProvider.overrideWith((ref) => ref.watch(_user)),
+          planMembershipLookupProvider.overrideWithValue(lookup),
+        ],
+      );
+      addTearDown(container.dispose);
+      final router = container.read(appRouterProvider);
+      final routerSubscription = container.listen(appRouterProvider, (_, _) {});
+      addTearDown(routerSubscription.close);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pump();
+      expect(lookup.requests.length, 1);
+      lookup.requests[0].complete('plan-1');
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
+      container.read(_user.notifier).value = 'user-2';
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(container.read(planAccessProvider), PlanAccess.loading);
+      expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
+      expect(lookup.requests.length, 2);
+      container.read(_user.notifier).value = 'user-1';
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(container.read(planAccessProvider), PlanAccess.loading);
+      expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
+      expect(lookup.requests.length, 3);
+      lookup.requests[1].complete('plan-1');
+      await tester.pump();
+      expect(container.read(planAccessProvider), PlanAccess.loading);
+      lookup.requests[2].complete('plan-1');
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
+    },
+  );
+
+  testWidgets('plan-check retry refreshes failed account identity', (
+    tester,
+  ) async {
+    final source = _RetryIdentitySource();
+    final container = ProviderContainer(
+      overrides: [
+        authStateProvider.overrideWithValue(AuthState.authenticated),
+        authIdentitySourceProvider.overrideWithValue(source),
+        planMembershipLookupProvider.overrideWithValue(
+          _RetryMembershipLookup(),
+        ),
+      ],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await source.dispose();
+    });
+    final router = container.read(appRouterProvider);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    source.changes.addError(StateError('synthetic identity failure'));
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
+    expect(find.text('Retry'), findsOneWidget);
+    source.userId = 'user-1';
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
+  });
+
   testWidgets(
     'custom-scheme invite opens SCR-02 with original token unauthenticated',
     (tester) async {

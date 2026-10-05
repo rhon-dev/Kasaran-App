@@ -37,6 +37,8 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
 
   Future<void> _issue(String planId) async {
     if (_busy) return;
+    final userId = ref.read(authUserIdProvider);
+    if (userId == null) return;
     final authEpoch = _authEpoch;
     final planEpoch = _planEpoch;
     setState(() {
@@ -52,6 +54,7 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
       if (authEpoch != _authEpoch ||
           planEpoch != _planEpoch ||
           ref.read(authStateProvider) != AuthState.authenticated ||
+          ref.read(authUserIdProvider) != userId ||
           !currentPlan.hasValue ||
           currentPlan.requireValue != planId) {
         return;
@@ -63,7 +66,10 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
       });
       ref.invalidate(_invitationOverviewProvider(planId));
     } catch (_) {
-      if (mounted) {
+      if (mounted &&
+          authEpoch == _authEpoch &&
+          planEpoch == _planEpoch &&
+          ref.read(authUserIdProvider) == userId) {
         setState(
           () => _error = 'Could not issue invitation. Reconnect and retry.',
         );
@@ -75,13 +81,23 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
 
   Future<void> _revoke(String planId, String inviteId) async {
     if (_busy) return;
+    final userId = ref.read(authUserIdProvider);
+    if (userId == null) return;
+    final authEpoch = _authEpoch;
+    final planEpoch = _planEpoch;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       await ref.read(invitationRepositoryProvider).revokeInvite(inviteId);
-      if (!mounted) return;
+      if (!mounted ||
+          authEpoch != _authEpoch ||
+          planEpoch != _planEpoch ||
+          ref.read(authUserIdProvider) != userId ||
+          ref.read(authStateProvider) != AuthState.authenticated) {
+        return;
+      }
       setState(() {
         if (_issuedId == inviteId) {
           _issuedId = null;
@@ -91,7 +107,10 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
       });
       ref.invalidate(_invitationOverviewProvider(planId));
     } catch (_) {
-      if (mounted) {
+      if (mounted &&
+          authEpoch == _authEpoch &&
+          planEpoch == _planEpoch &&
+          ref.read(authUserIdProvider) == userId) {
         setState(
           () => _error = 'Could not revoke invitation. Reconnect and retry.',
         );
@@ -103,6 +122,17 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(authUserIdProvider, (previous, next) {
+      if (previous != next && mounted) {
+        _authEpoch++;
+        setState(() {
+          _issuedId = null;
+          _issuedPlanId = null;
+          _issuedLink = null;
+          _error = null;
+        });
+      }
+    });
     ref.listen(authStateProvider, (_, next) {
       if (next != AuthState.authenticated && mounted) {
         _authEpoch++;
@@ -126,6 +156,7 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
       }
     });
     final auth = ref.watch(authStateProvider);
+    final userId = ref.watch(authUserIdProvider);
     final plan = ref.watch(currentPlanIdProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('SCR-17 · Shared Access')),
@@ -135,7 +166,7 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
           AsyncLoading() => const Center(child: CircularProgressIndicator()),
           AsyncError() => _retryPlan(),
           AsyncData(value: final planId) =>
-            planId == null || auth != AuthState.authenticated
+            planId == null || auth != AuthState.authenticated || userId == null
                 ? const Text('No active plan is available for invitations.')
                 : _invitationBlock(planId),
         },
