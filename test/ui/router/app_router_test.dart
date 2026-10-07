@@ -7,10 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
+import 'package:kasaran/ui/providers/setup_draft_provider.dart';
 import 'package:kasaran/ui/router/app_router.dart';
 import 'package:kasaran/ui/screens/placeholder_screen.dart';
 import 'package:kasaran/ui/screens/scr_01_sign_in.dart';
 import 'package:kasaran/ui/screens/scr_02_invite_acceptance.dart';
+import 'package:kasaran/ui/screens/scr_03_setup_budget_date.dart';
+import 'package:kasaran/ui/screens/scr_04_setup_guest_region.dart';
 import 'package:kasaran/ui/screens/scr_17_shared_access.dart';
 
 final _auth = NotifierProvider<_AuthController, AuthState>(_AuthController.new);
@@ -79,6 +82,7 @@ Future<(ProviderContainer, GoRouter)> _pump(
     overrides: [
       authStateProvider.overrideWith((ref) => ref.watch(_auth)),
       planAccessProvider.overrideWith((ref) => ref.watch(_plan)),
+      authUserIdProvider.overrideWithValue('user-1'),
     ],
   );
   addTearDown(container.dispose);
@@ -151,6 +155,85 @@ void main() {
       lookup.requests[2].complete('plan-1');
       await tester.pumpAndSettle();
       expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
+    },
+  );
+
+  testWidgets('sign-out hides an open past-date prompt and erases its draft', (
+    tester,
+  ) async {
+    final (container, router) = await _pump(tester, plan: false);
+    final keepRouterWatched = container.listen(appRouterProvider, (_, _) {});
+    addTearDown(keepRouterWatched.close);
+    await tester.tap(find.text('Start our plan'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('setup-budget')), '123');
+    await tester.enterText(find.byKey(const Key('setup-date')), '2020-01-01');
+    await tester.tap(find.byKey(const Key('setup-next')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2020-01-01'), findsWidgets);
+    container.read(_auth.notifier).value = AuthState.unauthenticated;
+    await tester.pumpAndSettle();
+    expect(container.read(setupDraftProvider).ownerId, isNull);
+    expect(find.textContaining('2020-01-01'), findsNothing);
+    expect(find.text('Continue'), findsNothing);
+    expect(router.routeInformationProvider.value.uri.path, Routes.signIn);
+  });
+
+  testWidgets(
+    'identity reload hides and erases SCR-03 draft through production router',
+    (tester) async {
+      final lookup = _PendingMembershipLookup();
+      final container = ProviderContainer(
+        overrides: [
+          authStateProvider.overrideWithValue(AuthState.authenticated),
+          authUserIdProvider.overrideWith((ref) => ref.watch(_user)),
+          planMembershipLookupProvider.overrideWithValue(lookup),
+        ],
+      );
+      addTearDown(container.dispose);
+      final router = container.read(appRouterProvider);
+      final keepRouterWatched = container.listen(appRouterProvider, (_, _) {});
+      addTearDown(keepRouterWatched.close);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pump();
+      lookup.requests[0].complete(null);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start our plan'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('setup-budget')),
+        '₱28,000.00',
+      );
+      await tester.enterText(find.byKey(const Key('setup-date')), '2028-02-29');
+      expect(container.read(setupDraftProvider).budgetInput, '₱28,000.00');
+      container.read(_user.notifier).value = 'user-2';
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
+      expect(container.read(setupDraftProvider).budgetInput, isEmpty);
+      expect(find.text('₱28,000.00'), findsNothing);
+      container.read(_user.notifier).value = 'user-1';
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
+      lookup.requests[1].complete(null);
+      await tester.pump();
+      lookup.requests[2].complete(null);
+      await tester.pumpAndSettle();
+      router.go(Routes.onboardingBudgetDate);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('setup-budget')))
+            .controller!
+            .text,
+        isEmpty,
+      );
     },
   );
 
@@ -356,15 +439,64 @@ void main() {
     tester,
   ) async {
     final (_, router) = await _pump(tester, plan: false);
-    for (final entry in <String, String>{
-      Routes.onboardingBudgetDate: 'SCR-03',
-      '/onboarding/budget-date/guest-region': 'SCR-04',
-      '/onboarding/budget-date/guest-region/hidden-fees': 'SCR-05',
-    }.entries) {
-      router.go(entry.key);
+    router.go(Routes.onboardingBudgetDate);
+    await tester.pumpAndSettle();
+    expect(find.byType(Scr03SetupBudgetDate), findsOneWidget);
+    expect(find.textContaining('No plan has been created'), findsOneWidget);
+    router.go(Routes.onboardingGuestRegion);
+    await tester.pumpAndSettle();
+    expect(find.byType(Scr04SetupGuestRegion), findsOneWidget);
+    expect(find.textContaining('no plan has been created'), findsOneWidget);
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      Routes.onboardingGuestRegion,
+    );
+    router.go(Routes.onboardingHiddenFees);
+    await tester.pumpAndSettle();
+    _expectScreen('SCR-05');
+  });
+
+  testWidgets('Start advances SCR-03 draft to SCR-04 and Back restores it', (
+    tester,
+  ) async {
+    final (container, router) = await _pump(tester, plan: false);
+    await tester.tap(find.text('Start our plan'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Scr03SetupBudgetDate), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('setup-budget')), '₱28,000.00');
+    await tester.enterText(find.byKey(const Key('setup-date')), '2028-02-29');
+    await tester.tap(find.byKey(const Key('setup-next')));
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      Routes.onboardingGuestRegion,
+    );
+    expect(find.byType(Scr04SetupGuestRegion), findsOneWidget);
+    expect(container.read(setupDraftProvider).acceptedDate, '2028-02-29');
+    await tester.tap(find.text('Back to budget & date'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('setup-budget')))
+          .controller!
+          .text,
+      '₱28,000.00',
+    );
+  });
+
+  testWidgets('member cannot open either onboarding draft route', (
+    tester,
+  ) async {
+    final (_, router) = await _pump(tester);
+    for (final path in [
+      Routes.onboardingBudgetDate,
+      Routes.onboardingGuestRegion,
+    ]) {
+      router.go(path);
       await tester.pumpAndSettle();
-      _expectScreen(entry.value);
-      expect(router.routeInformationProvider.value.uri.path, entry.key);
+      expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
+      expect(find.byType(Scr03SetupBudgetDate), findsNothing);
+      expect(find.byType(Scr04SetupGuestRegion), findsNothing);
     }
   });
 
