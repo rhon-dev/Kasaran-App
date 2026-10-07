@@ -134,7 +134,11 @@ Every **70 currently defined** REQ ID in `requirements.md` appears. Levels: **U*
 
 **Coverage (specified, not executed):** the older 48/54 claim is superseded by the audited totals below. The two Prompt 5 REQs are now defined: **62 v1 REQ IDs have mapped test specifications** (60 pre-Prompt-5 + REQ-MT-1 + REQ-SV-1); two v1.1 IDs have deferred cases, five REQ-AI-1…5 are out of v1, and REQ-EX-1 is review-only: **62 + 2 + 5 + 1 = 70 distinct REQ IDs**. REQ-SE-1 gains a clause and an additional test but no new REQ ID. All 46 previously mapped-but-undefined IDs now have rows in §4.6A. REQ-CK-1's unverified legal/church preset oracle is **BLOCKED (OQ-11)**, not counted as a passing case. Five tracked historical limitations remain (UT-1, UT-2, UT-7…9); UT-3…6 and UT-10…11 have executable redirects. Authored cases are not passing implementation tests until code exists.
 
-### 2.0 Phase 06 evidence ledger — scoped, not a release verdict
+### 2.0 Phase 04 hosted smoke — scoped, not a sync or release verdict
+
+The separate Free synthetic-only `kasaran` project `fjmbmbjskdcjqqcbpqsc` was read back ACTIVE_HEALTHY in Singapore (`ap-southeast-1`). The owner confirmed Free status. Hosted Auth management readback reported email enabled, auto-confirm disabled, 3600-second JWT lifetime and refresh rotation enabled; this is hosted evidence, not the local `supabase/config.toml`. Only the empty `sync_push` and legacy GET `sync_pull` stubs were deployed; both read back ACTIVE with `verify_jwt=true`. Status-only remote probes returned 401 for missing and invalid bearer on each endpoint (four cases). No authorized verified synthetic account was provisioned, so authenticated 200/4xx and issued-JWT expiry probes remain blocked. After starting Colima and excluding optional vector/analytics services, local `flutter test --no-pub test/api/contract/ --reporter=json` passed 36/36 tests without skips; plain `supabase stop` preserved local data. Local success is not hosted authenticated evidence. No migrations, RLS/tenant proof, full TC-API-01/02/03/05, or remote CI gate is established.
+
+### 2.0A Phase 06 evidence ledger — scoped, not a release verdict
 
 | Existing TC / gate | Source-level implementation and possible local evidence | What is **not** established by that evidence |
 |---|---|---|
