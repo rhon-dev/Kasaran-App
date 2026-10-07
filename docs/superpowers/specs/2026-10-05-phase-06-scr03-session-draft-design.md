@@ -1,0 +1,25 @@
+# Phase 06 SCR-03 Session Draft Design
+
+## Scope and authority
+
+Implement only the Budget & Date step of SCR-03 as a **session-memory draft** for a verified account with no plan. The owner selected this boundary: do not create a plan until the later SCR-04/Phase 09 four-required-input workflow exists (ADR-75). REQ-BS-1 clauses 1–5, REQ-BS-2, REQ-BS-3, REQ-GEN-1/2 and the SCR-03 UX specification govern the visible fields; their complete setup and allocation gates remain open. The `create_plan` RPC requires budget, date, guest cap and region and must not be invoked by this slice. SCR-04, allocation, hidden fees, invitations, server writes, encrypted device persistence and restart recovery are outside this slice. Do not present a draft as an existing plan or setup completion.
+
+The four v1 product tests in `project-brief.md` §4 hold: budget/date entry is deterministic and explainable; it moves no money, creates no supplier recommendation, and adds no AI.
+
+## Draft ownership and navigation
+
+Use a focused, non-auto-disposed Riverpod draft provider with raw budget input, raw date input and the previously accepted date. Its owner is the authenticated account ID, **not** the verified/unverified status alone. When Auth signs out or account identity becomes unknown, loading, failed or changes, clear the provider draft and any mounted text controllers before displaying another identity. Do not retain a keyed copy that can reappear after A→B→A in the same session. Do not write the draft to Supabase, logs, analytics, local DB, preferences or secure storage; restart loses it.
+
+`Start our plan` opens SCR-03. On a valid Next, capture the accepted values in memory and navigate to the SCR-04 route, which remains explicitly unfinished and provides Back to SCR-03. Back restores both accepted fields only for the same authenticated identity. Align the route constant and registered path so navigation to SCR-04 resolves in the production router; member accounts and loading/failed membership remain gated by the existing redirect. SCR-04 must say that its fields and plan creation are not yet available, not imply a plan exists. An unknown identity must not display the old draft while membership is being resolved.
+
+## Input and error states
+
+Show step 1 of 3, labeled budget and wedding-date fields, an inline field-specific validation message and a plain session-draft notice. Accept an optional peso sign and correctly grouped commas or ungrouped digits with optional decimal fraction. Validate the **whole** monetary input before using the existing integer-centavo parser; reject malformed text rather than relying on permissive trimming/truncation. Apply the existing half-centavo-away-from-zero rule if a third fractional digit is supplied; reject further precision rather than silently truncate it. Use integer centavos only; reject zero and negative values with distinct explanations, and impose no arbitrary budget band. Render any monetary summary/accessibility label in the full peso format required by REQ-GEN-2. An invalid budget leaves the date intact and writes nothing.
+
+Accept a strictly valid calendar date entered as `YYYY-MM-DD`, without a product-imposed min/max year inside that format; reject nonexistent dates and missing input inline while retaining budget. Compare to the injected device-local current calendar date (year/month/day only) for deterministic tests. If the candidate date is past, show a confirmation dialog naming it. Confirm accepts it and advances; decline restores the previously accepted date (or empty when none), keeps the budget, and stays on SCR-03. Validation and a dismissed dialog never create a plan, change membership, or mark setup complete. While SCR-04 remains unfinished, the user can only go Back or leave to Start/Join; no completion action is shown.
+
+## Tests, traceability and evidence
+
+Use red-green widget/provider tests before implementation. Assert valid centavo conversion (including third-decimal rounding), invalid/non-numeric/zero/negative/over-precision handling, low/high budgets accepted without a warning, calendar/leap-day validation, date-past confirmation/decline with prior date restoration, other-field retention, same-account navigation restore, sign-out and A→B→A clearing (including loading/error identity), and real production-router access to SCR-04 and back. Instrument the form boundary to assert Next causes no `create_plan` RPC or persistence. Check that a completed draft is never presented as a plan, and that a member cannot access either onboarding step.
+
+Update the SCR-03/SCR-04 inventory and state matrix, Phase 06 evidence ledger and test-case mapping for the **partial** clauses exercised, without marking REQ-BS-1, TC-BS-01, Phase 06 or Phase 09 fully passed. Run focused tests, full Flutter tests with required local synthetic services, and Flutter analysis. Keep GitHub Actions, staging, real-device/iOS, legal review and real-user beta evidence separate; a local pass does not establish those gates. Preserve local Supabase volumes with plain `supabase stop` if services were started.
