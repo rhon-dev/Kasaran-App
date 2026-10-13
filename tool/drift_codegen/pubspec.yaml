@@ -1,0 +1,9 @@
+name: kasaran_drift_codegen
+publish_to: none
+environment:
+  sdk: ^3.11.4
+dependencies:
+  drift: 2.35.1
+dev_dependencies:
+  drift_dev: 2.35.1
+  build_runner: 2.16.2

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:kasaran/platform/db/encrypted_database.dart';
 
 class _MemoryKeyStore implements DatabaseKeyStore {
@@ -15,6 +17,29 @@ class _MemoryKeyStore implements DatabaseKeyStore {
   Future<void> write(String key) async {
     value = key;
     writes++;
+  }
+}
+
+Future<void> _createEncryptedFixture(
+  File file,
+  _MemoryKeyStore store, {
+  required int version,
+}) async {
+  final random = Random.secure();
+  final key = List<int>.generate(
+    32,
+    (_) => random.nextInt(256),
+  ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+  await store.write(key);
+  final raw = sqlite.sqlite3.open(file.path);
+  try {
+    expect(raw.select('PRAGMA cipher'), isNotEmpty);
+    raw.execute("PRAGMA key = '$key'");
+    raw.execute('CREATE TABLE legacy_sentinel(value TEXT NOT NULL)');
+    raw.execute("INSERT INTO legacy_sentinel VALUES ('preserve-local-row')");
+    raw.execute('PRAGMA user_version = $version');
+  } finally {
+    raw.dispose();
   }
 }
 
@@ -91,6 +116,48 @@ void main() {
     );
   });
 
+  test(
+    'encrypted v1 upgrade preserves unrelated rows and original key',
+    () async {
+      await _createEncryptedFixture(file, store, version: 1);
+      final originalKey = store.value;
+      final db = await EncryptedDatabaseOpener(file, store).open();
+      expect(db.schemaVersion, 2);
+      final sentinel = await db
+          .customSelect('SELECT value FROM legacy_sentinel')
+          .get();
+      expect(sentinel.single.read<String>('value'), 'preserve-local-row');
+      expect(db.allTables, hasLength(7));
+      await db.close();
+      expect(store.value, originalKey);
+      expect(store.writes, 1);
+      final reopened = await EncryptedDatabaseOpener(file, store).open();
+      expect(
+        (await reopened.customSelect('PRAGMA user_version').get()).single
+            .read<int>('user_version'),
+        2,
+      );
+      await reopened.close();
+    },
+  );
+
+  test('future encrypted version fails before changing file bytes', () async {
+    await _createEncryptedFixture(file, store, version: 3);
+    final originalBytes = await file.readAsBytes();
+    await expectLater(
+      EncryptedDatabaseOpener(file, store).open(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Encrypted local schema newer than supported',
+        ),
+      ),
+    );
+    expect(await file.readAsBytes(), originalBytes);
+    expect(store.writes, 1);
+  });
+
   test('open and read do not attempt a network request', () async {
     var attempts = 0;
     await HttpOverrides.runZoned(
@@ -100,7 +167,7 @@ void main() {
           (await db.customSelect('PRAGMA user_version').get()).single.read<int>(
             'user_version',
           ),
-          1,
+          2,
         );
         await db.close();
       },

@@ -1,14 +1,24 @@
 import 'package:drift/drift.dart';
 
-/// Phase-05 local store: no plan or identity entities exist until phases 06–07.
-/// SQLite's user_version is managed by drift; tests may create TEMP probes
-/// without adding application tables to the persistent schema.
-class AppDatabase extends GeneratedDatabase {
+part 'app_database.g.dart';
+
+/// Encrypted local v2 core schema; writers and transport are later slices.
+@DriftDatabase(include: {'schema.drift'})
+class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  final List<TableInfo<Table, dynamic>> allTables = const [];
+  int get schemaVersion => 2;
 
   @override
-  int get schemaVersion => 1;
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from != 1 || to != 2) {
+        throw StateError('Unsupported local schema transition');
+      }
+      await m.createAll();
+    },
+    beforeOpen: (_) async => customStatement('PRAGMA foreign_keys = ON'),
+  );
 }
