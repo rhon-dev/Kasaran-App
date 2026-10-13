@@ -43,6 +43,56 @@ Future<void> _createEncryptedFixture(
   }
 }
 
+/// Relevant tables from the encrypted v2 layout before the parity indexes.
+Future<void> _createPreConstraintV2Fixture(
+  File file,
+  _MemoryKeyStore store, {
+  bool duplicateMembership = false,
+  bool duplicateActiveCreator = false,
+}) async {
+  await _createEncryptedFixture(file, store, version: 2);
+  final raw = sqlite.sqlite3.open(file.path);
+  try {
+    raw.execute("PRAGMA key = '${store.value}'");
+    raw.execute('''
+      CREATE TABLE plans (
+        id TEXT NOT NULL PRIMARY KEY,
+        creator_user_id TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+    raw.execute('''
+      CREATE TABLE plan_members (
+        plan_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        plan_member_id TEXT NOT NULL UNIQUE,
+        role TEXT NOT NULL,
+        joined_at TEXT NOT NULL,
+        PRIMARY KEY(plan_id, user_id)
+      )
+    ''');
+    raw.execute("INSERT INTO plans VALUES ('plan-a', 'creator-a', 1)");
+    raw.execute('''
+      INSERT INTO plan_members VALUES (
+        'plan-a', 'member-a', 'alias-a', 'partner', '2026-10-14'
+      )
+    ''');
+    if (duplicateMembership || duplicateActiveCreator) {
+      raw.execute(
+        "INSERT INTO plans VALUES ('plan-b', '${duplicateActiveCreator ? 'creator-a' : 'creator-b'}', 1)",
+      );
+      raw.execute('''
+        INSERT INTO plan_members VALUES (
+          'plan-b', '${duplicateMembership ? 'member-a' : 'member-b'}',
+          'alias-b', 'partner', '2026-10-14'
+        )
+      ''');
+    }
+  } finally {
+    raw.close();
+  }
+}
+
 void main() {
   late Directory directory;
   late File file;
@@ -157,6 +207,97 @@ void main() {
     expect(await file.readAsBytes(), originalBytes);
     expect(store.writes, 1);
   });
+
+  test(
+    'reopening pre-constraint encrypted v2 enforces one membership per user',
+    () async {
+      await _createPreConstraintV2Fixture(file, store);
+      final originalKey = store.value;
+      final db = await EncryptedDatabaseOpener(file, store).open();
+      addTearDown(db.close);
+      expect(db.schemaVersion, 2);
+      expect(
+        (await db.customSelect('SELECT value FROM legacy_sentinel').get())
+            .single
+            .read<String>('value'),
+        'preserve-local-row',
+      );
+      await db.customStatement(
+        "INSERT INTO plans VALUES ('plan-b', 'creator-a', 0)",
+      );
+      await expectLater(
+        db.customStatement('''
+        INSERT INTO plan_members VALUES (
+          'plan-b', 'member-a', 'alias-b', 'partner', '2026-10-14'
+        )
+      '''),
+        throwsA(isA<Exception>()),
+      );
+      await expectLater(
+        db.customStatement(
+          "INSERT INTO plans VALUES ('plan-c', 'creator-a', 1)",
+        ),
+        throwsA(isA<Exception>()),
+      );
+      expect(store.value, originalKey);
+      expect(store.writes, 1);
+    },
+  );
+
+  test(
+    'ambiguous pre-constraint encrypted v2 fails without deleting rows',
+    () async {
+      await _createPreConstraintV2Fixture(
+        file,
+        store,
+        duplicateMembership: true,
+      );
+      await expectLater(
+        EncryptedDatabaseOpener(file, store).open(),
+        throwsA(isA<Exception>()),
+      );
+      final raw = sqlite.sqlite3.open(file.path);
+      try {
+        raw.execute("PRAGMA key = '${store.value}'");
+        expect(
+          raw.select('SELECT COUNT(*) AS n FROM plan_members').single['n'],
+          2,
+        );
+        expect(raw.select('PRAGMA user_version').single['user_version'], 2);
+      } finally {
+        raw.close();
+      }
+    },
+  );
+
+  test(
+    'ambiguous active creators fail without partial index changes',
+    () async {
+      await _createPreConstraintV2Fixture(
+        file,
+        store,
+        duplicateActiveCreator: true,
+      );
+      await expectLater(
+        EncryptedDatabaseOpener(file, store).open(),
+        throwsA(isA<Exception>()),
+      );
+      final raw = sqlite.sqlite3.open(file.path);
+      try {
+        raw.execute("PRAGMA key = '${store.value}'");
+        expect(raw.select('SELECT COUNT(*) AS n FROM plans').single['n'], 2);
+        expect(
+          raw.select('''
+          SELECT name FROM sqlite_master WHERE type = 'index'
+          AND name IN ('one_membership_user', 'one_active_created_plan')
+        '''),
+          isEmpty,
+        );
+      } finally {
+        raw.close();
+      }
+    },
+  );
 
   test('open and read do not attempt a network request', () async {
     var attempts = 0;

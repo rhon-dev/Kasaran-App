@@ -15,6 +15,9 @@
 // In CI the contract-tests job starts `supabase start` first.
 //
 // TC-API-03 (idempotency) is deferred to phase 08.
+// Excluded from the service-free unit job; contract-tests runs this suite.
+@Tags(['local_supabase'])
+library;
 
 import 'dart:convert';
 

@@ -117,8 +117,8 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Run tests
-        run: flutter test --reporter=expanded
+      - name: Run tests (local Supabase gate runs separately)
+        run: flutter test --exclude-tags=local_supabase --reporter=expanded
 
 # ---------------------------------------------------------------------------
 # Job: contract-tests
@@ -189,6 +189,111 @@ jobs:
         run: supabase stop
 
 # ---------------------------------------------------------------------------
+# Job: core-schema-isolation
+# Blocking local Phase-07 two-plan subset. This does not satisfy the separate
+# future forged plan_id pull requirement in tenant-isolation below.
+# ---------------------------------------------------------------------------
+  core-schema-isolation:
+    name: Core schema isolation (blocking local subset)
+    runs-on: ubuntu-latest
+    needs: analyze
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install local Postgres catalog client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+
+      - name: Prepare disposable local Supabase project
+        shell: bash
+        run: |
+          scratch="$RUNNER_TEMP/kasaran_p07_disposable"
+          mkdir -p "$scratch/supabase/migrations"
+          cp supabase/config.toml "$scratch/supabase/config.toml"
+          cp supabase/migrations/*.sql "$scratch/supabase/migrations/"
+          if [ -d supabase/functions ]; then
+            cp -R supabase/functions "$scratch/supabase/functions"
+          fi
+          python3 - "$scratch/supabase/config.toml" <<'PY'
+          from pathlib import Path
+          import sys
+          config = Path(sys.argv[1])
+          current = config.read_text()
+          original = 'project_id = "kasaran"'
+          if current.count(original) != 1:
+              raise SystemExit('Expected a unique local project_id')
+          config.write_text(current.replace(original,
+                                            'project_id = "kasaran_p07_disposable"'))
+          PY
+
+      - name: Start local Supabase with migrations
+        run: |
+          (cd "$RUNNER_TEMP/kasaran_p07_disposable" &&
+            supabase start -x vector,analytics,studio > /dev/null 2>&1)
+        timeout-minutes: 10
+
+      - name: Run core schema isolation (eight non-skipped tests)
+        shell: bash
+        env:
+          SUPABASE_WORKDIR: ${{ runner.temp }}/kasaran_p07_disposable
+        run: |
+          set -euo pipefail
+          flutter test --no-pub test/api/tenant_isolation/core_schema_isolation_test.dart \
+            --reporter=json > "$RUNNER_TEMP/core-schema.jsonl"
+          python3 - "$RUNNER_TEMP/core-schema.jsonl" <<'PY'
+          import json
+          import sys
+
+          events = [json.loads(line) for line in open(sys.argv[1])
+                    if line.strip().startswith('{')]
+          names = {e['test']['id']: e['test']['name'] for e in events
+                   if e.get('type') == 'testStart' and not e['test'].get('hidden')
+                   and not e['test']['name'].startswith(('loading ', '('))}
+          done = [e for e in events if e.get('type') == 'testDone'
+                  and e.get('testID') in names]
+          required = {
+              'own ledger and log rows are visible to each plan member',
+              'cross-tenant read hides foreign ledger and log rows',
+              'direct anon and authenticated insert update delete denied',
+              'cross-tenant write denies forged plan and alias binding',
+              'cross-tenant delete denies foreign rows',
+              'privileged log update and delete rejected by trigger',
+              'policy catalog covers every public plan-scoped table',
+              'removed member loses ledger and log read',
+          }
+          if (len(done) != len(required) or
+              len(names) != len(required) or
+              set(names[e['testID']] for e in done) != required or
+              any(e.get('result') != 'success' or e.get('skipped') for e in done)):
+              sys.exit('Core schema isolation requires all eight executed, '
+                       'passing, non-skipped checks')
+          print(f'Core schema isolation checks executed: {len(done)}')
+          PY
+
+      - name: Stop local Supabase (preserve data)
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/kasaran_p07_disposable/supabase/config.toml" ]; then
+            (cd "$RUNNER_TEMP/kasaran_p07_disposable" &&
+              supabase stop > /dev/null 2>&1)
+          fi
+
+# ---------------------------------------------------------------------------
 # Job: tenant-isolation
 # Once migrations land, the cross-tenant suite is mandatory and must execute
 # real non-skipped assertions against a running local Supabase instance.
@@ -217,6 +322,14 @@ jobs:
             echo 'enabled=true' >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Require future forged-pull coverage before starting services
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          if [ ! -f test/api/tenant_isolation/forged_pull_test.dart ]; then
+            echo 'Full tenant-isolation gate pending Phase 08 forged-pull case'
+            exit 1
+          fi
+
       - name: Set up Flutter
         if: steps.gate.outputs.enabled == 'true'
         uses: subosito/flutter-action@v2
@@ -235,40 +348,87 @@ jobs:
         with:
           version: latest
 
+      - name: Install local Postgres catalog client
+        if: steps.gate.outputs.enabled == 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+
+      - name: Prepare disposable local Supabase project
+        if: steps.gate.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          scratch="$RUNNER_TEMP/kasaran_p07_disposable"
+          mkdir -p "$scratch/supabase/migrations"
+          cp supabase/config.toml "$scratch/supabase/config.toml"
+          cp supabase/migrations/*.sql "$scratch/supabase/migrations/"
+          if [ -d supabase/functions ]; then
+            cp -R supabase/functions "$scratch/supabase/functions"
+          fi
+          python3 - "$scratch/supabase/config.toml" <<'PY'
+          from pathlib import Path
+          import sys
+          config = Path(sys.argv[1])
+          current = config.read_text()
+          original = 'project_id = "kasaran"'
+          if current.count(original) != 1:
+              raise SystemExit('Expected a unique local project_id')
+          config.write_text(current.replace(original,
+                                            'project_id = "kasaran_p07_disposable"'))
+          PY
+
       - name: Start local Supabase with migrations
         if: steps.gate.outputs.enabled == 'true'
-        run: supabase start && supabase status
+        run: |
+          (cd "$RUNNER_TEMP/kasaran_p07_disposable" &&
+            supabase start -x vector,analytics,studio > /dev/null 2>&1)
         timeout-minutes: 10
 
       - name: Run tenant-isolation suite and require executed assertions
         if: steps.gate.outputs.enabled == 'true'
         shell: bash
+        env:
+          SUPABASE_WORKDIR: ${{ runner.temp }}/kasaran_p07_disposable
         run: |
-          flutter test test/api/tenant_isolation/ --reporter=json > "$RUNNER_TEMP/isolation.jsonl"
+          flutter test test/api/tenant_isolation/ --reporter=json \
+            > "$RUNNER_TEMP/isolation.jsonl"
           python3 - "$RUNNER_TEMP/isolation.jsonl" <<'PY'
           import json
           import sys
 
           events = [json.loads(line) for line in open(sys.argv[1]) if line.strip().startswith('{')]
-          names = {e['test']['id']: e['test']['name'].lower() for e in events
-                   if e.get('type') == 'testStart' and not e['test'].get('hidden')}
+          suites = {e['suite']['id']: e['suite'].get('path', '').replace('\\', '/')
+                    for e in events if e.get('type') == 'suite'}
+          tests = {e['test']['id']: e['test'] for e in events
+                   if e.get('type') == 'testStart' and not e['test'].get('hidden')
+                   and not e['test']['name'].startswith(('loading ', '('))}
           done = [e for e in events if e.get('type') == 'testDone' and
-                  e.get('testID') in names]
+                  e.get('testID') in tests]
           passed = [e for e in done if e.get('result') == 'success' and
                     not e.get('skipped')]
           required = ('cross-tenant read', 'cross-tenant write',
-                      'cross-tenant delete', 'forged plan_id pull')
-          if len(passed) != len(done) or not all(
-              any(label in names[e['testID']] for e in passed) for label in required
+                      'cross-tenant delete')
+          forged_file = 'test/api/tenant_isolation/forged_pull_test.dart'
+          forged = [e for e in passed
+                    if 'forged plan_id pull' in tests[e['testID']]['name'].lower()
+                    and (suites.get(tests[e['testID']]['suiteID']) == forged_file
+                         or suites.get(tests[e['testID']]['suiteID'], '').endswith(
+                             '/' + forged_file))]
+          if not done or len(passed) != len(done) or not forged or not all(
+              any(label in tests[e['testID']]['name'].lower() for e in passed)
+              for label in required
           ):
               sys.exit('Tenant isolation requires executed, passing read/write/delete '
-                       'and forged plan_id pull denials; skipped tests cannot satisfy gate')
+                       'and forged plan_id pull denials from forged_pull_test.dart; '
+                       'skipped tests cannot satisfy gate')
           print(f'Tenant-isolation checks executed: {len(passed)}')
           PY
 
       - name: Stop Supabase
         if: always() && steps.gate.outputs.enabled == 'true'
-        run: supabase stop
+        run: |
+          if [ -f "$RUNNER_TEMP/kasaran_p07_disposable/supabase/config.toml" ]; then
+            (cd "$RUNNER_TEMP/kasaran_p07_disposable" &&
+              supabase stop > /dev/null 2>&1)
+          fi
 
 # ---------------------------------------------------------------------------
 # Job: build-android

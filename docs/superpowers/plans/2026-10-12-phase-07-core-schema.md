@@ -18,13 +18,13 @@
 
 ## File map
 
-- `supabase/migrations/0002_core_schema.sql`: additive ledger/log constraints, authorization grants/policies, immutability trigger, indexes; no existing table rewrite.
+- `supabase/migrations/0002_core_schema.sql` plus forward-only `0003_core_trusted_writer_grants.sql`: additive ledger/log constraints, authorization grants/policies, immutability trigger, indexes; no existing table rewrite.
 - `test/api/tenant_isolation/core_schema_isolation_test.dart`: real local two-account/two-plan REST and privileged immutability tests, policy inventory; no hard-coded secrets.
 - `lib/data/db/schema.drift`: typed SQLite plan/member/alias, ledger, raw log, sync state and outbox tables with integer money and foreign keys.
 - `lib/data/db/app_database.dart` and generated `lib/data/db/app_database.g.dart`: Drift-generated schema version 2, atomic upgrade, fail-closed future-version behavior.
 - `tool/drift_codegen/pubspec.yaml`, `tool/drift_codegen/.gitignore`, `tool/drift_codegen/generate.sh`: reproducible isolated code generation without changing the Flutter app's `pubspec.yaml` or `pubspec.lock`. `tool/drift_codegen/pubspec.lock` is committed after generation.
 - `test/data/db/schema_version_test.dart`, `test/data/db/encrypted_database_test.dart`, `test/data/db/core_schema_test.dart`: update v1 expectation and add encrypted upgrade/constraints/round-trip tests.
-- `.github/workflows/ci.yml`: make the existing tenant job execute the new subset without a skip; do not replace its required future forged-pull check with a pretend PASS.
+- `.github/workflows/ci.yml` and `dart_test.yaml`: run the local-Supabase-tagged subset in its own blocking job and exclude that tag from the service-free unit job; retain the separate future forged-pull tenant job without a pretend PASS.
 - `docs/development-phases.md`, `docs/testing-plan.md`, `docs/security-plan.md`: describe observed subset, policy/privacy inventory and remaining gates, without modifying REQ/TC/SEC IDs.
 
 ---
@@ -92,6 +92,8 @@
   ```
 
 - [ ] **Step 3 — Verify GREEN:** Apply only to local/disposable development DB. Run the focused own-read test; expected success and no skip. Run `supabase migration list --local` (do not print local connection strings) and assert `0001` plus `0002` applied. If startup fails, fix the local setup rather than weakening RLS or going hosted. Commit `feat(db): add protected core ledger and log schema` after a clean `git diff --check`.
+
+**Implementation note (2026-10-14):** `0002` was already applied to the retained local database when the focused service-role read exposed HTTP 403/SQLSTATE 42501: both new tables had no `service_role` grants. The fix is additive migration `0003`, not a rewrite of previously applied `0002`. Explicit privileged grants permit test fixture and future trusted writer operations; direct anon/authenticated mutations remain revoked and the log trigger still rejects privileged UPDATE/DELETE. Both migrations are copied into the fresh disposable-stack replay. Treat the original two-migration wording above as the pre-execution plan, not an assertion that `0003` is absent.
 
 ### Task 2: Executable tenant/security negative matrix (server subset)
 

@@ -1366,7 +1366,7 @@ class PlanMembers extends Table with TableInfo<PlanMembers, PlanMember> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
+    $customConstraints: 'NOT NULL UNIQUE',
   );
   static const VerificationMeta _planMemberIdMeta = const VerificationMeta(
     'planMemberId',
@@ -4197,6 +4197,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final Plans plans = Plans(this);
+  late final Index oneActiveCreatedPlan = Index(
+    'one_active_created_plan',
+    'CREATE UNIQUE INDEX one_active_created_plan ON plans (creator_user_id) WHERE is_active = 1',
+  );
   late final PlanMemberAliases planMemberAliases = PlanMemberAliases(this);
   late final PlanMembers planMembers = PlanMembers(this);
   late final LedgerEntries ledgerEntries = LedgerEntries(this);
@@ -4209,6 +4213,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     plans,
+    oneActiveCreatedPlan,
     planMemberAliases,
     planMembers,
     ledgerEntries,

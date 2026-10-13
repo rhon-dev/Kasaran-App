@@ -190,4 +190,57 @@ VALUES (?,?,?,?,?,?,?,?)''',
       expect(count.single.read<int>('n'), 0);
     },
   );
+
+  test('local membership rejects a user joining two plans', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _plan(db, 'plan-a', 'member-a');
+    await _plan(db, 'plan-b', 'member-b');
+    await db.customStatement(
+      'INSERT INTO plan_members (plan_id,user_id,plan_member_id,role,joined_at) '
+      'VALUES (?,?,?,?,?)',
+      ['plan-a', 'member-a', 'plan-a-alias', 'creator', '2026-10-01T00:00:00Z'],
+    );
+    await db.customStatement(
+      'INSERT INTO plan_member_aliases (plan_member_id,plan_id,user_id) '
+      'VALUES (?,?,?)',
+      ['plan-b-alias-a', 'plan-b', 'member-a'],
+    );
+    await expectLater(
+      db.customStatement(
+        'INSERT INTO plan_members (plan_id,user_id,plan_member_id,role,joined_at) '
+        'VALUES (?,?,?,?,?)',
+        [
+          'plan-b',
+          'member-a',
+          'plan-b-alias-a',
+          'partner',
+          '2026-10-01T00:00:00Z',
+        ],
+      ),
+      throwsA(isA<Exception>()),
+    );
+    final memberships = await db
+        .customSelect('SELECT plan_id FROM plan_members')
+        .get();
+    expect(memberships.map((row) => row.read<String>('plan_id')), ['plan-a']);
+  });
+
+  test('local creator has at most one active plan', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _plan(db, 'plan-a', 'member-a');
+    await expectLater(
+      _plan(db, 'plan-b', 'member-a'),
+      throwsA(isA<Exception>()),
+    );
+    await db.customStatement(
+      "UPDATE plans SET is_active = 0 WHERE id = 'plan-a'",
+    );
+    await _plan(db, 'plan-c', 'member-a');
+    final active = await db
+        .customSelect('SELECT id FROM plans WHERE is_active = 1')
+        .get();
+    expect(active.single.read<String>('id'), 'plan-c');
+  });
 }
