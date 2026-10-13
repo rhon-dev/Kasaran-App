@@ -19,9 +19,10 @@ class _KeyStore implements DatabaseKeyStore {
 
 Future<void> _plan(AppDatabase db, String id, String member) async {
   await db.customStatement(
-    'INSERT INTO plans (id,creator_user_id,wedding_date,total_budget_cents,'
-    'guest_cap,region_code,ruleset_version,driving_rsvp_status,created_at)'
-    ' VALUES (?,?,?,?,?,?,?,?,?)',
+    '''
+INSERT INTO plans (id,creator_user_id,wedding_date,total_budget_cents,
+guest_cap,region_code,ruleset_version,driving_rsvp_status,created_at)
+VALUES (?,?,?,?,?,?,?,?,?)''',
     [
       id,
       member,
@@ -54,8 +55,9 @@ void main() {
       await _plan(db, 'plan-a', 'member-a');
       const cents = 9007199254740991;
       await db.customStatement(
-        'INSERT INTO ledger_entries (id,plan_id,category_code,entry_type,supplier_name,'
-        'estimated_cents,pricing_mode,created_at) VALUES (?,?,?,?,?,?,?,?)',
+        '''
+INSERT INTO ledger_entries (id,plan_id,category_code,entry_type,supplier_name,
+estimated_cents,pricing_mode,created_at) VALUES (?,?,?,?,?,?,?,?)''',
         [
           'ledger-a',
           'plan-a',
@@ -70,9 +72,10 @@ void main() {
       const rawJson =
           '{"unknown":{"unicode":"ñ","veryLarge":9007199254740991}}';
       await db.customStatement(
-        'INSERT INTO change_log (id,plan_id,entity_type,entity_id,field_name,'
-        'schema_version,new_value,device_monotonic,device_id,plan_member_id,created_at)'
-        ' VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        '''
+INSERT INTO change_log (id,plan_id,entity_type,entity_id,field_name,
+schema_version,new_value,device_monotonic,device_id,plan_member_id,created_at)
+VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
         [
           'event-a',
           'plan-a',
@@ -123,9 +126,10 @@ void main() {
       expect(fk.single.read<int>('foreign_keys'), 1);
       await expectLater(
         db.customStatement(
-          'INSERT INTO change_log (id,plan_id,entity_type,entity_id,field_name,'
-          'schema_version,device_monotonic,device_id,plan_member_id,created_at)'
-          ' VALUES (?,?,?,?,?,?,?,?,?,?)',
+          '''
+INSERT INTO change_log (id,plan_id,entity_type,entity_id,field_name,
+schema_version,device_monotonic,device_id,plan_member_id,created_at)
+VALUES (?,?,?,?,?,?,?,?,?,?)''',
           [
             'bad-event',
             'plan-a',
@@ -143,9 +147,10 @@ void main() {
       );
       await expectLater(
         db.customStatement(
-          'INSERT INTO ledger_entries (id,plan_id,category_code,entry_type,'
-          'supplier_name,estimated_cents,pricing_mode,per_head_rate_cents,created_at)'
-          ' VALUES (?,?,?,?,?,?,?,?,?)',
+          '''
+INSERT INTO ledger_entries (id,plan_id,category_code,entry_type,
+supplier_name,estimated_cents,pricing_mode,per_head_rate_cents,created_at)
+VALUES (?,?,?,?,?,?,?,?,?)''',
           [
             'bad-mode',
             'plan-a',
@@ -162,9 +167,10 @@ void main() {
       );
       await expectLater(
         db.customStatement(
-          'INSERT INTO ledger_entries (id,plan_id,category_code,entry_type,'
-          'supplier_name,estimated_cents,pricing_mode,created_at)'
-          ' VALUES (?,?,?,?,?,?,?,?)',
+          '''
+INSERT INTO ledger_entries (id,plan_id,category_code,entry_type,
+supplier_name,estimated_cents,pricing_mode,created_at)
+VALUES (?,?,?,?,?,?,?,?)''',
           [
             'bad-negative',
             'plan-a',

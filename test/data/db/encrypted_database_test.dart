@@ -3,8 +3,8 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:kasaran/platform/db/encrypted_database.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 class _MemoryKeyStore implements DatabaseKeyStore {
   String? value;
@@ -39,7 +39,7 @@ Future<void> _createEncryptedFixture(
     raw.execute("INSERT INTO legacy_sentinel VALUES ('preserve-local-row')");
     raw.execute('PRAGMA user_version = $version');
   } finally {
-    raw.dispose();
+    raw.close();
   }
 }
 
