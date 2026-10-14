@@ -1,6 +1,6 @@
 # Phase 07 account-scoped encrypted local store (ADR-79)
 
-**Status:** Owner approved the architecture direction; written design awaits owner review. Design only; not implemented. This is a prerequisite for accepting ADR-78's ledger writer and for Phase 07 exit, not Phase 08 work.
+**Status:** Owner approved the architecture and reviewed this written design. Design only; not implemented. This is a prerequisite for accepting ADR-78's ledger writer and for Phase 07 exit, not Phase 08 work.
 
 ## Problem and invariant
 
