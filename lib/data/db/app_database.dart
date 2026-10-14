@@ -1,14 +1,39 @@
 import 'package:drift/drift.dart';
 
-/// Phase-05 local store: no plan or identity entities exist until phases 06–07.
-/// SQLite's user_version is managed by drift; tests may create TEMP probes
-/// without adding application tables to the persistent schema.
-class AppDatabase extends GeneratedDatabase {
+part 'app_database.g.dart';
+
+/// Encrypted local v2 core schema; writers and transport are later slices.
+@DriftDatabase(include: {'schema.drift'})
+class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  final List<TableInfo<Table, dynamic>> allTables = const [];
+  int get schemaVersion => 2;
 
   @override
-  int get schemaVersion => 1;
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from != 1 || to != 2) {
+        throw StateError('Unsupported local schema transition');
+      }
+      await m.createAll();
+    },
+    beforeOpen: (_) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+      // This bounded v2 slice also existed before the parity indexes were
+      // added. Install both on reopen, atomically; do not silently choose a
+      // survivor if old local rows violate either invariant.
+      await transaction(() async {
+        await customStatement('''
+          CREATE UNIQUE INDEX IF NOT EXISTS one_membership_user
+          ON plan_members(user_id)
+        ''');
+        await customStatement('''
+          CREATE UNIQUE INDEX IF NOT EXISTS one_active_created_plan
+          ON plans(creator_user_id) WHERE is_active = 1
+        ''');
+      });
+    },
+  );
 }

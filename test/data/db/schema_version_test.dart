@@ -3,23 +3,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kasaran/data/db/app_database.dart';
 
 void main() {
-  test(
-    'phase-05 schema starts at version 1 with no application tables',
-    () async {
-      final db = AppDatabase(NativeDatabase.memory());
-      addTearDown(db.close);
-
-      expect(db.schemaVersion, 1);
-      expect(db.allTables, isEmpty);
-      final tables = await db
-          .customSelect(
-            "SELECT name FROM sqlite_master WHERE type = 'table' "
-            "AND name NOT LIKE 'sqlite_%'",
-          )
-          .get();
-      expect(tables, isEmpty);
-    },
-  );
+  test('phase-07 schema has seven typed application tables', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    expect(db.schemaVersion, 2);
+    expect(db.allTables.map((table) => table.actualTableName).toSet(), {
+      'plans',
+      'plan_member_aliases',
+      'plan_members',
+      'ledger_entries',
+      'change_log',
+      'sync_state',
+      'outbox',
+    });
+    final columns = await db
+        .customSelect('PRAGMA table_info(ledger_entries)')
+        .get();
+    expect(
+      columns.map((row) => row.read<String>('name')),
+      contains('estimated_cents'),
+    );
+    expect(
+      columns.map((row) => row.read<String>('type')).toSet(),
+      isNot(contains('REAL')),
+    );
+  });
 
   test(
     'SQLite round-trips signed integer centavos without floating point',

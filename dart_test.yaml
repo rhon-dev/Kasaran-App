@@ -1,0 +1,3 @@
+# Tests requiring a running local-only Supabase stack use a separate CI job.
+tags:
+  local_supabase:

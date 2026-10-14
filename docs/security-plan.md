@@ -108,6 +108,8 @@ Justified against the threat model:
 
 **Note on SEC-24.** design.md §3 flags the RLS policy as "the whole security model" and warns it needs deliberate tests, not eyeballing. SEC-24 is that test, promoted to a gate item.
 
+**Phase 07 core subset (2026-10-14, ADR-77):** Local migrations `0002` and `0003` add `ledger_entries` and `change_log` to the SEC-22/23 forced-RLS inventory. A disposable-local catalog assertion checks every present public table with `plan_id`, plus `plans(id)` and self-only `users`; the eight-case two-plan matrix tests member removal, direct REST denial, foreign/nonexistent read parity and immutable log rejection. This is local subset evidence, **not** a full SEC-24 verdict: unbuilt v1 tables, forged pull, remote policy execution and real-user gates remain untested. `service_role` holds explicit trusted-writer grants, never a client credential.
+
 **SEC-16 and SEC-24 are unchanged by Decisions 1 and 2, and remain consistent.** SEC-16 (no cloud auto-backup of the local DB) is orthogonal to removal — it concerns backup exclusion, not membership. SEC-24 (cross-tenant denial, CI gate-blocker before internal beta) now additionally *covers the removal flow*: a removed partner is, from the moment of removal, a non-member attempting to reach a plan they no longer belong to — which is exactly the cross-tenant case SEC-24 already proves is denied by RLS. The removal-specific direction (a formerly-valid member post-removal) is exercised explicitly by SEC-07 and SEC-09 and by the test cases in testing-plan.md; SEC-24's forged-`plan_id` suite is the general guarantee behind them.
 
 ---
@@ -142,7 +144,7 @@ Kasaran collects **personal data** (names, emails) and **financial and event dat
 | Password (hash) | Auth | Yes (held by provider) | No | Supabase |
 | Wedding date | Core function (countdown, adequacy) | Yes | No | Supabase |
 | Budget, allocations, ledger amounts | Core function | Yes | No | Supabase |
-| Supplier names | Core function | Yes | No | Supabase |
+| Supplier names and optional ledger notes | Core function; free text may include third-party personal information | Yes (linked to plan) | No | Supabase; encrypted local store |
 | Payment schedule dates, amounts, and labels | Supplier payment planning; locally scheduled reminders | Yes | No | Supabase; OS notification scheduler holds due-date triggers on each device, not supplier names or amounts in default lock-screen copy |
 | Recorded payment/refund dates, amounts, method, and notes | Ledger and reconciliation only; no in-app money movement or payment-rail credentials | Yes | No | Supabase |
 | Sponsor names, roles (including secondary sponsor and candle/veil/cord sub-role), pledge amounts, receipts, dates, and notes | Core function (pledges and partial fulfillment) | Yes | No | Supabase |
@@ -155,7 +157,7 @@ Kasaran collects **personal data** (names, emails) and **financial and event dat
 | Device sync metadata (`server_ts`, `device_monotonic`, `device_id`) | Sync integrity | Yes | No | Supabase |
 | Per-plan member alias and removable alias-to-user mapping | Attribution in the immutable change log; technical separation for deletion review (OQ-01) | Yes while mapping exists | No | Supabase |
 | Per-device session/revocation metadata | List active devices and revoke a chosen device's session; local wipe offered only on that device | Yes | No | Supabase; OS key store on device |
-| Immutable change-log old/new values and schema/group metadata | Auditable shared edits and version-safe projection; may contain historical names and financial content after account closure pending OQ-01 | Yes while shared plan or member mapping exists | No | Supabase; encrypted local store |
+| Immutable change-log old/new values and schema/group metadata | Auditable shared edits and version-safe projection; raw old/new payloads may contain historical supplier names, notes and financial content after account closure pending OQ-01 | Yes while shared plan or member mapping exists | No | Supabase; encrypted local store |
 | Wedding-type template choice and checklist ticks (v1) | Unticked suggested expense types and couple-managed task state; no prices or verified legal claims | Yes when associated with a plan | No | Supabase for saved checklist state; bundled ruleset for template labels |
 | Checklist manual dates, verification status and optional fee link (v1 target; presets blocked OQ-11) | Plan reminders and optional user-confirmed ledger entry; no authority claim for unverified legal/church timing | Yes | No | Supabase; device-local reminders if enabled |
 | Transient PDF, CSV and full-data exports (v1) | Local export and OS sharing chosen by partner; may contain sensitive supplier, sponsor, guest or account data | Yes | No | Device temporary storage, then explicitly chosen OS share target (e.g. messaging or mail provider); no Kasaran-hosted link |

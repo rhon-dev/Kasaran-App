@@ -73,6 +73,11 @@ final class EncryptedDatabaseOpener {
             throw StateError('Encrypted SQLite backend unavailable');
           }
           raw.execute("PRAGMA key = '$key'");
+          final version =
+              raw.select('PRAGMA user_version').single.columnAt(0) as int;
+          if (version > 2) {
+            throw StateError('Encrypted local schema newer than supported');
+          }
         },
       ),
     );
