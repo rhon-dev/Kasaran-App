@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:drift/native.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kasaran/data/db/app_database.dart';
+import 'package:kasaran/platform/secure_storage/token_store.dart';
 
 /// The DB key must live in platform secure storage, never in the database.
 abstract interface class DatabaseKeyStore {
@@ -33,6 +34,28 @@ final class PlatformDatabaseKeyStore implements DatabaseKeyStore {
 
   @override
   Future<void> write(String key) => _storage.write(key: keyName, value: key);
+}
+
+/// Independently keyed account file; the opaque store ID never comes from Auth.
+final class AccountDatabaseKeyStore implements DatabaseKeyStore {
+  AccountDatabaseKeyStore(this._metadata, this.storeId) {
+    if (!RegExp(r'^[0-9a-f]{32}$').hasMatch(storeId)) {
+      throw StateError('Invalid account store identifier');
+    }
+  }
+
+  final SecureKeyValueStore _metadata;
+  final String storeId;
+  String get _keyName => 'kasaran.account_db.v1.$storeId';
+  String get _attemptKey => 'kasaran.account_db_attempt.v1.$storeId';
+
+  Future<String?> readAttempt() => _metadata.read(_attemptKey);
+  Future<void> markAttempted() => _metadata.write(_attemptKey, 'attempted');
+
+  @override
+  Future<String?> read() => _metadata.read(_keyName);
+  @override
+  Future<void> write(String key) => _metadata.write(_keyName, key);
 }
 
 /// Opens the local store only when an encrypted SQLite build and the original
@@ -75,7 +98,7 @@ final class EncryptedDatabaseOpener {
           raw.execute("PRAGMA key = '$key'");
           final version =
               raw.select('PRAGMA user_version').single.columnAt(0) as int;
-          if (version > 2) {
+          if (version > 3) {
             throw StateError('Encrypted local schema newer than supported');
           }
         },

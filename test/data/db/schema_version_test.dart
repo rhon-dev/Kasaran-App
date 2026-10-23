@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kasaran/data/db/app_database.dart';
 
 void main() {
-  test('phase-07 schema has seven typed application tables', () async {
+  test('phase-08 v3 schema adds raw inbox to seven unchanged application tables', () async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    expect(db.schemaVersion, 2);
+    expect(db.schemaVersion, 3);
     expect(db.allTables.map((table) => table.actualTableName).toSet(), {
       'plans',
       'plan_member_aliases',
@@ -15,6 +15,7 @@ void main() {
       'change_log',
       'sync_state',
       'outbox',
+      'sync_inbox',
     });
     final columns = await db
         .customSelect('PRAGMA table_info(ledger_entries)')

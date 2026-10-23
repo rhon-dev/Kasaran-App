@@ -1,16 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kasaran/data/repositories/auth_repository.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Preserve the router's synchronous Provider of AuthState override contract.
 enum AuthState { unauthenticated, unverified, authenticated }
 
-/// Null only when a test embeds KasaranApp without calling main(); production
-/// initializes Supabase before mounting the router.
+/// Production installs a coordinator after Auth initialization. A missing
+/// coordinator fails closed instead of exposing an uncoordinated SDK gateway.
 final authRepositoryProvider = Provider<AuthRepository?>((ref) {
   try {
+    final coordinator = ref.watch(accountStoreCoordinatorProvider);
+    if (coordinator == null) return null;
     final client = Supabase.instance.client;
-    return SupabaseAuthRepository(SupabaseAuthGateway(client.auth));
+    return SupabaseAuthRepository(
+      SupabaseAuthGateway(client.auth),
+      transition: coordinator.transition,
+    );
     // Widget-only smoke tests mount KasaranApp directly without calling main.
     // ignore: avoid_catching_errors
   } on AssertionError {

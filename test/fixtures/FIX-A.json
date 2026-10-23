@@ -1,0 +1,338 @@
+{
+  "fixture": "FIX-A",
+  "authority": "docs/testing-plan.md:252-404",
+  "ruleset": {
+    "version": "document-fixture",
+    "production_asset": false,
+    "baselines_bp": [
+      4000,
+      1500,
+      1000,
+      1000,
+      500,
+      2000
+    ],
+    "region_code": "fixture",
+    "cost_index_bp": 10000
+  },
+  "plan_id": "plan",
+  "budget_cents": 80000000,
+  "guests": 150,
+  "guest_cap": 160,
+  "today": "2026-10-02",
+  "entries": [
+    {
+      "id": "catering",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "catering",
+      "type": "standard",
+      "pricing_mode": "per_head",
+      "estimate_cents": null,
+      "rate_cents": 240000,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "favors",
+      "plan_id": "plan",
+      "category": "entourage_misc",
+      "supplier": "favors",
+      "type": "standard",
+      "pricing_mode": "per_head",
+      "estimate_cents": null,
+      "rate_cents": 12000,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "invitations",
+      "plan_id": "plan",
+      "category": "entourage_misc",
+      "supplier": "invitations",
+      "type": "standard",
+      "pricing_mode": "per_head",
+      "estimate_cents": null,
+      "rate_cents": 8000,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "church",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "church",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 1500000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "aircon",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "aircon",
+      "type": "church_aircon",
+      "pricing_mode": "flat",
+      "estimate_cents": 800000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": [
+        {
+          "id": "air",
+          "type": "flat",
+          "amount_cents": 800000,
+          "quantity": null,
+          "unit_rate_cents": null
+        }
+      ]
+    },
+    {
+      "id": "photo",
+      "plan_id": "plan",
+      "category": "photo_video",
+      "supplier": "photo",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 9500000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "hmua",
+      "plan_id": "plan",
+      "category": "attire_styling",
+      "supplier": "hmua",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 2500000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "attire",
+      "plan_id": "plan",
+      "category": "attire_styling",
+      "supplier": "attire",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 4500000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "coordination",
+      "plan_id": "plan",
+      "category": "coordination",
+      "supplier": "coordination",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 5500000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "lights",
+      "plan_id": "plan",
+      "category": "coordination",
+      "supplier": "lights",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 3000000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "cake",
+      "plan_id": "plan",
+      "category": "entourage_misc",
+      "supplier": "cake",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 1200000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "corkage",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "corkage",
+      "type": "corkage",
+      "pricing_mode": "flat",
+      "estimate_cents": 550000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": [
+        {
+          "id": "cake",
+          "type": "cake",
+          "amount_cents": 300000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "wine",
+          "type": "wine",
+          "amount_cents": 250000,
+          "quantity": null,
+          "unit_rate_cents": null
+        }
+      ]
+    },
+    {
+      "id": "crew",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "crew",
+      "type": "crew_meals",
+      "pricing_mode": "flat",
+      "estimate_cents": 630000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": [
+        {
+          "id": "photo",
+          "type": "supplier",
+          "amount_cents": null,
+          "quantity": 6,
+          "unit_rate_cents": 35000
+        },
+        {
+          "id": "hmua",
+          "type": "supplier",
+          "amount_cents": null,
+          "quantity": 3,
+          "unit_rate_cents": 35000
+        },
+        {
+          "id": "coord",
+          "type": "supplier",
+          "amount_cents": null,
+          "quantity": 5,
+          "unit_rate_cents": 35000
+        },
+        {
+          "id": "lights",
+          "type": "supplier",
+          "amount_cents": null,
+          "quantity": 4,
+          "unit_rate_cents": 35000
+        }
+      ]
+    }
+  ],
+  "pledges": [
+    {
+      "id": "Ramon",
+      "plan_id": "plan",
+      "sponsor": "Ramon",
+      "role": "family",
+      "type": "cash",
+      "value_cents": 5000000,
+      "status": "confirmed",
+      "linked_entry_id": null,
+      "receipts": [
+        {
+          "id": "Ramon-receipt",
+          "amount_cents": 5000000,
+          "received_on": "2026-09-01",
+          "payment_id": null
+        }
+      ]
+    },
+    {
+      "id": "Cora",
+      "plan_id": "plan",
+      "sponsor": "Cora",
+      "role": "family",
+      "type": "cash",
+      "value_cents": 3000000,
+      "status": "confirmed",
+      "linked_entry_id": null,
+      "receipts": []
+    },
+    {
+      "id": "Mila",
+      "plan_id": "plan",
+      "sponsor": "Mila",
+      "role": "family",
+      "type": "cash",
+      "value_cents": 2000000,
+      "status": "tentative",
+      "linked_entry_id": null,
+      "receipts": []
+    }
+  ],
+  "gifts": [],
+  "expected_allocation_cents": [
+    32000000,
+    12000000,
+    8000000,
+    8000000,
+    4000000,
+    16000000
+  ],
+  "expected": [
+    {
+      "guests": 150,
+      "gross_cents": 68680000,
+      "net_cents": 63680000,
+      "expected_cents": 5000000,
+      "exposure_cents": 3000000,
+      "per_head_display_centavos": 457867,
+      "buffer_cents": 7820000,
+      "headroom_cents": 11320000,
+      "over_cap": false,
+      "category_cents": [
+        39480000,
+        9500000,
+        7000000,
+        8500000,
+        4200000,
+        0
+      ]
+    },
+    {
+      "guests": 175,
+      "gross_cents": 75180000,
+      "net_cents": 70180000,
+      "expected_cents": 5000000,
+      "exposure_cents": 3000000,
+      "per_head_display_centavos": 429600,
+      "buffer_cents": 1320000,
+      "headroom_cents": 4820000,
+      "over_cap": true,
+      "category_cents": [
+        45480000,
+        9500000,
+        7000000,
+        8500000,
+        4700000,
+        0
+      ],
+      "marginal_cents": 260000
+    }
+  ]
+}

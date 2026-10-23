@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 
 /// Inject the device-local clock for deterministic past-date tests.
@@ -37,11 +38,16 @@ final setupDraftProvider = NotifierProvider<SetupDraftController, SetupDraft>(
 class SetupDraftController extends Notifier<SetupDraft> {
   @override
   SetupDraft build() {
+    final account = ref.watch(accountStoreStateProvider);
     final auth = ref.watch(authStateProvider);
     final userId = ref.watch(authUserIdProvider);
     // Rebuild from empty on *every* identity transition, including A->B->A,
     // loading, errors and sign-out. No account-keyed copy survives.
-    return SetupDraft(ownerId: auth == AuthState.authenticated ? userId : null);
+    return SetupDraft(
+      ownerId: account.isReady && auth == AuthState.authenticated
+          ? userId
+          : null,
+    );
   }
 
   void setBudget(String value) {

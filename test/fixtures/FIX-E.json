@@ -1,0 +1,211 @@
+{
+  "fixture": "FIX-E",
+  "authority": "docs/testing-plan.md:631-673",
+  "ruleset": {
+    "version": "document-fixture",
+    "production_asset": false,
+    "baselines_bp": [
+      4000,
+      1500,
+      1000,
+      1000,
+      500,
+      2000
+    ],
+    "region_code": "fixture",
+    "cost_index_bp": 10000
+  },
+  "plan_id": "plan",
+  "budget_cents": 2800000,
+  "guests": 20,
+  "guest_cap": 25,
+  "today": "2026-10-02",
+  "entries": [
+    {
+      "id": "catering",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "catering",
+      "type": "standard",
+      "pricing_mode": "per_head",
+      "estimate_cents": null,
+      "rate_cents": 35000,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "venue",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "venue",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 200000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "photo",
+      "plan_id": "plan",
+      "category": "photo_video",
+      "supplier": "photo",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 300000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "attire",
+      "plan_id": "plan",
+      "category": "attire_styling",
+      "supplier": "attire",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 250000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "coordination",
+      "plan_id": "plan",
+      "category": "coordination",
+      "supplier": "coordination",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 200000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "favors",
+      "plan_id": "plan",
+      "category": "entourage_misc",
+      "supplier": "favors",
+      "type": "standard",
+      "pricing_mode": "per_head",
+      "estimate_cents": null,
+      "rate_cents": 5000,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    }
+  ],
+  "pledges": [
+    {
+      "id": "cash",
+      "plan_id": "plan",
+      "sponsor": "cash",
+      "role": "family",
+      "type": "cash",
+      "value_cents": 300000,
+      "status": "confirmed",
+      "linked_entry_id": null,
+      "receipts": [
+        {
+          "id": "cash-receipt",
+          "amount_cents": 100000,
+          "received_on": "2026-09-01",
+          "payment_id": null
+        }
+      ]
+    }
+  ],
+  "gifts": [],
+  "expected_allocation_cents": [
+    1120000,
+    420000,
+    280000,
+    280000,
+    140000,
+    560000
+  ],
+  "expected": [
+    {
+      "guests": 20,
+      "gross_cents": 1750000,
+      "net_cents": 1650000,
+      "expected_cents": 200000,
+      "exposure_cents": 200000,
+      "per_head_display_centavos": 87500,
+      "buffer_cents": 560000,
+      "headroom_cents": 1050000,
+      "over_cap": false,
+      "category_cents": [
+        900000,
+        300000,
+        250000,
+        200000,
+        100000,
+        0
+      ]
+    },
+    {
+      "guests": 25,
+      "gross_cents": 1950000,
+      "net_cents": 1850000,
+      "expected_cents": 200000,
+      "exposure_cents": 200000,
+      "per_head_display_centavos": 78000,
+      "buffer_cents": 560000,
+      "headroom_cents": 850000,
+      "over_cap": false,
+      "category_cents": [
+        1075000,
+        300000,
+        250000,
+        200000,
+        125000,
+        0
+      ],
+      "marginal_cents": 40000
+    }
+  ],
+  "fee_decisions": [
+    {
+      "type": "crew_meals",
+      "state": "dismissed",
+      "actor": "fixture-member",
+      "at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "type": "oot_fees",
+      "state": "dismissed",
+      "actor": "fixture-member",
+      "at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "type": "church_aircon",
+      "state": "dismissed",
+      "actor": "fixture-member",
+      "at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "type": "corkage",
+      "state": "dismissed",
+      "actor": "fixture-member",
+      "at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "type": "overtime",
+      "state": "dismissed",
+      "actor": "fixture-member",
+      "at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "type": "venue_power",
+      "state": "dismissed",
+      "actor": "fixture-member",
+      "at": "2026-09-01T00:00:00Z"
+    }
+  ]
+}

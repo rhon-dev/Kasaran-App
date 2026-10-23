@@ -5,9 +5,45 @@ import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kasaran/data/changelog/local_ledger_writer.dart';
+import 'package:kasaran/data/changelog/verified_local_identity.dart';
 import 'package:kasaran/data/db/app_database.dart';
 import 'package:kasaran/data/repositories/ledger_repository.dart';
+import 'package:kasaran/platform/db/account_store_coordinator.dart';
 import 'package:kasaran/platform/db/encrypted_database.dart';
+
+class _Identity implements VerifiedLocalIdentity {
+  _Identity(this._userId);
+  String? _userId;
+  Object _marker = Object();
+  int captures = 0;
+  void Function(int)? onCapture;
+
+  set verifiedUserId(String? userId) {
+    _userId = userId;
+    _marker = Object();
+  }
+
+  @override
+  VerifiedSessionSnapshot? capture() {
+    captures++;
+    onCapture?.call(captures);
+    final userId = _userId;
+    return userId == null ? null : VerifiedSessionSnapshot(userId, _marker);
+  }
+}
+
+LedgerRepository testRepo(AppDatabase db, {required LocalLedgerWriter writer}) {
+  if (!identical(db, writer.db)) {
+    throw ArgumentError('Ledger writer must use repository database');
+  }
+  return LedgerRepository.forTestLease(
+    AccountStoreCoordinator(writer.identity, (_) async => db),
+    writerFactory: (_) => writer,
+  );
+}
+
+LedgerRepository repoFor(AppDatabase db) =>
+    testRepo(db, writer: LocalLedgerWriter(db, identity: _Identity('user-a')));
 
 class _Keys implements DatabaseKeyStore {
   String? value;
@@ -81,10 +117,11 @@ void main() {
       var next = 0;
       String id() =>
           '01938000-0000-7000-8000-${(++next).toRadixString(16).padLeft(12, '0')}';
-      final repository = LedgerRepository(
+      final repository = testRepo(
         db,
         writer: LocalLedgerWriter(
           db,
+          identity: _Identity('user-a'),
           newId: id,
           utcNow: () => DateTime.utc(2026, 10, 14),
         ),
@@ -92,15 +129,17 @@ void main() {
       final entry = await repository.create(actor, draft);
       expect(entry.estimatedCents, 9007199254740991);
       expect(entry.id, startsWith('01938000-0000-7000-8000-'));
-      expect((await repository.listLive('plan-a')).single.id, entry.id);
+      expect((await repository.listLive(actor)).single.id, entry.id);
+      final rawBefore =
+          (await db.customSelect('SELECT new_value FROM change_log').get())
+              .single
+              .read<String>('new_value');
       await db.close();
 
       final reopened = await EncryptedDatabaseOpener(file, keys).open();
       addTearDown(reopened.close);
       expect(
-        (await LedgerRepository(
-          reopened,
-        ).listLive('plan-a')).single.estimatedCents,
+        (await repoFor(reopened).listLive(actor)).single.estimatedCents,
         9007199254740991,
       );
       final events = await reopened
@@ -108,6 +147,7 @@ void main() {
           .get();
       expect(events, hasLength(1));
       expect(events.single.read<String>('field_name'), r'$create');
+      expect(events.single.read<String>('new_value'), rawBefore);
       expect(events.single.read<int>('schema_version'), 1);
       expect(events.single.read<int>('device_monotonic'), 1);
       expect(events.single.readNullable<int>('server_ts'), isNull);
@@ -141,10 +181,11 @@ void main() {
       var serial = 0;
       String id() =>
           '01938000-0000-7000-8000-${(++serial).toRadixString(16).padLeft(12, '0')}';
-      final repo = LedgerRepository(
+      final repo = testRepo(
         db,
         writer: LocalLedgerWriter(
           db,
+          identity: _Identity('user-a'),
           newId: id,
           utcNow: () => DateTime.utc(2026, 10, 14),
         ),
@@ -174,7 +215,7 @@ void main() {
           notes: Value(null),
         ),
       );
-      final current = (await repo.listLive('plan-a')).single;
+      final current = (await repo.listLive(actor)).single;
       expect(current.pricingMode, 'per_head');
       expect(current.perHeadRateCents, 17);
       expect(current.estimatedCents, isNull);
@@ -213,7 +254,7 @@ void main() {
       ]);
       await repo.delete(actor, created.id);
       await repo.delete(actor, created.id);
-      expect(await repo.listLive('plan-a'), isEmpty);
+      expect(await repo.listLive(actor), isEmpty);
       expect(
         (await db.select(db.ledgerEntries).get()).single.deletedAt,
         isNotNull,
@@ -249,10 +290,13 @@ void main() {
       return '01938000-0000-7000-8000-${ids.current.toRadixString(16).padLeft(12, '0')}';
     }
 
-    final repo = LedgerRepository(db, writer: LocalLedgerWriter(db, newId: id));
+    final repo = testRepo(
+      db,
+      writer: LocalLedgerWriter(db, identity: _Identity('user-a'), newId: id),
+    );
     await repo.create(actor, draft);
     await expectLater(repo.create(actor, draft), throwsA(isA<Exception>()));
-    expect(await repo.listLive('plan-a'), hasLength(1));
+    expect(await repo.listLive(actor), hasLength(1));
     expect(
       await db.customSelect('SELECT * FROM change_log').get(),
       hasLength(1),
@@ -276,9 +320,9 @@ void main() {
         return '01938000-0000-7000-8000-${ids.current.toRadixString(16).padLeft(12, '0')}';
       }
 
-      final repo = LedgerRepository(
+      final repo = testRepo(
         db,
-        writer: LocalLedgerWriter(db, newId: id),
+        writer: LocalLedgerWriter(db, identity: _Identity('user-a'), newId: id),
       );
       final before = await repo.create(actor, draft);
       await expectLater(
@@ -292,7 +336,7 @@ void main() {
         ),
         throwsA(isA<Exception>()),
       );
-      expect((await repo.listLive('plan-a')).single, before);
+      expect((await repo.listLive(actor)).single, before);
       expect(
         await db.customSelect('SELECT * FROM change_log').get(),
         hasLength(1),
@@ -313,7 +357,7 @@ void main() {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
       await seed(db);
-      final repo = LedgerRepository(db);
+      final repo = repoFor(db);
       await expectLater(
         repo.create(
           const LedgerActor(
@@ -373,14 +417,11 @@ void main() {
       await HttpOverrides.runZoned(() async {
         final db = await EncryptedDatabaseOpener(file, keys).open();
         await seed(db);
-        final created = await LedgerRepository(db).create(actor, draft);
+        final created = await repoFor(db).create(actor, draft);
         await db.close();
         final reopened = await EncryptedDatabaseOpener(file, keys).open();
-        expect(
-          (await LedgerRepository(reopened).listLive('plan-a')).single.id,
-          created.id,
-        );
-        await LedgerRepository(reopened).delete(actor, created.id);
+        expect((await repoFor(reopened).listLive(actor)).single.id, created.id);
+        await repoFor(reopened).delete(actor, created.id);
         await reopened.close();
       }, createHttpClient: _NoNetwork().createHttpClient);
     },
@@ -422,7 +463,7 @@ INSERT INTO plan_members
       (plan_id,user_id,plan_member_id,role,joined_at) VALUES (?,?,?,?,?)''',
         ['plan-b', 'user-b', 'alias-b', 'creator', '2026-10-01T00:00:00Z'],
       );
-      final repo = LedgerRepository(db);
+      final repo = repoFor(db);
       final row = await repo.create(actor, draft);
       const foreign = LedgerActor(
         planId: 'plan-b',
@@ -475,7 +516,7 @@ INSERT INTO plan_members
         ),
         throwsStateError,
       );
-      expect((await repo.listLive('plan-a')).single, row);
+      expect((await repo.listLive(actor)).single, row);
       expect(
         await db.customSelect('SELECT * FROM change_log').get(),
         hasLength(1),
@@ -489,4 +530,283 @@ INSERT INTO plan_members
       );
     },
   );
+
+  test('edit rejects a synthetic rowid patch', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seed(db);
+    final repo = repoFor(db);
+    final entry = await repo.create(actor, draft);
+    await expectLater(
+      repo.edit(
+        actor,
+        entry.id,
+        const LedgerEntriesCompanion(rowid: Value(999)),
+      ),
+      throwsArgumentError,
+    );
+    expect((await repo.listLive(actor)).single, entry);
+    expect(
+      await db.customSelect('SELECT * FROM change_log').get(),
+      hasLength(1),
+    );
+  });
+
+  test('unverifiable provenance references fail closed', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seed(db);
+    final repo = repoFor(db);
+    for (final unsupported in [
+      const LedgerDraft(
+        categoryCode: 'buffer',
+        entryType: 'standard',
+        supplierName: 'Supplier',
+        pricingMode: 'flat',
+        estimatedCents: 1,
+        checklistItemId: 'foreign-checklist',
+      ),
+      const LedgerDraft(
+        categoryCode: 'buffer',
+        entryType: 'standard',
+        supplierName: 'Supplier',
+        pricingMode: 'flat',
+        estimatedCents: 1,
+        templateSuggestionId: 'unknown-template',
+      ),
+    ]) {
+      await expectLater(repo.create(actor, unsupported), throwsArgumentError);
+    }
+    expect(await repo.listLive(actor), isEmpty);
+    expect(await db.customSelect('SELECT * FROM change_log').get(), isEmpty);
+  });
+
+  test('hidden-fee subtype rejects a mismatched category', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seed(db);
+    final repo = repoFor(db);
+    await expectLater(
+      repo.create(
+        actor,
+        const LedgerDraft(
+          categoryCode: 'buffer',
+          entryType: 'crew_meals',
+          supplierName: 'Supplier',
+          pricingMode: 'flat',
+          estimatedCents: 1,
+        ),
+      ),
+      throwsArgumentError,
+    );
+    expect(await repo.listLive(actor), isEmpty);
+  });
+
+  test(
+    'a valid foreign member tuple cannot impersonate the active session',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seed(db);
+      await db.customStatement(
+        '''
+INSERT INTO plans
+(id,creator_user_id,wedding_date,total_budget_cents,guest_cap,region_code,
+ ruleset_version,driving_rsvp_status,created_at)
+VALUES (?,?,?,?,?,?,?,?,?)''',
+        [
+          'plan-b',
+          'user-b',
+          '2027-01-01',
+          10000,
+          2,
+          'TEST',
+          'fixture',
+          'pending',
+          '2026-10-01T00:00:00Z',
+        ],
+      );
+      await db.customStatement(
+        'INSERT INTO plan_member_aliases (plan_member_id,plan_id,user_id) VALUES (?,?,?)',
+        ['alias-b', 'plan-b', 'user-b'],
+      );
+      await db.customStatement(
+        'INSERT INTO plan_members (plan_id,user_id,plan_member_id,role,joined_at) VALUES (?,?,?,?,?)',
+        ['plan-b', 'user-b', 'alias-b', 'creator', '2026-10-01T00:00:00Z'],
+      );
+      const foreign = LedgerActor(
+        planId: 'plan-b',
+        userId: 'user-b',
+        planMemberId: 'alias-b',
+        deviceId: 'device-b',
+      );
+      final identity = _Identity('user-b');
+      final repo = testRepo(
+        db,
+        writer: LocalLedgerWriter(db, identity: identity),
+      );
+      final entry = await repo.create(foreign, draft);
+      expect(
+        await db.customSelect('SELECT * FROM change_log').get(),
+        hasLength(1),
+      );
+      identity.verifiedUserId = 'user-a';
+      await expectLater(repo.listLive(foreign), throwsStateError);
+      await expectLater(repo.create(foreign, draft), throwsStateError);
+      await expectLater(
+        repo.edit(
+          foreign,
+          entry.id,
+          const LedgerEntriesCompanion(notes: Value('x')),
+        ),
+        throwsStateError,
+      );
+      await expectLater(repo.delete(foreign, entry.id), throwsStateError);
+      identity.verifiedUserId = null;
+      await expectLater(repo.listLive(actor), throwsStateError);
+    },
+  );
+
+  test(
+    'lease rejects a writer for another store before read or write',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'kasaran-cross-store-',
+      );
+      final leased = await EncryptedDatabaseOpener(
+        File('${directory.path}/leased.sqlite'),
+        _Keys(),
+      ).open();
+      final foreign = AppDatabase(NativeDatabase.memory());
+      addTearDown(() async {
+        await leased.close();
+        await foreign.close();
+        await directory.delete(recursive: true);
+      });
+      await seed(leased);
+      await seed(foreign);
+      final identity = _Identity('user-a');
+      await LocalLedgerWriter(foreign, identity: identity).create(actor, draft);
+      final repo = LedgerRepository.forTestLease(
+        AccountStoreCoordinator(identity, (_) async => leased),
+        writerFactory: (_) => LocalLedgerWriter(foreign, identity: identity),
+      );
+      await expectLater(repo.listLive(actor), throwsStateError);
+      await expectLater(repo.create(actor, draft), throwsStateError);
+      expect(await leased.select(leased.ledgerEntries).get(), isEmpty);
+      expect(await leased.customSelect('SELECT * FROM outbox').get(), isEmpty);
+      expect(await foreign.select(foreign.ledgerEntries).get(), hasLength(1));
+      expect(
+        await foreign.customSelect('SELECT * FROM outbox').get(),
+        hasLength(1),
+      );
+    },
+  );
+
+  test('lease rejects a writer with a different identity source', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seed(db);
+    final repo = LedgerRepository.forTestLease(
+      AccountStoreCoordinator(_Identity('user-a'), (_) async => db),
+      writerFactory: (leased) =>
+          LocalLedgerWriter(leased, identity: _Identity('user-a')),
+    );
+    await expectLater(repo.create(actor, draft), throwsStateError);
+    expect(await db.select(db.ledgerEntries).get(), isEmpty);
+    expect(await db.customSelect('SELECT * FROM outbox').get(), isEmpty);
+  });
+
+  test('repository rejects writer bound to a different database', () async {
+    final first = AppDatabase(NativeDatabase.memory());
+    await first.close();
+    final second = AppDatabase(NativeDatabase.memory());
+    addTearDown(second.close);
+    expect(
+      () => testRepo(
+        first,
+        writer: LocalLedgerWriter(second, identity: _Identity('user-a')),
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test(
+    'session switch after read authorization suppresses prior rows',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seed(db);
+      final identity = _Identity('user-a');
+      final repo = testRepo(
+        db,
+        writer: LocalLedgerWriter(db, identity: identity),
+      );
+      await repo.create(actor, draft);
+      identity.captures = 0;
+      identity.onCapture = (count) {
+        if (count == 3) identity.verifiedUserId = 'user-b';
+      };
+      await expectLater(repo.listLive(actor), throwsStateError);
+      expect(identity.captures, greaterThanOrEqualTo(3));
+    },
+  );
+
+  test(
+    'session change during read transaction completion suppresses rows',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seed(db);
+      final identity = _Identity('user-a');
+      final repo = testRepo(
+        db,
+        writer: LocalLedgerWriter(db, identity: identity),
+      );
+      await repo.create(actor, draft);
+      identity.captures = 0;
+      identity.onCapture = (count) {
+        if (count == 4) identity.verifiedUserId = 'user-b';
+      };
+      await expectLater(repo.listLive(actor), throwsStateError);
+    },
+  );
+
+  test('A-to-B-to-A switch before commit rolls back local write', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seed(db);
+    final identity = _Identity('user-a');
+    identity.onCapture = (count) {
+      if (count == 3) {
+        identity.verifiedUserId = 'user-b';
+        identity.verifiedUserId = 'user-a';
+      }
+    };
+    final writer = LocalLedgerWriter(db, identity: identity);
+    await expectLater(writer.create(actor, draft), throwsStateError);
+    expect(identity.captures, greaterThanOrEqualTo(3));
+    expect(await db.select(db.ledgerEntries).get(), isEmpty);
+    expect(await db.customSelect('SELECT * FROM change_log').get(), isEmpty);
+    expect(await db.customSelect('SELECT * FROM outbox').get(), isEmpty);
+    expect(await db.customSelect('SELECT * FROM sync_state').get(), isEmpty);
+  });
+
+  test('list rejects foreign and revoked local membership', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seed(db);
+    final repo = repoFor(db);
+    await repo.create(actor, draft);
+    const outsider = LedgerActor(
+      planId: 'plan-a',
+      userId: 'user-b',
+      planMemberId: 'alias-b',
+      deviceId: 'device-b',
+    );
+    await expectLater(repo.listLive(outsider), throwsStateError);
+    expect(await repo.listLive(actor), hasLength(1));
+    await db.customStatement("DELETE FROM plan_members WHERE user_id='user-a'");
+    await expectLater(repo.listLive(actor), throwsStateError);
+  });
 }

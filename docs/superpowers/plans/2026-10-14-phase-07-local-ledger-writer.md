@@ -21,7 +21,7 @@
 
 **Files:** Create `lib/data/repositories/ledger_repository.dart`, `lib/data/changelog/local_ledger_writer.dart`, `test/data/repositories/ledger_repository_test.dart`.
 
-**Interfaces:** `LedgerRepository(AppDatabase, {LocalLedgerWriter? writer})`, `listLive(planId)`, `create(LedgerActor, LedgerDraft)`; writer accepts injectable `String Function()` UUIDv7 and `DateTime Function()` UTC clock. `LedgerActor` carries planId/userId/planMemberId/deviceId. `LedgerDraft` contains category, subtype, supplier, mode, cents, notes, provenance.
+**Interfaces:** `LedgerRepository(AppDatabase, {required LocalLedgerWriter writer})`, `listLive(LedgerActor)` with last-known verified-session ID and plan/member/alias validation, `create(LedgerActor, LedgerDraft)`; writer requires an injectable `VerifiedLocalIdentity` whose production adapter captures the current verified Supabase Auth session as an opaque object marker; recheck before returning a local read and before the write transaction exits, including A→B→A. It also accepts injectable `String Function()` UUIDv7 and `DateTime Function()` UTC clock. `LedgerActor` carries planId/userId/planMemberId/deviceId; an actor from a different signed-in account fails closed. `LedgerDraft` contains category, subtype, supplier, mode, cents, notes, nullable provenance; non-null provenance is rejected until a same-plan checklist lookup or pinned template catalog can validate it.
 
 - [ ] Write an encrypted create/reopen test: seed local plan, alias and member; create with 9007199254740991 cents; assert typed row, full `$create` JSON including nulls, pending outbox and counter 1, then reopen and assert same values.
 - [ ] Run `flutter test test/data/repositories/ledger_repository_test.dart -r expanded` and confirm missing repository symbols fail compilation.
@@ -32,7 +32,7 @@
 
 **Files:** Modify `lib/data/repositories/ledger_repository.dart`, `lib/data/changelog/local_ledger_writer.dart`, `test/data/repositories/ledger_repository_test.dart`.
 
-**Interfaces:** `edit(LedgerActor, entryId, LedgerEntriesCompanion patch)` (patch permits only source fields); `delete(LedgerActor, entryId)`; query `listLive(planId)` excludes tombstones. Reject an immutable-field patch rather than silently ignoring it.
+**Interfaces:** `edit(LedgerActor, entryId, LedgerEntriesCompanion patch)` (patch permits only source fields); `delete(LedgerActor, entryId)`; query `listLive(LedgerActor)` excludes tombstones only after last-known local membership validation. Reject an immutable-field patch, including synthetic `rowid`, rather than silently ignoring it.
 
 - [ ] Add tests for independent supplier/notes/actual edits, no-op, null values, and stable increasing counters; run focused test and observe missing behavior.
 - [ ] Implement full-row validation and one event per changed ordinary field in deterministic field order, then rerun focused test green.

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
 import 'package:kasaran/ui/providers/setup_draft_provider.dart';
@@ -80,6 +81,10 @@ Future<(ProviderContainer, GoRouter)> _pump(
 }) async {
   final container = ProviderContainer(
     overrides: [
+      // This isolated UI fixture explicitly supplies an admitted account scope.
+      accountStoreStateProvider.overrideWithValue(
+        const AccountStoreState(AccountStoreStatus.ready, 1),
+      ),
       authStateProvider.overrideWith((ref) => ref.watch(_auth)),
       planAccessProvider.overrideWith((ref) => ref.watch(_plan)),
       authUserIdProvider.overrideWithValue('user-1'),
@@ -111,52 +116,55 @@ void _expectScreen(String id) {
 }
 
 void main() {
-  testWidgets(
-    'account switches defer protected routes until membership reload',
-    (tester) async {
-      final lookup = _PendingMembershipLookup();
-      final container = ProviderContainer(
-        overrides: [
-          authStateProvider.overrideWithValue(AuthState.authenticated),
-          authUserIdProvider.overrideWith((ref) => ref.watch(_user)),
-          planMembershipLookupProvider.overrideWithValue(lookup),
-        ],
-      );
-      addTearDown(container.dispose);
-      final router = container.read(appRouterProvider);
-      final routerSubscription = container.listen(appRouterProvider, (_, _) {});
-      addTearDown(routerSubscription.close);
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp.router(routerConfig: router),
+  testWidgets('account switches defer protected routes until membership reload', (
+    tester,
+  ) async {
+    final lookup = _PendingMembershipLookup();
+    final container = ProviderContainer(
+      overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
         ),
-      );
-      await tester.pump();
-      expect(lookup.requests.length, 1);
-      lookup.requests[0].complete('plan-1');
-      await tester.pumpAndSettle();
-      expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
-      container.read(_user.notifier).value = 'user-2';
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(container.read(planAccessProvider), PlanAccess.loading);
-      expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
-      expect(lookup.requests.length, 2);
-      container.read(_user.notifier).value = 'user-1';
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(container.read(planAccessProvider), PlanAccess.loading);
-      expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
-      expect(lookup.requests.length, 3);
-      lookup.requests[1].complete('plan-1');
-      await tester.pump();
-      expect(container.read(planAccessProvider), PlanAccess.loading);
-      lookup.requests[2].complete('plan-1');
-      await tester.pumpAndSettle();
-      expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
-    },
-  );
+        authStateProvider.overrideWithValue(AuthState.authenticated),
+        authUserIdProvider.overrideWith((ref) => ref.watch(_user)),
+        planMembershipLookupProvider.overrideWithValue(lookup),
+      ],
+    );
+    addTearDown(container.dispose);
+    final router = container.read(appRouterProvider);
+    final routerSubscription = container.listen(appRouterProvider, (_, _) {});
+    addTearDown(routerSubscription.close);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pump();
+    expect(lookup.requests.length, 1);
+    lookup.requests[0].complete('plan-1');
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
+    container.read(_user.notifier).value = 'user-2';
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(container.read(planAccessProvider), PlanAccess.loading);
+    expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
+    expect(lookup.requests.length, 2);
+    container.read(_user.notifier).value = 'user-1';
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(container.read(planAccessProvider), PlanAccess.loading);
+    expect(router.routeInformationProvider.value.uri.path, Routes.planCheck);
+    expect(lookup.requests.length, 3);
+    lookup.requests[1].complete('plan-1');
+    await tester.pump();
+    expect(container.read(planAccessProvider), PlanAccess.loading);
+    lookup.requests[2].complete('plan-1');
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, Routes.dashboard);
+  });
 
   testWidgets('sign-out hides an open past-date prompt and erases its draft', (
     tester,
@@ -185,6 +193,10 @@ void main() {
       final lookup = _PendingMembershipLookup();
       final container = ProviderContainer(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWithValue(AuthState.authenticated),
           authUserIdProvider.overrideWith((ref) => ref.watch(_user)),
           planMembershipLookupProvider.overrideWithValue(lookup),
@@ -243,6 +255,10 @@ void main() {
     final source = _RetryIdentitySource();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWithValue(AuthState.authenticated),
         authIdentitySourceProvider.overrideWithValue(source),
         planMembershipLookupProvider.overrideWithValue(

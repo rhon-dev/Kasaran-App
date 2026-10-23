@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:drift/drift.dart';
+import 'package:kasaran/data/changelog/verified_local_identity.dart';
 import 'package:kasaran/data/db/app_database.dart';
 import 'package:kasaran/data/repositories/ledger_repository.dart';
 
@@ -23,11 +24,15 @@ String newLedgerUuidV7() {
 class LocalLedgerWriter {
   LocalLedgerWriter(
     this.db, {
+    required VerifiedLocalIdentity identity,
     String Function()? newId,
     DateTime Function()? utcNow,
-  }) : _newId = newId ?? newLedgerUuidV7,
+  }) : _identity = identity,
+       _newId = newId ?? newLedgerUuidV7,
        _utcNow = utcNow ?? DateTime.now;
   final AppDatabase db;
+  final VerifiedLocalIdentity _identity;
+  VerifiedLocalIdentity get identity => _identity;
   final String Function() _newId;
   final DateTime Function() _utcNow;
   static const _maxInt64 = 9223372036854775807;
@@ -48,6 +53,14 @@ class LocalLedgerWriter {
     'overtime',
     'venue_power',
   };
+  static const _subtypeCategory = {
+    'crew_meals': 'catering_venue',
+    'oot_fees': 'coordination',
+    'church_aircon': 'catering_venue',
+    'corkage': 'catering_venue',
+    'overtime': 'coordination',
+    'venue_power': 'catering_venue',
+  };
   static final _uuidV7 = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
   );
@@ -62,7 +75,21 @@ class LocalLedgerWriter {
 
   String _timestamp() => _utcNow().toUtc().toIso8601String();
 
-  Future<void> _authorize(LedgerActor actor) async {
+  void requireSameSession(LedgerActor actor, VerifiedSessionSnapshot expected) {
+    final current = _identity.capture();
+    if (current == null ||
+        current.userId != actor.userId ||
+        current.userId != expected.userId ||
+        !identical(current.marker, expected.marker)) {
+      throw StateError('Verified local session changed');
+    }
+  }
+
+  Future<VerifiedSessionSnapshot> _authorize(LedgerActor actor) async {
+    final session = _identity.capture();
+    if (session == null || actor.userId != session.userId) {
+      throw StateError('Verified local session unavailable for actor');
+    }
     if (actor.planId.isEmpty ||
         actor.userId.isEmpty ||
         actor.planMemberId.isEmpty ||
@@ -85,15 +112,28 @@ WHERE p.id=? AND p.deleted_at IS NULL AND p.is_active=1 LIMIT 1''',
         )
         .get();
     if (rows.isEmpty) throw StateError('Local plan membership unavailable');
+    requireSameSession(actor, session);
+    return session;
   }
+
+  /// Checks only the last-known encrypted-local membership and alias.
+  /// Server authorization must be rechecked before any future sync.
+  Future<VerifiedSessionSnapshot> requireLocalMembership(LedgerActor actor) =>
+      _authorize(actor);
 
   static void _validate(LedgerEntry row) {
     bool validCents(int? n) => n == null || (n >= 0 && n <= _maxInt64);
     if (!_categories.contains(row.categoryCode) ||
         !_types.contains(row.entryType) ||
+        (row.entryType != 'standard' &&
+            _subtypeCategory[row.entryType] != row.categoryCode) ||
         row.supplierName.trim().isEmpty ||
         row.supplierName.trim().length > 200 ||
         (row.notes?.length ?? 0) > 2000 ||
+        // Neither checklist items nor the pinned template catalog has a
+        // local validator in this slice; refuse unverified provenance.
+        row.templateSuggestionId != null ||
+        row.checklistItemId != null ||
         (row.manuallyValued != 0 && row.manuallyValued != 1) ||
         !validCents(row.estimatedCents) ||
         !validCents(row.actualCents) ||
@@ -110,7 +150,7 @@ WHERE p.id=? AND p.deleted_at IS NULL AND p.is_active=1 LIMIT 1''',
 
   Future<LedgerEntry> create(LedgerActor actor, LedgerDraft draft) =>
       db.transaction(() async {
-        await _authorize(actor);
+        final session = await _authorize(actor);
         final now = _timestamp();
         final row = LedgerEntry(
           id: _id(),
@@ -131,6 +171,7 @@ WHERE p.id=? AND p.deleted_at IS NULL AND p.is_active=1 LIMIT 1''',
         _validate(row);
         await db.into(db.ledgerEntries).insert(row);
         await _event(actor, row.id, r'$create', null, row.toJson(), now);
+        requireSameSession(actor, session);
         return row;
       });
 
@@ -148,10 +189,11 @@ WHERE p.id=? AND p.deleted_at IS NULL AND p.is_active=1 LIMIT 1''',
     String entryId,
     LedgerEntriesCompanion patch,
   ) => db.transaction(() async {
-    await _authorize(actor);
+    final session = await _authorize(actor);
     final before = await _existing(actor, entryId);
     if (before.deletedAt != null) throw StateError('Tombstoned entry');
     if (patch.id.present ||
+        patch.rowid.present ||
         patch.planId.present ||
         patch.createdAt.present ||
         patch.deletedAt.present) {
@@ -176,6 +218,7 @@ WHERE p.id=? AND p.deleted_at IS NULL AND p.is_active=1 LIMIT 1''',
         before.pricingMode != after.pricingMode ||
         before.perHeadRateCents != after.perHeadRateCents;
     if (!modeChanged && fields.every((f) => old[f] == updated[f])) {
+      requireSameSession(actor, session);
       return before;
     }
     final now = _timestamp();
@@ -202,19 +245,24 @@ WHERE p.id=? AND p.deleted_at IS NULL AND p.is_active=1 LIMIT 1''',
         groupId: _id(),
       );
     }
+    requireSameSession(actor, session);
     return after;
   });
 
   Future<void> delete(LedgerActor actor, String entryId) =>
       db.transaction(() async {
-        await _authorize(actor);
+        final session = await _authorize(actor);
         final row = await _existing(actor, entryId);
-        if (row.deletedAt != null) return;
+        if (row.deletedAt != null) {
+          requireSameSession(actor, session);
+          return;
+        }
         final now = _timestamp();
         await db
             .update(db.ledgerEntries)
             .replace(row.copyWith(deletedAt: Value(now)));
         await _event(actor, entryId, 'deleted_at', null, now, now);
+        requireSameSession(actor, session);
       });
 
   Future<void> _event(

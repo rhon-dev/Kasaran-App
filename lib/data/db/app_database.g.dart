@@ -3874,6 +3874,327 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
   }
 }
 
+class SyncInbox extends Table with TableInfo<SyncInbox, SyncInboxData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  SyncInbox(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _eventIdMeta = const VerificationMeta(
+    'eventId',
+  );
+  late final GeneratedColumn<String> eventId = GeneratedColumn<String>(
+    'event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _planIdMeta = const VerificationMeta('planId');
+  late final GeneratedColumn<String> planId = GeneratedColumn<String>(
+    'plan_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES plans(id)',
+  );
+  static const VerificationMeta _serverTsMeta = const VerificationMeta(
+    'serverTs',
+  );
+  late final GeneratedColumn<int> serverTs = GeneratedColumn<int>(
+    'server_ts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (server_ts > 0)',
+  );
+  static const VerificationMeta _rawEventMeta = const VerificationMeta(
+    'rawEvent',
+  );
+  late final GeneratedColumn<String> rawEvent = GeneratedColumn<String>(
+    'raw_event',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [eventId, planId, serverTs, rawEvent];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_inbox';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncInboxData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('event_id')) {
+      context.handle(
+        _eventIdMeta,
+        eventId.isAcceptableOrUnknown(data['event_id']!, _eventIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventIdMeta);
+    }
+    if (data.containsKey('plan_id')) {
+      context.handle(
+        _planIdMeta,
+        planId.isAcceptableOrUnknown(data['plan_id']!, _planIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_planIdMeta);
+    }
+    if (data.containsKey('server_ts')) {
+      context.handle(
+        _serverTsMeta,
+        serverTs.isAcceptableOrUnknown(data['server_ts']!, _serverTsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_serverTsMeta);
+    }
+    if (data.containsKey('raw_event')) {
+      context.handle(
+        _rawEventMeta,
+        rawEvent.isAcceptableOrUnknown(data['raw_event']!, _rawEventMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rawEventMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {eventId};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {planId, serverTs},
+  ];
+  @override
+  SyncInboxData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncInboxData(
+      eventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}event_id'],
+      )!,
+      planId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}plan_id'],
+      )!,
+      serverTs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_ts'],
+      )!,
+      rawEvent: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}raw_event'],
+      )!,
+    );
+  }
+
+  @override
+  SyncInbox createAlias(String alias) {
+    return SyncInbox(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const ['UNIQUE(plan_id, server_ts)'];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
+  final String eventId;
+  final String planId;
+  final int serverTs;
+  final String rawEvent;
+  const SyncInboxData({
+    required this.eventId,
+    required this.planId,
+    required this.serverTs,
+    required this.rawEvent,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['event_id'] = Variable<String>(eventId);
+    map['plan_id'] = Variable<String>(planId);
+    map['server_ts'] = Variable<int>(serverTs);
+    map['raw_event'] = Variable<String>(rawEvent);
+    return map;
+  }
+
+  SyncInboxCompanion toCompanion(bool nullToAbsent) {
+    return SyncInboxCompanion(
+      eventId: Value(eventId),
+      planId: Value(planId),
+      serverTs: Value(serverTs),
+      rawEvent: Value(rawEvent),
+    );
+  }
+
+  factory SyncInboxData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncInboxData(
+      eventId: serializer.fromJson<String>(json['event_id']),
+      planId: serializer.fromJson<String>(json['plan_id']),
+      serverTs: serializer.fromJson<int>(json['server_ts']),
+      rawEvent: serializer.fromJson<String>(json['raw_event']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'event_id': serializer.toJson<String>(eventId),
+      'plan_id': serializer.toJson<String>(planId),
+      'server_ts': serializer.toJson<int>(serverTs),
+      'raw_event': serializer.toJson<String>(rawEvent),
+    };
+  }
+
+  SyncInboxData copyWith({
+    String? eventId,
+    String? planId,
+    int? serverTs,
+    String? rawEvent,
+  }) => SyncInboxData(
+    eventId: eventId ?? this.eventId,
+    planId: planId ?? this.planId,
+    serverTs: serverTs ?? this.serverTs,
+    rawEvent: rawEvent ?? this.rawEvent,
+  );
+  SyncInboxData copyWithCompanion(SyncInboxCompanion data) {
+    return SyncInboxData(
+      eventId: data.eventId.present ? data.eventId.value : this.eventId,
+      planId: data.planId.present ? data.planId.value : this.planId,
+      serverTs: data.serverTs.present ? data.serverTs.value : this.serverTs,
+      rawEvent: data.rawEvent.present ? data.rawEvent.value : this.rawEvent,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncInboxData(')
+          ..write('eventId: $eventId, ')
+          ..write('planId: $planId, ')
+          ..write('serverTs: $serverTs, ')
+          ..write('rawEvent: $rawEvent')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(eventId, planId, serverTs, rawEvent);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncInboxData &&
+          other.eventId == this.eventId &&
+          other.planId == this.planId &&
+          other.serverTs == this.serverTs &&
+          other.rawEvent == this.rawEvent);
+}
+
+class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
+  final Value<String> eventId;
+  final Value<String> planId;
+  final Value<int> serverTs;
+  final Value<String> rawEvent;
+  final Value<int> rowid;
+  const SyncInboxCompanion({
+    this.eventId = const Value.absent(),
+    this.planId = const Value.absent(),
+    this.serverTs = const Value.absent(),
+    this.rawEvent = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncInboxCompanion.insert({
+    required String eventId,
+    required String planId,
+    required int serverTs,
+    required String rawEvent,
+    this.rowid = const Value.absent(),
+  }) : eventId = Value(eventId),
+       planId = Value(planId),
+       serverTs = Value(serverTs),
+       rawEvent = Value(rawEvent);
+  static Insertable<SyncInboxData> custom({
+    Expression<String>? eventId,
+    Expression<String>? planId,
+    Expression<int>? serverTs,
+    Expression<String>? rawEvent,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (eventId != null) 'event_id': eventId,
+      if (planId != null) 'plan_id': planId,
+      if (serverTs != null) 'server_ts': serverTs,
+      if (rawEvent != null) 'raw_event': rawEvent,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncInboxCompanion copyWith({
+    Value<String>? eventId,
+    Value<String>? planId,
+    Value<int>? serverTs,
+    Value<String>? rawEvent,
+    Value<int>? rowid,
+  }) {
+    return SyncInboxCompanion(
+      eventId: eventId ?? this.eventId,
+      planId: planId ?? this.planId,
+      serverTs: serverTs ?? this.serverTs,
+      rawEvent: rawEvent ?? this.rawEvent,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (eventId.present) {
+      map['event_id'] = Variable<String>(eventId.value);
+    }
+    if (planId.present) {
+      map['plan_id'] = Variable<String>(planId.value);
+    }
+    if (serverTs.present) {
+      map['server_ts'] = Variable<int>(serverTs.value);
+    }
+    if (rawEvent.present) {
+      map['raw_event'] = Variable<String>(rawEvent.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncInboxCompanion(')
+          ..write('eventId: $eventId, ')
+          ..write('planId: $planId, ')
+          ..write('serverTs: $serverTs, ')
+          ..write('rawEvent: $rawEvent, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class Outbox extends Table with TableInfo<Outbox, OutboxData> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -4206,6 +4527,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final LedgerEntries ledgerEntries = LedgerEntries(this);
   late final ChangeLog changeLog = ChangeLog(this);
   late final SyncState syncState = SyncState(this);
+  late final SyncInbox syncInbox = SyncInbox(this);
   late final Outbox outbox = Outbox(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -4219,6 +4541,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ledgerEntries,
     changeLog,
     syncState,
+    syncInbox,
     outbox,
   ];
 }
@@ -4360,6 +4683,24 @@ final class $PlansReferences
     ).filter((f) => f.planId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_syncStateRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<SyncInbox, List<SyncInboxData>>
+  _syncInboxRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.syncInbox,
+    aliasName: 'plans__id__sync_inbox__plan_id',
+  );
+
+  $SyncInboxProcessedTableManager get syncInboxRefs {
+    final manager = $SyncInboxTableManager(
+      $_db,
+      $_db.syncInbox,
+    ).filter((f) => f.planId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_syncInboxRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -4599,6 +4940,31 @@ class $PlansFilterComposer extends Composer<_$AppDatabase, Plans> {
           }) => $SyncStateFilterComposer(
             $db: $db,
             $table: $db.syncState,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> syncInboxRefs(
+    Expression<bool> Function($SyncInboxFilterComposer f) f,
+  ) {
+    final $SyncInboxFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.syncInbox,
+      getReferencedColumn: (t) => t.planId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $SyncInboxFilterComposer(
+            $db: $db,
+            $table: $db.syncInbox,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4944,6 +5310,31 @@ class $PlansAnnotationComposer extends Composer<_$AppDatabase, Plans> {
     return f(composer);
   }
 
+  Expression<T> syncInboxRefs<T extends Object>(
+    Expression<T> Function($SyncInboxAnnotationComposer a) f,
+  ) {
+    final $SyncInboxAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.syncInbox,
+      getReferencedColumn: (t) => t.planId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $SyncInboxAnnotationComposer(
+            $db: $db,
+            $table: $db.syncInbox,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> outboxRefs<T extends Object>(
     Expression<T> Function($OutboxAnnotationComposer a) f,
   ) {
@@ -4989,6 +5380,7 @@ class $PlansTableManager
             bool ledgerEntriesRefs,
             bool changeLogRefs,
             bool syncStateRefs,
+            bool syncInboxRefs,
             bool outboxRefs,
           })
         > {
@@ -5102,6 +5494,7 @@ class $PlansTableManager
                 ledgerEntriesRefs = false,
                 changeLogRefs = false,
                 syncStateRefs = false,
+                syncInboxRefs = false,
                 outboxRefs = false,
               }) {
                 return PrefetchHooks(
@@ -5112,6 +5505,7 @@ class $PlansTableManager
                     if (ledgerEntriesRefs) db.ledgerEntries,
                     if (changeLogRefs) db.changeLog,
                     if (syncStateRefs) db.syncState,
+                    if (syncInboxRefs) db.syncInbox,
                     if (outboxRefs) db.outbox,
                   ],
                   addJoins: null,
@@ -5191,6 +5585,20 @@ class $PlansTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (syncInboxRefs)
+                        await $_getPrefetchedData<Plan, Plans, SyncInboxData>(
+                          currentTable: table,
+                          referencedTable: $PlansReferences._syncInboxRefsTable(
+                            db,
+                          ),
+                          managerFromTypedResult: (p0) =>
+                              $PlansReferences(db, table, p0).syncInboxRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.planId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (outboxRefs)
                         await $_getPrefetchedData<Plan, Plans, OutboxData>(
                           currentTable: table,
@@ -5231,6 +5639,7 @@ typedef $PlansProcessedTableManager =
         bool ledgerEntriesRefs,
         bool changeLogRefs,
         bool syncStateRefs,
+        bool syncInboxRefs,
         bool outboxRefs,
       })
     >;
@@ -7173,6 +7582,301 @@ typedef $SyncStateProcessedTableManager =
       SyncStateData,
       PrefetchHooks Function({bool planId})
     >;
+typedef $SyncInboxCreateCompanionBuilder =
+    SyncInboxCompanion Function({
+      required String eventId,
+      required String planId,
+      required int serverTs,
+      required String rawEvent,
+      Value<int> rowid,
+    });
+typedef $SyncInboxUpdateCompanionBuilder =
+    SyncInboxCompanion Function({
+      Value<String> eventId,
+      Value<String> planId,
+      Value<int> serverTs,
+      Value<String> rawEvent,
+      Value<int> rowid,
+    });
+
+final class $SyncInboxReferences
+    extends BaseReferences<_$AppDatabase, SyncInbox, SyncInboxData> {
+  $SyncInboxReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static Plans _planIdTable(_$AppDatabase db) =>
+      db.plans.createAlias('sync_inbox__plan_id__plans__id');
+
+  $PlansProcessedTableManager get planId {
+    final $_column = $_itemColumn<String>('plan_id')!;
+
+    final manager = $PlansTableManager(
+      $_db,
+      $_db.plans,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_planIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $SyncInboxFilterComposer extends Composer<_$AppDatabase, SyncInbox> {
+  $SyncInboxFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverTs => $composableBuilder(
+    column: $table.serverTs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rawEvent => $composableBuilder(
+    column: $table.rawEvent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $PlansFilterComposer get planId {
+    final $PlansFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.planId,
+      referencedTable: $db.plans,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $PlansFilterComposer(
+            $db: $db,
+            $table: $db.plans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $SyncInboxOrderingComposer extends Composer<_$AppDatabase, SyncInbox> {
+  $SyncInboxOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverTs => $composableBuilder(
+    column: $table.serverTs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rawEvent => $composableBuilder(
+    column: $table.rawEvent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $PlansOrderingComposer get planId {
+    final $PlansOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.planId,
+      referencedTable: $db.plans,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $PlansOrderingComposer(
+            $db: $db,
+            $table: $db.plans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $SyncInboxAnnotationComposer extends Composer<_$AppDatabase, SyncInbox> {
+  $SyncInboxAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
+
+  GeneratedColumn<int> get serverTs =>
+      $composableBuilder(column: $table.serverTs, builder: (column) => column);
+
+  GeneratedColumn<String> get rawEvent =>
+      $composableBuilder(column: $table.rawEvent, builder: (column) => column);
+
+  $PlansAnnotationComposer get planId {
+    final $PlansAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.planId,
+      referencedTable: $db.plans,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $PlansAnnotationComposer(
+            $db: $db,
+            $table: $db.plans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $SyncInboxTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          SyncInbox,
+          SyncInboxData,
+          $SyncInboxFilterComposer,
+          $SyncInboxOrderingComposer,
+          $SyncInboxAnnotationComposer,
+          $SyncInboxCreateCompanionBuilder,
+          $SyncInboxUpdateCompanionBuilder,
+          (SyncInboxData, $SyncInboxReferences),
+          SyncInboxData,
+          PrefetchHooks Function({bool planId})
+        > {
+  $SyncInboxTableManager(_$AppDatabase db, SyncInbox table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $SyncInboxFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $SyncInboxOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $SyncInboxAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> eventId = const Value.absent(),
+                Value<String> planId = const Value.absent(),
+                Value<int> serverTs = const Value.absent(),
+                Value<String> rawEvent = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncInboxCompanion(
+                eventId: eventId,
+                planId: planId,
+                serverTs: serverTs,
+                rawEvent: rawEvent,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String eventId,
+                required String planId,
+                required int serverTs,
+                required String rawEvent,
+                Value<int> rowid = const Value.absent(),
+              }) => SyncInboxCompanion.insert(
+                eventId: eventId,
+                planId: planId,
+                serverTs: serverTs,
+                rawEvent: rawEvent,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<SyncInbox, SyncInboxData>(table),
+                  $SyncInboxReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({planId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (planId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.planId,
+                                referencedTable: $SyncInboxReferences
+                                    ._planIdTable(db),
+                                referencedColumn: $SyncInboxReferences
+                                    ._planIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $SyncInboxProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      SyncInbox,
+      SyncInboxData,
+      $SyncInboxFilterComposer,
+      $SyncInboxOrderingComposer,
+      $SyncInboxAnnotationComposer,
+      $SyncInboxCreateCompanionBuilder,
+      $SyncInboxUpdateCompanionBuilder,
+      (SyncInboxData, $SyncInboxReferences),
+      SyncInboxData,
+      PrefetchHooks Function({bool planId})
+    >;
 typedef $OutboxCreateCompanionBuilder =
     OutboxCompanion Function({
       required String eventId,
@@ -7484,5 +8188,7 @@ class $AppDatabaseManager {
       $ChangeLogTableManager(_db, _db.changeLog);
   $SyncStateTableManager get syncState =>
       $SyncStateTableManager(_db, _db.syncState);
+  $SyncInboxTableManager get syncInbox =>
+      $SyncInboxTableManager(_db, _db.syncInbox);
   $OutboxTableManager get outbox => $OutboxTableManager(_db, _db.outbox);
 }

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:kasaran/data/changelog/local_ledger_writer.dart';
 import 'package:kasaran/data/db/app_database.dart';
+import 'package:kasaran/platform/db/account_store_coordinator.dart';
 
 /// Last-known local identity. Server authorization is rechecked in Phase 08.
 class LedgerActor {
@@ -45,30 +46,72 @@ class LedgerDraft {
 }
 
 class LedgerRepository {
-  LedgerRepository(this.db, {LocalLedgerWriter? writer})
-    : _writer = writer ?? LocalLedgerWriter(db);
-  final AppDatabase db;
-  final LocalLedgerWriter _writer;
+  /// Production entry point: the account coordinator owns DB selection.
+  LedgerRepository(AccountStoreCoordinator coordinator)
+    : _coordinator = coordinator,
+      _writerFactory = ((db) =>
+          LocalLedgerWriter(db, identity: coordinator.identity));
 
-  Future<List<LedgerEntry>> listLive(String planId) =>
-      (db.select(db.ledgerEntries)
-            ..where((row) => row.planId.equals(planId) & row.deletedAt.isNull())
-            ..orderBy([
-              (row) => OrderingTerm.asc(row.createdAt),
-              (row) => OrderingTerm.asc(row.id),
-            ]))
-          .get();
+  /// Synthetic fixtures must explicitly provide their lease coordinator and
+  /// writer factory; no raw database fallback exists on the production path.
+  LedgerRepository.forTestLease(
+    AccountStoreCoordinator coordinator, {
+    required LocalLedgerWriter Function(AppDatabase) writerFactory,
+  }) : _coordinator = coordinator,
+       _writerFactory = writerFactory;
+
+  final AccountStoreCoordinator _coordinator;
+  final LocalLedgerWriter Function(AppDatabase) _writerFactory;
+
+  Future<T> _withWriter<T>(
+    Future<T> Function(AppDatabase, LocalLedgerWriter) work,
+  ) => _coordinator.withAccount(
+    (lease) => lease.run((db) {
+      final writer = _writerFactory(db);
+      if (!identical(writer.db, db) ||
+          !identical(writer.identity, _coordinator.identity)) {
+        throw StateError('Ledger writer does not match account lease');
+      }
+      return work(db, writer);
+    }),
+  );
+
+  /// Authenticated by the last-known local plan/member/alias snapshot.
+  Future<List<LedgerEntry>> listLive(LedgerActor actor) => _withWriter((
+    db,
+    writer,
+  ) async {
+    final result = await db.transaction(() async {
+      final session = await writer.requireLocalMembership(actor);
+      final rows =
+          await (db.select(db.ledgerEntries)
+                ..where(
+                  (row) =>
+                      row.planId.equals(actor.planId) & row.deletedAt.isNull(),
+                )
+                ..orderBy([
+                  (row) => OrderingTerm.asc(row.createdAt),
+                  (row) => OrderingTerm.asc(row.id),
+                ]))
+              .get();
+      writer.requireSameSession(actor, session);
+      return (session, rows);
+    });
+    // Drift's COMMIT is asynchronous; never return rows after an Auth switch.
+    writer.requireSameSession(actor, result.$1);
+    return result.$2;
+  });
 
   Future<LedgerEntry> create(LedgerActor actor, LedgerDraft draft) =>
-      _writer.create(actor, draft);
+      _withWriter((_, writer) => writer.create(actor, draft));
 
   /// Only present, mutable source fields may be patched. Value(null) clears a field.
   Future<LedgerEntry> edit(
     LedgerActor actor,
     String entryId,
     LedgerEntriesCompanion changes,
-  ) => _writer.edit(actor, entryId, changes);
+  ) => _withWriter((_, writer) => writer.edit(actor, entryId, changes));
 
   Future<void> delete(LedgerActor actor, String entryId) =>
-      _writer.delete(actor, entryId);
+      _withWriter((_, writer) => writer.delete(actor, entryId));
 }

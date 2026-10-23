@@ -62,6 +62,13 @@ CREATE TABLE sync_state (
   device_monotonic INTEGER NOT NULL DEFAULT 0 CHECK(device_monotonic>=0),
   PRIMARY KEY(device_id,plan_id)
 );
+CREATE TABLE sync_inbox (
+  event_id TEXT NOT NULL PRIMARY KEY,
+  plan_id TEXT NOT NULL REFERENCES plans(id),
+  server_ts INTEGER NOT NULL CHECK(server_ts>0),
+  raw_event TEXT NOT NULL,
+  UNIQUE(plan_id,server_ts)
+);
 CREATE TABLE outbox (
   event_id TEXT NOT NULL PRIMARY KEY,
   plan_id TEXT NOT NULL REFERENCES plans(id), device_id TEXT NOT NULL,

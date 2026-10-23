@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kasaran/data/repositories/plan_membership_repository.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
 import 'package:kasaran/ui/screens/scr_02_invite_acceptance.dart';
@@ -128,6 +129,9 @@ void main() {
     final lookup = _FakeLookup();
     final container = ProviderContainer(
       overrides: [
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
         planMembershipRepositoryProvider.overrideWith((ref) => fake),
