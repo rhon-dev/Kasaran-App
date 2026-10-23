@@ -1,0 +1,435 @@
+{
+  "fixture": "FIX-B",
+  "authority": "docs/testing-plan.md:408-487",
+  "ruleset": {
+    "version": "document-fixture",
+    "production_asset": false,
+    "baselines_bp": [
+      4000,
+      1500,
+      1000,
+      1000,
+      500,
+      2000
+    ],
+    "region_code": "fixture",
+    "cost_index_bp": 12000
+  },
+  "plan_id": "plan",
+  "budget_cents": 140000000,
+  "guests": 80,
+  "guest_cap": 100,
+  "today": "2026-10-02",
+  "entries": [
+    {
+      "id": "catering",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "catering",
+      "type": "standard",
+      "pricing_mode": "per_head",
+      "estimate_cents": null,
+      "rate_cents": 380000,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "favors",
+      "plan_id": "plan",
+      "category": "entourage_misc",
+      "supplier": "favors",
+      "type": "standard",
+      "pricing_mode": "per_head",
+      "estimate_cents": null,
+      "rate_cents": 25000,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "invitations",
+      "plan_id": "plan",
+      "category": "entourage_misc",
+      "supplier": "invitations",
+      "type": "standard",
+      "pricing_mode": "per_head",
+      "estimate_cents": null,
+      "rate_cents": 15000,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "venue",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "venue",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 18000000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "photo",
+      "plan_id": "plan",
+      "category": "photo_video",
+      "supplier": "photo",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 15000000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "hmua",
+      "plan_id": "plan",
+      "category": "attire_styling",
+      "supplier": "hmua",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 4500000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "attire",
+      "plan_id": "plan",
+      "category": "attire_styling",
+      "supplier": "attire",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 12000000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "coordination",
+      "plan_id": "plan",
+      "category": "coordination",
+      "supplier": "coordination",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 9000000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "lights",
+      "plan_id": "plan",
+      "category": "coordination",
+      "supplier": "lights",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 6000000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "cake",
+      "plan_id": "plan",
+      "category": "entourage_misc",
+      "supplier": "cake",
+      "type": "standard",
+      "pricing_mode": "flat",
+      "estimate_cents": 2000000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": []
+    },
+    {
+      "id": "corkage",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "corkage",
+      "type": "corkage",
+      "pricing_mode": "flat",
+      "estimate_cents": 1300000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": [
+        {
+          "id": "wine",
+          "type": "wine",
+          "amount_cents": 800000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "lechon",
+          "type": "lechon",
+          "amount_cents": 500000,
+          "quantity": null,
+          "unit_rate_cents": null
+        }
+      ]
+    },
+    {
+      "id": "power",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "power",
+      "type": "venue_power",
+      "pricing_mode": "flat",
+      "estimate_cents": 3500000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": [
+        {
+          "id": "generator",
+          "type": "generator",
+          "amount_cents": 3500000,
+          "quantity": null,
+          "unit_rate_cents": null
+        }
+      ]
+    },
+    {
+      "id": "crew",
+      "plan_id": "plan",
+      "category": "catering_venue",
+      "supplier": "crew",
+      "type": "crew_meals",
+      "pricing_mode": "flat",
+      "estimate_cents": 1100000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": [
+        {
+          "id": "0",
+          "type": "supplier",
+          "amount_cents": null,
+          "quantity": 6,
+          "unit_rate_cents": 50000
+        },
+        {
+          "id": "1",
+          "type": "supplier",
+          "amount_cents": null,
+          "quantity": 4,
+          "unit_rate_cents": 50000
+        },
+        {
+          "id": "2",
+          "type": "supplier",
+          "amount_cents": null,
+          "quantity": 6,
+          "unit_rate_cents": 50000
+        },
+        {
+          "id": "3",
+          "type": "supplier",
+          "amount_cents": null,
+          "quantity": 6,
+          "unit_rate_cents": 50000
+        }
+      ]
+    },
+    {
+      "id": "oot",
+      "plan_id": "plan",
+      "category": "coordination",
+      "supplier": "oot",
+      "type": "oot_fees",
+      "pricing_mode": "flat",
+      "estimate_cents": 13750000,
+      "rate_cents": null,
+      "actual_cents": null,
+      "manually_valued": false,
+      "components": [
+        {
+          "id": "0-travel",
+          "type": "travel",
+          "amount_cents": 2400000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "0-lodging",
+          "type": "lodging",
+          "amount_cents": 1600000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "0-per_diem",
+          "type": "per_diem",
+          "amount_cents": 600000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "1-travel",
+          "type": "travel",
+          "amount_cents": 1200000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "1-lodging",
+          "type": "lodging",
+          "amount_cents": 800000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "1-per_diem",
+          "type": "per_diem",
+          "amount_cents": 300000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "2-travel",
+          "type": "travel",
+          "amount_cents": 1800000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "2-lodging",
+          "type": "lodging",
+          "amount_cents": 1200000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "2-per_diem",
+          "type": "per_diem",
+          "amount_cents": 450000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "3-travel",
+          "type": "travel",
+          "amount_cents": 2000000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "3-lodging",
+          "type": "lodging",
+          "amount_cents": 1000000,
+          "quantity": null,
+          "unit_rate_cents": null
+        },
+        {
+          "id": "3-per_diem",
+          "type": "per_diem",
+          "amount_cents": 400000,
+          "quantity": null,
+          "unit_rate_cents": null
+        }
+      ]
+    }
+  ],
+  "pledges": [
+    {
+      "id": "Eduardo",
+      "plan_id": "plan",
+      "sponsor": "Eduardo",
+      "role": "family",
+      "type": "cash",
+      "value_cents": 15000000,
+      "status": "confirmed",
+      "linked_entry_id": null,
+      "receipts": [
+        {
+          "id": "Eduardo-receipt",
+          "amount_cents": 15000000,
+          "received_on": "2026-09-01",
+          "payment_id": null
+        }
+      ]
+    },
+    {
+      "id": "Rosa",
+      "plan_id": "plan",
+      "sponsor": "Rosa",
+      "role": "family",
+      "type": "cash",
+      "value_cents": 10000000,
+      "status": "confirmed",
+      "linked_entry_id": null,
+      "receipts": []
+    },
+    {
+      "id": "parents",
+      "plan_id": "plan",
+      "sponsor": "parents",
+      "role": "family",
+      "type": "cash",
+      "value_cents": 20000000,
+      "status": "confirmed",
+      "linked_entry_id": null,
+      "receipts": [
+        {
+          "id": "parents-receipt",
+          "amount_cents": 20000000,
+          "received_on": "2026-09-01",
+          "payment_id": null
+        }
+      ]
+    }
+  ],
+  "gifts": [],
+  "expected_allocation_cents": [
+    56000000,
+    21000000,
+    14000000,
+    14000000,
+    7000000,
+    28000000
+  ],
+  "expected": [
+    {
+      "guests": 80,
+      "gross_cents": 119750000,
+      "net_cents": 84750000,
+      "expected_cents": 10000000,
+      "exposure_cents": 10000000,
+      "per_head_display_centavos": 1496875,
+      "buffer_cents": 10750000,
+      "headroom_cents": 20250000,
+      "over_cap": false,
+      "category_cents": [
+        54300000,
+        15000000,
+        16500000,
+        28750000,
+        5200000,
+        0
+      ]
+    },
+    {
+      "guests": 105,
+      "gross_cents": 130250000,
+      "net_cents": 95250000,
+      "expected_cents": 10000000,
+      "exposure_cents": 10000000,
+      "per_head_display_centavos": 1240476,
+      "buffer_cents": 2950000,
+      "headroom_cents": 9750000,
+      "over_cap": true,
+      "marginal_cents": 420000
+    }
+  ]
+}

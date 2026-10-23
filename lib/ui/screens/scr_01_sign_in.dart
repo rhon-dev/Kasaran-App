@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kasaran/data/repositories/auth_repository.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/router/app_router.dart';
 
@@ -103,7 +104,8 @@ class _Scr01SignInState extends ConsumerState<Scr01SignIn> {
   @override
   Widget build(BuildContext context) {
     final status = ref.watch(authStateProvider);
-    if (status == AuthState.authenticated) {
+    if (status == AuthState.authenticated &&
+        ref.watch(accountStoreStateProvider).isReady) {
       return Scaffold(
         appBar: AppBar(title: const Text('Kasaran')),
         body: Center(

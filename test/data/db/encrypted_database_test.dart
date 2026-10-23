@@ -172,12 +172,12 @@ void main() {
       await _createEncryptedFixture(file, store, version: 1);
       final originalKey = store.value;
       final db = await EncryptedDatabaseOpener(file, store).open();
-      expect(db.schemaVersion, 2);
+      expect(db.schemaVersion, 3);
       final sentinel = await db
           .customSelect('SELECT value FROM legacy_sentinel')
           .get();
       expect(sentinel.single.read<String>('value'), 'preserve-local-row');
-      expect(db.allTables, hasLength(7));
+      expect(db.allTables, hasLength(8));
       await db.close();
       expect(store.value, originalKey);
       expect(store.writes, 1);
@@ -185,14 +185,14 @@ void main() {
       expect(
         (await reopened.customSelect('PRAGMA user_version').get()).single
             .read<int>('user_version'),
-        2,
+        3,
       );
       await reopened.close();
     },
   );
 
   test('future encrypted version fails before changing file bytes', () async {
-    await _createEncryptedFixture(file, store, version: 3);
+    await _createEncryptedFixture(file, store, version: 4);
     final originalBytes = await file.readAsBytes();
     await expectLater(
       EncryptedDatabaseOpener(file, store).open(),
@@ -215,7 +215,7 @@ void main() {
       final originalKey = store.value;
       final db = await EncryptedDatabaseOpener(file, store).open();
       addTearDown(db.close);
-      expect(db.schemaVersion, 2);
+      expect(db.schemaVersion, 3);
       expect(
         (await db.customSelect('SELECT value FROM legacy_sentinel').get())
             .single
@@ -264,6 +264,7 @@ void main() {
           2,
         );
         expect(raw.select('PRAGMA user_version').single['user_version'], 2);
+        expect(raw.select("SELECT name FROM sqlite_master WHERE name='sync_inbox'"),isEmpty);
       } finally {
         raw.close();
       }
@@ -308,7 +309,7 @@ void main() {
           (await db.customSelect('PRAGMA user_version').get()).single.read<int>(
             'user_version',
           ),
-          2,
+          3,
         );
         await db.close();
       },

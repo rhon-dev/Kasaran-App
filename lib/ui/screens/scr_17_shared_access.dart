@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kasaran/data/repositories/invitation_repository.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
 
@@ -12,9 +13,21 @@ final class _InvitationOverview {
 
 final _invitationOverviewProvider = FutureProvider.autoDispose
     .family<_InvitationOverview, String>((ref, planId) async {
+      final account = ref.watch(accountStoreStateProvider);
+      final coordinator = ref.read(accountStoreCoordinatorProvider);
+      bool isCurrent() =>
+          ref.mounted &&
+          (coordinator == null ||
+              coordinator.isReady &&
+                  coordinator.generation == account.generation) &&
+          ref.read(accountStoreStateProvider).isReady &&
+          ref.read(accountStoreStateProvider).generation == account.generation;
+      if (!isCurrent()) throw StateError('Account unavailable');
       final repository = ref.watch(invitationRepositoryProvider);
       final eligibility = await repository.pairingEligibility(planId);
+      if (!isCurrent()) throw StateError('Account changed');
       final invites = await repository.listInvites(planId);
+      if (!isCurrent()) throw StateError('Account changed');
       return _InvitationOverview(eligibility, invites);
     });
 
@@ -35,8 +48,23 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
   String? _issuedPlanId;
   String? _error;
 
+  // Cached provider state alone misses GoTrue's silent same-user recovery.
+  // Read live readiness first: it revokes the stale generation synchronously.
+  bool _accountCurrent(int generation) {
+    if (!mounted) return false;
+    final coordinator = ref.read(accountStoreCoordinatorProvider);
+    if (coordinator != null &&
+        (!coordinator.isReady || coordinator.generation != generation)) {
+      return false;
+    }
+    final account = ref.read(accountStoreStateProvider);
+    return account.isReady && account.generation == generation;
+  }
+
   Future<void> _issue(String planId) async {
     if (_busy) return;
+    final generation = ref.read(accountStoreStateProvider).generation;
+    if (!_accountCurrent(generation)) return;
     final userId = ref.read(authUserIdProvider);
     if (userId == null) return;
     final authEpoch = _authEpoch;
@@ -49,7 +77,7 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
       final issued = await ref
           .read(invitationRepositoryProvider)
           .issueInvite(planId);
-      if (!mounted) return;
+      if (!_accountCurrent(generation)) return;
       final currentPlan = ref.read(currentPlanIdProvider);
       if (authEpoch != _authEpoch ||
           planEpoch != _planEpoch ||
@@ -66,7 +94,7 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
       });
       ref.invalidate(_invitationOverviewProvider(planId));
     } catch (_) {
-      if (mounted &&
+      if (_accountCurrent(generation) &&
           authEpoch == _authEpoch &&
           planEpoch == _planEpoch &&
           ref.read(authUserIdProvider) == userId) {
@@ -81,6 +109,8 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
 
   Future<void> _revoke(String planId, String inviteId) async {
     if (_busy) return;
+    final generation = ref.read(accountStoreStateProvider).generation;
+    if (!_accountCurrent(generation)) return;
     final userId = ref.read(authUserIdProvider);
     if (userId == null) return;
     final authEpoch = _authEpoch;
@@ -91,7 +121,7 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
     });
     try {
       await ref.read(invitationRepositoryProvider).revokeInvite(inviteId);
-      if (!mounted ||
+      if (!_accountCurrent(generation) ||
           authEpoch != _authEpoch ||
           planEpoch != _planEpoch ||
           ref.read(authUserIdProvider) != userId ||
@@ -107,7 +137,7 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
       });
       ref.invalidate(_invitationOverviewProvider(planId));
     } catch (_) {
-      if (mounted &&
+      if (_accountCurrent(generation) &&
           authEpoch == _authEpoch &&
           planEpoch == _planEpoch &&
           ref.read(authUserIdProvider) == userId) {
@@ -122,6 +152,17 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(accountStoreStateProvider, (_, _) {
+      _authEpoch++;
+      if (mounted) {
+        setState(() {
+          _issuedId = null;
+          _issuedPlanId = null;
+          _issuedLink = null;
+          _error = null;
+        });
+      }
+    });
     ref.listen(authUserIdProvider, (previous, next) {
       if (previous != next && mounted) {
         _authEpoch++;
@@ -155,6 +196,7 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
         });
       }
     });
+    final account = ref.watch(accountStoreStateProvider);
     final auth = ref.watch(authStateProvider);
     final userId = ref.watch(authUserIdProvider);
     final plan = ref.watch(currentPlanIdProvider);
@@ -166,7 +208,10 @@ class _Scr17SharedAccessState extends ConsumerState<Scr17SharedAccess> {
           AsyncLoading() => const Center(child: CircularProgressIndicator()),
           AsyncError() => _retryPlan(),
           AsyncData(value: final planId) =>
-            planId == null || auth != AuthState.authenticated || userId == null
+            !account.isReady ||
+                    planId == null ||
+                    auth != AuthState.authenticated ||
+                    userId == null
                 ? const Text('No active plan is available for invitations.')
                 : _invitationBlock(planId),
         },

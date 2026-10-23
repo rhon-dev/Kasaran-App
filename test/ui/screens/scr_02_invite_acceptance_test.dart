@@ -1,11 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kasaran/data/repositories/plan_membership_repository.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
+import 'package:kasaran/ui/providers/sync_runtime_provider.dart';
 import 'package:kasaran/ui/screens/scr_02_invite_acceptance.dart';
+
+import '../../sync/queue/sync_runtime_owner_test.dart' show RuntimeHarness;
+import '../../sync/transport/bootstrap_transport_test.dart' as wire;
 
 class _FakeMembership implements PlanMembershipRepository {
   String? accepted;
@@ -13,14 +20,7 @@ class _FakeMembership implements PlanMembershipRepository {
   Future<void> acceptInvite(String token) async => accepted = token;
 }
 
-class _FakeLookup implements PlanMembershipLookup {
-  int calls = 0;
-  @override
-  Future<String?> currentPlanId() async {
-    calls++;
-    return null;
-  }
-}
+class _LoopbackHttp extends HttpOverrides {}
 
 final _token = List.filled(32, 'a').join();
 
@@ -121,31 +121,57 @@ void main() {
     expect(find.textContaining(_token), findsNothing);
   });
 
-  testWidgets('successful acceptance refreshes membership lookup', (
-    tester,
-  ) async {
-    final fake = _FakeMembership();
-    final lookup = _FakeLookup();
-    final container = ProviderContainer(
-      overrides: [
-        authStateProvider.overrideWith((ref) => AuthState.authenticated),
-        authUserIdProvider.overrideWithValue('user-1'),
-        planMembershipRepositoryProvider.overrideWith((ref) => fake),
-        planMembershipLookupProvider.overrideWith((ref) => lookup),
-      ],
-    );
-    addTearDown(container.dispose);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(home: Scr02InviteAcceptance(token: _token)),
-      ),
-    );
-    await container.read(currentPlanIdProvider.future);
-    expect(lookup.calls, 1);
-    await tester.tap(find.text('Accept invitation'));
-    await tester.pumpAndSettle();
-    await container.read(currentPlanIdProvider.future);
-    expect(lookup.calls, 2);
-  });
+  testWidgets(
+    'successful acceptance refreshes original host then bootstraps local access',
+    (tester) async {
+      final fake = _FakeMembership();
+      final harness = (await tester.runAsync(
+        () => HttpOverrides.runWithHttpOverrides(
+          () => RuntimeHarness.open(
+            seed: false,
+            discovery: (_) async => fake.accepted == null ? null : wire.planId,
+          ),
+          _LoopbackHttp(),
+        ),
+      ))!;
+      await tester.runAsync(() => harness.owner.settled);
+      final container = ProviderContainer(
+        overrides: [
+          syncRuntimeOwnerProvider.overrideWithValue(harness.owner),
+          accountStoreCoordinatorProvider.overrideWithValue(
+            harness.coordinator,
+          ),
+          accountSessionEventsProvider.overrideWithValue(const Stream.empty()),
+          authStateProvider.overrideWithValue(AuthState.authenticated),
+          authUserIdProvider.overrideWithValue(wire.userId),
+          planMembershipRepositoryProvider.overrideWithValue(fake),
+        ],
+      );
+      try {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(home: Scr02InviteAcceptance(token: _token)),
+          ),
+        );
+        expect(harness.discoveries, 1);
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Accept invitation'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await harness.owner.settled;
+        });
+        expect(harness.discoveries, 2);
+        expect(
+          await tester.runAsync(
+            () => container.read(currentPlanIdProvider.future),
+          ),
+          wire.planId,
+        );
+      } finally {
+        await tester.pumpWidget(const SizedBox());
+        container.dispose();
+        await tester.runAsync(harness.close);
+      }
+    },
+  );
 }

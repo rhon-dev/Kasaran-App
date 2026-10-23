@@ -1,20 +1,16 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:kasaran/data/db/app_database.dart';
-import 'package:kasaran/platform/db/local_store_bootstrap.dart';
 
-/// Fail-closed startup: the app router is never mounted if local encryption or
-/// platform file protection cannot be established.
+/// Await Auth initialization and device protection without opening a financial
+/// database. Signed-out/unverified routes can mount independently of any key.
 class LocalStoreGate extends StatefulWidget {
   const LocalStoreGate({
-    required this.open,
+    required this.prepare,
     required this.markWarningShown,
     required this.child,
     super.key,
   });
 
-  final Future<LocalStoreResult> Function() open;
+  final Future<bool> Function() prepare;
   final Future<void> Function() markWarningShown;
   final Widget child;
 
@@ -23,15 +19,8 @@ class LocalStoreGate extends StatefulWidget {
 }
 
 class _LocalStoreGateState extends State<LocalStoreGate> {
-  late final Future<LocalStoreResult> _opening = widget.open();
-  AppDatabase? _db;
+  late final Future<bool> _opening = widget.prepare();
   bool _dismissed = false;
-
-  @override
-  void dispose() {
-    if (_db != null) unawaited(_db!.close());
-    super.dispose();
-  }
 
   Future<void> _acknowledge() async {
     await widget.markWarningShown();
@@ -39,7 +28,7 @@ class _LocalStoreGateState extends State<LocalStoreGate> {
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<LocalStoreResult>(
+  Widget build(BuildContext context) => FutureBuilder<bool>(
     future: _opening,
     builder: (context, snapshot) {
       if (snapshot.hasError) {
@@ -59,14 +48,13 @@ class _LocalStoreGateState extends State<LocalStoreGate> {
           home: Scaffold(body: Center(child: CircularProgressIndicator())),
         );
       }
-      final result = snapshot.requireData;
-      _db ??= result.db;
+      final warningNeeded = snapshot.requireData;
       return MaterialApp(
         home: Scaffold(
           body: Stack(
             children: [
               widget.child,
-              if (result.warningNeeded && !_dismissed)
+              if (warningNeeded && !_dismissed)
                 Positioned.fill(
                   child: Material(
                     color: Colors.black54,

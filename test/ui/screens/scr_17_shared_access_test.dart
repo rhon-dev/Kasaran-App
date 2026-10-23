@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kasaran/data/repositories/invitation_repository.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
 import 'package:kasaran/ui/screens/scr_17_shared_access.dart';
@@ -47,7 +48,7 @@ class _FakeAuthIdentitySource implements AuthIdentitySource {
   Future<void> dispose() => changes.close();
 }
 
-class _ChangingIdentityLookup implements PlanMembershipLookup {
+class _ChangingIdentityLookup implements LocalPlanLookup {
   _ChangingIdentityLookup(this.userId);
   final String Function() userId;
   int calls = 0;
@@ -123,7 +124,13 @@ void main() {
   test('account identity provider follows user-ID events', () async {
     final source = _FakeAuthIdentitySource();
     final container = ProviderContainer(
-      overrides: [authIdentitySourceProvider.overrideWithValue(source)],
+      overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
+        authIdentitySourceProvider.overrideWithValue(source),
+      ],
     );
     addTearDown(() async {
       container.dispose();
@@ -146,9 +153,13 @@ void main() {
     final source = _FakeAuthIdentitySource();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWithValue(AuthState.authenticated),
         authIdentitySourceProvider.overrideWithValue(source),
-        planMembershipLookupProvider.overrideWithValue(
+        localPlanLookupProvider.overrideWithValue(
           _ChangingIdentityLookup(() => 'user-1'),
         ),
       ],
@@ -175,9 +186,13 @@ void main() {
       final lookup = _ChangingIdentityLookup(() => 'user-1');
       final container = ProviderContainer(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue(null),
-          planMembershipLookupProvider.overrideWithValue(lookup),
+          localPlanLookupProvider.overrideWithValue(lookup),
         ],
       );
       addTearDown(container.dispose);
@@ -192,9 +207,13 @@ void main() {
     final lookup = _ChangingIdentityLookup(() => 'user-1');
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authIdentitySourceProvider.overrideWithValue(source),
-        planMembershipLookupProvider.overrideWithValue(lookup),
+        localPlanLookupProvider.overrideWithValue(lookup),
       ],
     );
     addTearDown(() async {
@@ -221,9 +240,13 @@ void main() {
     final lookup = _ChangingIdentityLookup(() => container.read(_identity));
     container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
-        planMembershipLookupProvider.overrideWith((ref) => lookup),
+        localPlanLookupProvider.overrideWith((ref) => lookup),
       ],
     );
     addTearDown(container.dispose);
@@ -240,6 +263,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -263,6 +290,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -282,6 +313,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -302,6 +337,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -325,6 +364,10 @@ void main() {
     final fake = _FakeInvitations();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -359,6 +402,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -383,6 +430,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -418,6 +469,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -443,6 +498,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // This isolated UI fixture explicitly supplies an admitted account scope.
+          accountStoreStateProvider.overrideWithValue(
+            const AccountStoreState(AccountStoreStatus.ready, 1),
+          ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
           currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -464,6 +523,10 @@ void main() {
     final fake = _FakeInvitations();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -489,6 +552,10 @@ void main() {
     final fake = _FakeInvitations();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => ref.watch(_auth)),
         authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -517,6 +584,10 @@ void main() {
     final fake = _FakeInvitations()..pendingIssue = Completer<IssuedInvite>();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => ref.watch(_auth)),
         authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -554,6 +625,10 @@ void main() {
     final fake = _FakeInvitations()..pendingIssue = Completer<IssuedInvite>();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => ref.watch(_plan)),
@@ -589,6 +664,10 @@ void main() {
     final fake = _FakeInvitations()..pendingIssue = Completer<IssuedInvite>();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => ref.watch(_plan)),
@@ -626,6 +705,10 @@ void main() {
     final fake = _FakeInvitations();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -657,6 +740,10 @@ void main() {
     final fake = _FakeInvitations()..pendingIssue = Completer<IssuedInvite>();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -696,6 +783,10 @@ void main() {
       ..failRevoke = true;
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -728,6 +819,10 @@ void main() {
     final fake = _FakeInvitations()..pendingIssue = Completer<IssuedInvite>();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
         currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
@@ -755,6 +850,10 @@ void main() {
     final fake = _FakeInvitations();
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
         currentPlanIdProvider.overrideWith((ref) async => ref.watch(_plan)),

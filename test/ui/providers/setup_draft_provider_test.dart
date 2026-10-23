@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/setup_draft_provider.dart';
 
@@ -24,6 +25,10 @@ void main() {
   test('same-account draft survives edits while A-B-A erases it', () {
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => ref.watch(_auth)),
         authUserIdProvider.overrideWith((ref) => ref.watch(_user)),
       ],
@@ -42,6 +47,10 @@ void main() {
   test('unknown account and sign-out erase the draft', () {
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWith((ref) => ref.watch(_auth)),
         authUserIdProvider.overrideWith((ref) => ref.watch(_user)),
       ],
@@ -60,6 +69,10 @@ void main() {
   test('declining a changed date restores the previous accepted date', () {
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWithValue(AuthState.authenticated),
         authUserIdProvider.overrideWithValue('A'),
       ],
@@ -76,6 +89,10 @@ void main() {
     addTearDown(identity.close);
     final container = ProviderContainer(
       overrides: [
+        // This isolated UI fixture explicitly supplies an admitted account scope.
+        accountStoreStateProvider.overrideWithValue(
+          const AccountStoreState(AccountStoreStatus.ready, 1),
+        ),
         authStateProvider.overrideWithValue(AuthState.authenticated),
         authIdentityStateProvider.overrideWith((ref) => identity.stream),
       ],

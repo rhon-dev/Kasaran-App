@@ -122,12 +122,11 @@ jobs:
 
 # ---------------------------------------------------------------------------
 # Job: contract-tests
-# Starts the local Supabase CLI instance, deploys the Edge Function stubs,
-# then runs the Dart contract test suite against the local instance.
+# Runs versioned contracts, SQL concurrency and Dart/Edge transport against
+# an isolated synthetic Supabase project.
 #
 # deployment-plan §2.3 gate: zero failures required.
-# Phase-04 GET/push stub smoke tests are not full TC-API-01/02/04/05.
-# Versioned POST/cursor acceptance and tenant isolation remain phase-08 gates.
+# This bounded transport gate does not establish full replay/convergence.
 # ---------------------------------------------------------------------------
   contract-tests:
     name: API contract tests
@@ -153,40 +152,78 @@ jobs:
         with:
           version: latest
 
-      - name: Start local Supabase
-        run: supabase start
-        # supabase start pulls Docker images and boots all services.
-        # This takes 2-5 minutes on a cold runner cache.
+      - name: Install local Postgres catalog client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+
+      - name: Prepare disposable transport project
+        shell: bash
+        run: |
+          export SUPABASE_WORKDIR="$RUNNER_TEMP/kasaran_p08_disposable"
+          printf 'SUPABASE_WORKDIR=%s\n' "$SUPABASE_WORKDIR" >> "$GITHUB_ENV"
+          mkdir -p "$SUPABASE_WORKDIR/supabase/migrations"
+          cp supabase/config.toml "$SUPABASE_WORKDIR/supabase/config.toml"
+          cp supabase/migrations/*.sql "$SUPABASE_WORKDIR/supabase/migrations/"
+          cp -R supabase/functions "$SUPABASE_WORKDIR/supabase/functions"
+          python3 - "$SUPABASE_WORKDIR/supabase/config.toml" <<'PY'
+          from pathlib import Path
+          import sys
+          config = Path(sys.argv[1])
+          current = config.read_text()
+          original = 'project_id = "kasaran"'
+          if current.count(original) != 1:
+              raise SystemExit('Expected a unique local project_id')
+          config.write_text(current.replace(original,
+                                            'project_id = "kasaran_p08_disposable"'))
+          PY
+
+      - name: Start disposable Supabase
+        run: |
+          (cd "$SUPABASE_WORKDIR" &&
+            supabase start -x vector,analytics,studio > /dev/null 2>&1)
         timeout-minutes: 10
-
-      - name: Verify Supabase is healthy
-        run: supabase status
-
-      - name: Serve Edge Functions (background)
-        # Edge Functions are served automatically when supabase start is running.
-        # The serve command is not needed separately; functions in supabase/functions/
-        # are auto-loaded by the edge-runtime container.
-        run: echo "Edge functions served by supabase start"
 
       - name: Run contract tests (zero skips)
         shell: bash
         run: |
-          flutter test test/api/contract/ --reporter=json > "$RUNNER_TEMP/contract.jsonl"
+          set -euo pipefail
+          python3 - <<'PY'
+          import sys
+          import unittest
+
+          suite = unittest.defaultTestLoader.discover('test/api/sync')
+          expected = suite.countTestCases()
+          if expected < 13:
+              sys.exit('Transport gate requires at least thirteen discovered Python cases')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if (not result.wasSuccessful() or result.skipped or
+              result.testsRun != expected):
+              sys.exit('Every discovered Python transport case must pass without skips')
+          PY
+          flutter test --no-pub test/api/contract/ test/api/sync/ --concurrency=1 \
+            --reporter=json > "$RUNNER_TEMP/contract.jsonl"
           python3 - "$RUNNER_TEMP/contract.jsonl" <<'PY'
           import json
           import sys
 
           events = [json.loads(line) for line in open(sys.argv[1]) if line.strip().startswith('{')]
-          done = [e for e in events if e.get('type') == 'testDone']
-          if not done or any(e.get('result') != 'success' or e.get('skipped') for e in done):
+          tests = {e['test']['id']: e['test'] for e in events
+                   if e.get('type') == 'testStart' and not e['test'].get('hidden')
+                   and not e['test']['name'].startswith(('loading ', '('))}
+          done = [e for e in events if e.get('type') == 'testDone'
+                  and e.get('testID') in tests]
+          if (len(done) != 17 or len(tests) != 17 or
+              not any(e.get('type') == 'done' and e.get('success') for e in events) or
+              any(e.get('result') != 'success' or e.get('skipped') for e in done)):
               sys.exit('Contract suite must execute without failures or skips')
-          print(f'Contract smoke tests executed without skips: {len(done)}')
+          print(f'Contract and transport assertions executed without skips: {len(done)}')
           PY
-        # Phase-04 smoke success is not future versioned POST/tenant acceptance.
 
       - name: Stop Supabase
         if: always()
-        run: supabase stop
+        run: |
+          if [ -f "$SUPABASE_WORKDIR/supabase/config.toml" ]; then
+            (cd "$SUPABASE_WORKDIR" && supabase stop > /dev/null 2>&1)
+          fi
 
 # ---------------------------------------------------------------------------
 # Job: core-schema-isolation
@@ -322,11 +359,11 @@ jobs:
             echo 'enabled=true' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Require future forged-pull coverage before starting services
+      - name: Require forged-pull coverage before starting services
         if: steps.gate.outputs.enabled == 'true'
         run: |
           if [ ! -f test/api/tenant_isolation/forged_pull_test.dart ]; then
-            echo 'Full tenant-isolation gate pending Phase 08 forged-pull case'
+            echo 'ERROR: required forged-pull test is absent'
             exit 1
           fi
 
@@ -356,7 +393,8 @@ jobs:
         if: steps.gate.outputs.enabled == 'true'
         shell: bash
         run: |
-          scratch="$RUNNER_TEMP/kasaran_p07_disposable"
+          scratch="$RUNNER_TEMP/kasaran_p08_disposable"
+          printf 'SUPABASE_WORKDIR=%s\n' "$scratch" >> "$GITHUB_ENV"
           mkdir -p "$scratch/supabase/migrations"
           cp supabase/config.toml "$scratch/supabase/config.toml"
           cp supabase/migrations/*.sql "$scratch/supabase/migrations/"
@@ -372,23 +410,22 @@ jobs:
           if current.count(original) != 1:
               raise SystemExit('Expected a unique local project_id')
           config.write_text(current.replace(original,
-                                            'project_id = "kasaran_p07_disposable"'))
+                                            'project_id = "kasaran_p08_disposable"'))
           PY
 
       - name: Start local Supabase with migrations
         if: steps.gate.outputs.enabled == 'true'
         run: |
-          (cd "$RUNNER_TEMP/kasaran_p07_disposable" &&
+          (cd "$SUPABASE_WORKDIR" &&
             supabase start -x vector,analytics,studio > /dev/null 2>&1)
         timeout-minutes: 10
 
       - name: Run tenant-isolation suite and require executed assertions
         if: steps.gate.outputs.enabled == 'true'
         shell: bash
-        env:
-          SUPABASE_WORKDIR: ${{ runner.temp }}/kasaran_p07_disposable
         run: |
-          flutter test test/api/tenant_isolation/ --reporter=json \
+          set -euo pipefail
+          flutter test --no-pub test/api/tenant_isolation/ --concurrency=1 --reporter=json \
             > "$RUNNER_TEMP/isolation.jsonl"
           python3 - "$RUNNER_TEMP/isolation.jsonl" <<'PY'
           import json
@@ -425,8 +462,8 @@ jobs:
       - name: Stop Supabase
         if: always() && steps.gate.outputs.enabled == 'true'
         run: |
-          if [ -f "$RUNNER_TEMP/kasaran_p07_disposable/supabase/config.toml" ]; then
-            (cd "$RUNNER_TEMP/kasaran_p07_disposable" &&
+          if [ -f "$SUPABASE_WORKDIR/supabase/config.toml" ]; then
+            (cd "$SUPABASE_WORKDIR" &&
               supabase stop > /dev/null 2>&1)
           fi
 

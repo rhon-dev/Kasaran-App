@@ -276,7 +276,7 @@ void main() {
     final configText = await config.readAsString();
     expect(
       RegExp(
-        r'^project_id\s*=\s*"kasaran_p07_disposable(?:_[A-Za-z0-9]+)?"\s*$',
+        r'^project_id\s*=\s*"(?:kasaran_p07_disposable(?:_[A-Za-z0-9]+)?|kasaran_p08_disposable)"\s*$',
         multiLine: true,
       ).hasMatch(configText),
       isTrue,

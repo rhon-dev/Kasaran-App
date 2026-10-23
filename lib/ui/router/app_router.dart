@@ -1,8 +1,10 @@
 // Production go_router route tree. SCR-19 lives only under More.
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
 import 'package:kasaran/ui/screens/scr_01_sign_in.dart';
@@ -61,27 +63,47 @@ class _RouterRefresh extends ChangeNotifier {
   void refresh() => notifyListeners();
 }
 
-/// Keep one router instance; refresh its redirect when auth/plan changes.
-final appRouterProvider = Provider<GoRouter>((ref) {
+/// Keep one router per account readiness scope; refresh membership within it.
+final appRouterProvider = Provider<GoRouter>(createAppRouter);
+
+GoRouter createAppRouter(Ref ref) {
+  // Dispose indexed stacks and dialogs on every account generation.
+  ref.watch(accountStoreStateProvider.select((state) => state.scopeKey));
   final refresh = _RouterRefresh();
   ref.listen(authStateProvider, (_, _) => refresh.refresh());
   ref.listen(planAccessProvider, (_, _) => refresh.refresh());
   final router = GoRouter(
     initialLocation: Routes.signIn,
     refreshListenable: refresh,
-    redirect: (_, state) => _redirect(
-      state,
-      ref.read(authStateProvider),
-      ref.read(planAccessProvider),
-    ),
+    redirect: (_, state) {
+      final account = ref.read(accountStoreStateProvider);
+      final coordinator = ref.read(accountStoreCoordinatorProvider);
+      final ready =
+          account.isReady && (coordinator == null || coordinator.isReady);
+      if (!ready) {
+        final target = ref.read(authStateProvider) == AuthState.authenticated
+            ? Routes.planCheck
+            : Routes.signIn;
+        return state.uri.path == target ? null : target;
+      }
+      return _redirect(
+        state,
+        ref.read(authStateProvider),
+        ref.read(planAccessProvider),
+      );
+    },
     routes: _buildRoutes(),
   );
   ref.onDispose(() {
-    router.dispose();
-    refresh.dispose();
+    // A fresh synchronous session capture can revoke during go_router's own
+    // notification stack. Dispose after that stack unwinds, never inside it.
+    scheduleMicrotask(() {
+      router.dispose();
+      refresh.dispose();
+    });
   });
   return router;
-});
+}
 
 String? _redirect(GoRouterState state, AuthState auth, PlanAccess planAccess) {
   final uri = state.uri;
@@ -292,6 +314,35 @@ class _PlanCheckScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final account = ref.watch(accountStoreStateProvider);
+    if (!account.isReady) {
+      return Scaffold(
+        body: Center(
+          child: account.status == AccountStoreStatus.loading
+              ? const CircularProgressIndicator()
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'The secure local store is unavailable. Your data was not reset.',
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(accountStoreCoordinatorProvider)
+                              ?.retryCurrent();
+                        } catch (_) {
+                          /* Remain unavailable; never display raw storage errors. */
+                        }
+                      },
+                      child: const Text('Retry local store'),
+                    ),
+                  ],
+                ),
+        ),
+      );
+    }
     final status = ref.watch(planAccessProvider);
     return Scaffold(
       body: Center(

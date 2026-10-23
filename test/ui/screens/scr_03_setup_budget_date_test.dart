@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/setup_draft_provider.dart';
 import 'package:kasaran/ui/router/app_router.dart';
@@ -19,6 +20,10 @@ class _User extends Notifier<String> {
 ProviderContainer _container({bool mutableUser = false}) {
   final container = ProviderContainer(
     overrides: [
+      // This isolated UI fixture explicitly supplies an admitted account scope.
+      accountStoreStateProvider.overrideWithValue(
+        const AccountStoreState(AccountStoreStatus.ready, 1),
+      ),
       authStateProvider.overrideWithValue(AuthState.authenticated),
       if (mutableUser)
         authUserIdProvider.overrideWith((ref) => ref.watch(_user))

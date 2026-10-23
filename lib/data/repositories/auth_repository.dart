@@ -37,8 +37,25 @@ abstract interface class AuthRepository {
 
 /// Separates policy from the SDK so tests never need a network or real tokens.
 final class SupabaseAuthRepository implements AuthRepository {
-  SupabaseAuthRepository(this._gateway);
+  SupabaseAuthRepository(
+    this._gateway, {
+    Future<void> Function(Future<void> Function())? transition,
+  }) : _transition = transition;
   final AuthGateway _gateway;
+  final Future<void> Function(Future<void> Function())? _transition;
+
+  Future<T> _change<T>(Future<T> Function() action) async {
+    final transition = _transition;
+    if (transition == null) {
+      return action(); // Standalone policy unit tests only.
+    }
+    late T result;
+    await transition(() async {
+      result = await action();
+    });
+    return result;
+  }
+
   @override
   AuthSessionStatus get currentStatus => _gateway.currentStatus;
   @override
@@ -51,16 +68,18 @@ final class SupabaseAuthRepository implements AuthRepository {
     required bool isAdult,
   }) async {
     if (!isAdult) throw const AgeDeclarationRequired();
-    return _gateway.signUp(email.trim(), password, displayName.trim());
+    return _change(
+      () => _gateway.signUp(email.trim(), password, displayName.trim()),
+    );
   }
 
   @override
   Future<AuthSessionStatus> signIn({
     required String email,
     required String password,
-  }) => _gateway.signIn(email.trim(), password);
+  }) => _change(() => _gateway.signIn(email.trim(), password));
   @override
-  Future<void> signOut() => _gateway.signOut();
+  Future<void> signOut() => _change(_gateway.signOut);
 }
 
 /// Production adapter; Supabase Auth owns credentials, refresh rotation and
