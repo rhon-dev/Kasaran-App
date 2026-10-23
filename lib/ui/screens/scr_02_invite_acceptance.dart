@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kasaran/data/repositories/plan_membership_repository.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
-import 'package:kasaran/ui/providers/plan_provider.dart';
+import 'package:kasaran/ui/providers/sync_runtime_provider.dart';
 import 'package:kasaran/ui/router/app_router.dart';
 
 /// The custom-scheme link and pasted link enter the same server acceptance path.
@@ -56,10 +56,14 @@ class _InviteAcceptanceState extends ConsumerState<Scr02InviteAcceptance> {
       _submitting = true;
       _error = null;
     });
+    final originalHost = ref.read(syncRuntimeOwnerProvider)?.host;
     try {
       await ref.read(planMembershipRepositoryProvider).acceptInvite(token);
+      if (!mounted) return;
       _pastedLink.clear();
-      ref.invalidate(currentPlanIdProvider);
+      // Captured before RPC: never route A's late acceptance into B's host.
+      await originalHost?.refreshMembership();
+      if (!mounted) return;
       if (mounted) setState(() => _joined = true);
     } on InviteAcceptanceException catch (error) {
       if (mounted) setState(() => _error = error.message);

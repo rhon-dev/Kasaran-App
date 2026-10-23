@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kasaran/config/app_config.dart';
@@ -6,12 +9,72 @@ import 'package:kasaran/platform/db/account_store_runtime.dart';
 import 'package:kasaran/platform/db/encrypted_database.dart';
 import 'package:kasaran/platform/db/local_store_bootstrap.dart';
 import 'package:kasaran/platform/secure_storage/token_store.dart';
+import 'package:kasaran/sync/queue/account_sync_host.dart';
+import 'package:kasaran/sync/queue/sync_runtime_owner.dart';
+import 'package:kasaran/sync/transport/bootstrap_transport.dart';
+import 'package:kasaran/sync/transport/sync_transport.dart';
 import 'package:kasaran/ui/local_store_gate.dart';
 import 'package:kasaran/ui/providers/account_store_provider.dart';
+import 'package:kasaran/ui/providers/plan_provider.dart';
 import 'package:kasaran/ui/providers/setup_draft_provider.dart';
+import 'package:kasaran/ui/providers/sync_runtime_provider.dart';
 import 'package:kasaran/ui/router/app_router.dart';
+import 'package:kasaran/ui/sync_runtime_gate.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// The Auth adapter, membership adapter and both HTTP transports share exactly
+/// the verified-local Auth client; configuration comes from app_config in main.
+SyncRuntimeOwner createAppSyncRuntimeOwner(
+  AccountStoreRuntime runtime,
+  SupabaseClient client, {
+  required Uri baseUrl,
+  required String anonKey,
+  required PlanMembershipLookup membership,
+}) {
+  final identity = runtime.coordinator.identity;
+  if (identity is! SupabaseVerifiedLocalIdentity ||
+      !identical(identity.auth, client.auth)) {
+    throw StateError('Sync Auth client does not match local identity');
+  }
+  final sessions = SupabaseSyncSessionSource(client.auth);
+  return SyncRuntimeOwner(
+    coordinator: runtime.coordinator,
+    createHost: (lifetime) => AccountSyncHost.ownedTransports(
+      coordinator: runtime.coordinator,
+      deviceIdentity: runtime.deviceIdentity,
+      discoverMembership: (binding) async {
+        final generation = runtime.coordinator.generation;
+        void check() {
+          final current = sessions.capture();
+          if (!runtime.coordinator.isReady ||
+              generation != runtime.coordinator.generation ||
+              current?.userId != binding.userId ||
+              !identical(current?.marker, binding.marker)) {
+            throw const SyncTransportException('session_changed');
+          }
+        }
+
+        check();
+        final plan = await membership.currentPlanId();
+        check();
+        return plan;
+      },
+      syncTransport: HttpSyncTransport(
+        baseUrl: baseUrl,
+        anonKey: anonKey,
+        sessions: sessions,
+        client: lifetime.wrap(HttpClient()),
+      ),
+      bootstrapTransport: HttpBootstrapTransport(
+        baseUrl: baseUrl,
+        anonKey: anonKey,
+        sessions: sessions,
+        client: lifetime.wrap(HttpClient()),
+      ),
+    ),
+  );
+}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,9 +111,23 @@ void main() {
       child: Builder(
         builder: (_) => ProviderScope(
           overrides: [
-            accountStoreCoordinatorProvider.overrideWith((ref) {
-              ref.onDispose(runtime.coordinator.dispose);
-              return runtime.coordinator;
+            accountStoreCoordinatorProvider.overrideWithValue(
+              runtime.coordinator,
+            ),
+            syncRuntimeOwnerProvider.overrideWith((ref) {
+              final owner = createAppSyncRuntimeOwner(
+                runtime,
+                Supabase.instance.client,
+                baseUrl: Uri.parse(supabaseUrl),
+                anonKey: supabaseAnonKey,
+                membership: ref.read(planMembershipLookupProvider),
+              );
+              // Gate owns shutdown; provider teardown only initiates the same
+              // retained barrier as a fallback, never a second coordinator owner.
+              ref.onDispose(
+                () => unawaited(owner.close().catchError((Object _) {})),
+              );
+              return owner;
             }),
           ],
           child: const KasaranApp(),
@@ -68,13 +145,16 @@ class KasaranApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final account = ref.watch(accountStoreStateProvider);
-    return ProviderScope(
-      key: ValueKey(account.scopeKey),
-      overrides: [
-        appRouterProvider.overrideWith(createAppRouter),
-        setupDraftProvider.overrideWith(SetupDraftController.new),
-      ],
-      child: const _AccountApp(),
+    return SyncRuntimeGate(
+      owner: ref.watch(syncRuntimeOwnerProvider),
+      child: ProviderScope(
+        key: ValueKey(account.scopeKey),
+        overrides: [
+          appRouterProvider.overrideWith(createAppRouter),
+          setupDraftProvider.overrideWith(SetupDraftController.new),
+        ],
+        child: const _AccountApp(),
+      ),
     );
   }
 }

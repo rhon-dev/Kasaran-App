@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kasaran/sync/queue/account_sync_host.dart';
 import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
 import 'package:kasaran/ui/providers/setup_draft_provider.dart';
+import 'package:kasaran/ui/providers/sync_runtime_provider.dart';
 import 'package:kasaran/ui/router/app_router.dart';
 import 'package:kasaran/ui/screens/placeholder_screen.dart';
 import 'package:kasaran/ui/screens/scr_01_sign_in.dart';
@@ -45,7 +47,7 @@ class _UserController extends Notifier<String> {
   set value(String next) => state = next;
 }
 
-class _PendingMembershipLookup implements PlanMembershipLookup {
+class _PendingMembershipLookup implements LocalPlanLookup {
   final requests = <Completer<String?>>[];
 
   @override
@@ -69,7 +71,7 @@ class _RetryIdentitySource implements AuthIdentitySource {
   Future<void> dispose() => changes.close();
 }
 
-class _RetryMembershipLookup implements PlanMembershipLookup {
+class _RetryMembershipLookup implements LocalPlanLookup {
   @override
   Future<String?> currentPlanId() async => 'plan-1';
 }
@@ -128,7 +130,8 @@ void main() {
         ),
         authStateProvider.overrideWithValue(AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_user)),
-        planMembershipLookupProvider.overrideWithValue(lookup),
+        localPlanLookupProvider.overrideWithValue(lookup),
+        syncHostStatusProvider.overrideWithValue(AccountSyncHostStatus.none),
       ],
     );
     addTearDown(container.dispose);
@@ -199,7 +202,8 @@ void main() {
           ),
           authStateProvider.overrideWithValue(AuthState.authenticated),
           authUserIdProvider.overrideWith((ref) => ref.watch(_user)),
-          planMembershipLookupProvider.overrideWithValue(lookup),
+          localPlanLookupProvider.overrideWithValue(lookup),
+          syncHostStatusProvider.overrideWithValue(AccountSyncHostStatus.none),
         ],
       );
       addTearDown(container.dispose);
@@ -261,9 +265,7 @@ void main() {
         ),
         authStateProvider.overrideWithValue(AuthState.authenticated),
         authIdentitySourceProvider.overrideWithValue(source),
-        planMembershipLookupProvider.overrideWithValue(
-          _RetryMembershipLookup(),
-        ),
+        localPlanLookupProvider.overrideWithValue(_RetryMembershipLookup()),
       ],
     );
     addTearDown(() async {

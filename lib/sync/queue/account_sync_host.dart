@@ -155,6 +155,15 @@ final class AccountSyncHost {
     return start();
   }
 
+  /// Only the bound facade calls this after its complete commit future succeeds.
+  void notifyLocalWrite() {
+    if (!_fresh() || _terminal || _actor == null) return;
+    _invalidate();
+    // A listener can synchronously revoke this host.
+    if (!_fresh() || _terminal) return;
+    _worker?.notifyLocalWrite();
+  }
+
   bool _foreground = false;
   Timer? _foregroundTimer;
 

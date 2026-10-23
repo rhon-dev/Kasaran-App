@@ -5,13 +5,19 @@ import 'package:kasaran/platform/db/account_store_coordinator.dart';
 import 'package:kasaran/platform/db/account_store_registry.dart';
 import 'package:kasaran/platform/db/encrypted_database.dart';
 import 'package:kasaran/platform/db/local_store_bootstrap.dart';
+import 'package:kasaran/platform/secure_storage/sync_device_identity.dart';
 import 'package:kasaran/platform/secure_storage/token_store.dart';
 
 /// Auth initialization and device preparation create no financial database.
 /// Only a fresh verified coordinator snapshot can select/open an account file.
 final class AccountStoreRuntime {
-  AccountStoreRuntime._(this.coordinator, this.warningNeeded);
+  AccountStoreRuntime._(
+    this.coordinator,
+    this.warningNeeded,
+    this.deviceIdentity,
+  );
   final AccountStoreCoordinator coordinator;
+  final SyncDeviceIdentity deviceIdentity;
   final bool warningNeeded;
 
   static Future<AccountStoreRuntime> initialize({
@@ -50,6 +56,10 @@ final class AccountStoreRuntime {
       // replace it with an empty destination through this production path.
       return bootstrap.openAccount(location);
     });
-    return AccountStoreRuntime._(coordinator, warning);
+    return AccountStoreRuntime._(
+      coordinator,
+      warning,
+      SyncDeviceIdentity(metadata, registry: registry),
+    );
   }
 }

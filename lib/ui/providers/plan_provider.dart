@@ -1,6 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kasaran/data/repositories/local_plan_repository.dart';
+import 'package:kasaran/platform/db/account_store_coordinator.dart';
+import 'package:kasaran/sync/queue/account_sync_host.dart';
 import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
+import 'package:kasaran/ui/providers/sync_runtime_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show SupabaseClient, Supabase;
 
@@ -32,7 +36,27 @@ final planMembershipLookupProvider = Provider<PlanMembershipLookup>(
   (ref) => SupabasePlanMembershipLookup(Supabase.instance.client),
 );
 
-/// A failed network read is not proof that the account has no plan.
+// Local-only injectable seam, deliberately separate from server discovery.
+// ignore: one_member_abstracts
+abstract interface class LocalPlanLookup {
+  Future<String?> currentPlanId();
+}
+
+final class _EncryptedLocalPlanLookup implements LocalPlanLookup {
+  const _EncryptedLocalPlanLookup(this.coordinator);
+  final AccountStoreCoordinator coordinator;
+  @override
+  Future<String?> currentPlanId() async =>
+      (await LocalPlanRepository(coordinator).currentActivePlan())?.plan.id;
+}
+
+final localPlanLookupProvider = Provider<LocalPlanLookup>((ref) {
+  final coordinator = ref.watch(accountStoreCoordinatorProvider);
+  if (coordinator == null) throw StateError('Account unavailable');
+  return _EncryptedLocalPlanLookup(coordinator);
+});
+
+/// Ordinary reads are finite encrypted-local operations, never discovery.
 final currentPlanIdProvider = FutureProvider<String?>((ref) async {
   final account = ref.watch(accountStoreStateProvider);
   if (!account.isReady) return null;
@@ -43,7 +67,8 @@ final currentPlanIdProvider = FutureProvider<String?>((ref) async {
   }
   final coordinator = ref.read(accountStoreCoordinatorProvider);
   if (coordinator != null && !coordinator.isReady) return null;
-  final result = await ref.watch(planMembershipLookupProvider).currentPlanId();
+  ref.watch(syncRuntimeRevisionProvider);
+  final result = await ref.watch(localPlanLookupProvider).currentPlanId();
   // Dispose/invalidating a future is not enough: reject the stale result at
   // its source, including same-user session replacement and A->B->A.
   if (!ref.mounted) throw StateError('Account changed');
@@ -75,5 +100,14 @@ final planAccessProvider = Provider<PlanAccess>((ref) {
   if (lookup.isLoading) return PlanAccess.loading;
   if (lookup.hasError) return PlanAccess.error;
   if (!lookup.hasValue) return PlanAccess.loading;
-  return lookup.requireValue == null ? PlanAccess.none : PlanAccess.member;
+  final status = ref.watch(syncHostStatusProvider);
+  if (status == AccountSyncHostStatus.error ||
+      status == AccountSyncHostStatus.updateRequired) {
+    return PlanAccess.error;
+  }
+  if (lookup.requireValue != null) return PlanAccess.member;
+  // Fresh encrypted metadata has no persisted authoritative-empty marker.
+  return status == AccountSyncHostStatus.none
+      ? PlanAccess.none
+      : PlanAccess.loading;
 });

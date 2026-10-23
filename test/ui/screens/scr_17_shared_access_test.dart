@@ -48,7 +48,7 @@ class _FakeAuthIdentitySource implements AuthIdentitySource {
   Future<void> dispose() => changes.close();
 }
 
-class _ChangingIdentityLookup implements PlanMembershipLookup {
+class _ChangingIdentityLookup implements LocalPlanLookup {
   _ChangingIdentityLookup(this.userId);
   final String Function() userId;
   int calls = 0;
@@ -159,7 +159,7 @@ void main() {
         ),
         authStateProvider.overrideWithValue(AuthState.authenticated),
         authIdentitySourceProvider.overrideWithValue(source),
-        planMembershipLookupProvider.overrideWithValue(
+        localPlanLookupProvider.overrideWithValue(
           _ChangingIdentityLookup(() => 'user-1'),
         ),
       ],
@@ -192,7 +192,7 @@ void main() {
           ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue(null),
-          planMembershipLookupProvider.overrideWithValue(lookup),
+          localPlanLookupProvider.overrideWithValue(lookup),
         ],
       );
       addTearDown(container.dispose);
@@ -213,7 +213,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authIdentitySourceProvider.overrideWithValue(source),
-        planMembershipLookupProvider.overrideWithValue(lookup),
+        localPlanLookupProvider.overrideWithValue(lookup),
       ],
     );
     addTearDown(() async {
@@ -246,7 +246,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
-        planMembershipLookupProvider.overrideWith((ref) => lookup),
+        localPlanLookupProvider.overrideWith((ref) => lookup),
       ],
     );
     addTearDown(container.dispose);

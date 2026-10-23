@@ -166,6 +166,29 @@ void main() {
     await dir.delete(recursive: true);
   });
   test(
+    'committed local notification invalidates now and debounces worker HTTP',
+    () async {
+      await fixture.seed(db, fixtureActor);
+      await host.start();
+      await host.settled;
+      var changes = 0;
+      host.addListener(() => changes++);
+      host.notifyLocalWrite();
+      host.notifyLocalWrite();
+      expect(changes, greaterThanOrEqualTo(2));
+      expect(requests, ['sync_pull']);
+      expect(timers.active.single.delay, const Duration(milliseconds: 250));
+      timers.fire();
+      await host.settled;
+      expect(requests, ['sync_pull', 'sync_pull']);
+      await host.dispose();
+      final before = changes;
+      host.notifyLocalWrite();
+      expect(changes, before);
+    },
+  );
+
+  test(
     'asynchronous invalidation observer cannot hold disposal or replay stale authority',
     () async {
       await fixture.seed(db, fixtureActor);

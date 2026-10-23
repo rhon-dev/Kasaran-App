@@ -232,7 +232,7 @@ void main() {
       overrides: [
         authStateProvider.overrideWithValue(AuthState.authenticated),
         authUserIdProvider.overrideWithValue('synthetic-a'),
-        planMembershipLookupProvider.overrideWithValue(lookup),
+        localPlanLookupProvider.overrideWithValue(lookup),
       ],
     );
     addTearDown(container.dispose);
@@ -462,7 +462,7 @@ class _PendingInvitations implements InvitationRepository {
   }
 }
 
-class _Lookup implements PlanMembershipLookup {
+class _Lookup implements LocalPlanLookup {
   int calls = 0;
   @override
   Future<String?> currentPlanId() async {
