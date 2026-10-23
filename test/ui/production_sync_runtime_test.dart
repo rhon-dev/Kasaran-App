@@ -4,8 +4,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kasaran/data/changelog/verified_local_identity.dart';
-import 'package:kasaran/main.dart';
 import 'package:kasaran/data/repositories/bound_ledger_repository.dart';
+import 'package:kasaran/main.dart';
 import 'package:kasaran/platform/db/account_store_coordinator.dart';
 import 'package:kasaran/platform/db/account_store_runtime.dart';
 import 'package:kasaran/platform/db/encrypted_database.dart';
@@ -167,9 +167,11 @@ void main() {
           final observations = <Future<void>>[];
           if (transition == 'signout') {
             // Real SDK local signout; any logout request is loopback only.
-            await client.auth.signOut(scope: SignOutScope.local);
+            await client.auth.signOut();
           } else {
-            await client.auth.recoverSession(session(transition == 'A-B-A' ? 'synthetic-b' : wire.userId));
+            await client.auth.recoverSession(
+              session(transition == 'A-B-A' ? 'synthetic-b' : wire.userId),
+            );
           }
           observations.add(runtime.coordinator.observeSession());
           if (transition == 'A-B-A') {
@@ -196,7 +198,8 @@ void main() {
           metadata.beforeRead = (key) async {
             if (key != SyncDeviceIdentity.metadataKey) return;
             metadata.beforeRead = null;
-            entered.complete(); await release.future;
+            entered.complete();
+            await release.future;
           };
           await client.auth.recoverSession(session(wire.userId));
           await runtime.coordinator.observeSession();
@@ -204,9 +207,11 @@ void main() {
           final old = owner.host!;
           expect(old.actor, isNull);
           if (transition == 'signout') {
-            await client.auth.signOut(scope: SignOutScope.local);
+            await client.auth.signOut();
           } else {
-            await client.auth.recoverSession(session(transition == 'A-B-A' ? 'synthetic-b' : wire.userId));
+            await client.auth.recoverSession(
+              session(transition == 'A-B-A' ? 'synthetic-b' : wire.userId),
+            );
           }
           final observations = [runtime.coordinator.observeSession()];
           if (transition == 'A-B-A') {
@@ -215,11 +220,13 @@ void main() {
           }
           expect(old.actor, isNull);
           release.complete();
-          await Future.wait(observations); await owner.settled;
+          await Future.wait(observations);
+          await owner.settled;
           if (transition == 'signout') {
             expect(owner.host, isNull);
             await client.auth.recoverSession(session(wire.userId));
-            await runtime.coordinator.observeSession(); await owner.settled;
+            await runtime.coordinator.observeSession();
+            await owner.settled;
           }
           expect(owner.host, isNot(same(old)));
           expect(owner.host?.actor?.planId, wire.planId);
@@ -257,6 +264,7 @@ class MemoryMetadata implements SecureKeyValueStore {
     await beforeRead?.call(key);
     return values[key];
   }
+
   @override
   Future<void> write(String key, String value) async {
     values[key] = value;

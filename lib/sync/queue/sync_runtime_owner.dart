@@ -28,7 +28,10 @@ final class SyncRuntimeOwner extends ChangeNotifier {
 
   AccountSyncHostStatus get status => _closing != null
       ? AccountSyncHostStatus.stopped
-      : host?.status ?? (_failed ? AccountSyncHostStatus.error : AccountSyncHostStatus.unknown);
+      : host?.status ??
+            (_failed
+                ? AccountSyncHostStatus.error
+                : AccountSyncHostStatus.unknown);
 
   AccountSyncHost? get host {
     if (_closing != null) return null;
@@ -59,38 +62,45 @@ final class SyncRuntimeOwner extends ChangeNotifier {
     old?.removeListener(_changed);
     final drain = old
         ?.dispose(); // synchronous revocation before async replacement
-    _replacement = _replacement.then((_) async {
-      await _drainHost(drain, lifetime);
-      if (_closing != null || epoch != _epoch || !coordinator.isReady) return;
-      final current = coordinator.identity.capture();
-      if (coordinator.generation != generation ||
-          !identical(current?.marker, marker)) {
-        return;
-      }
-      final resources = _lifetime = SyncTransportLifetime._();
-      final AccountSyncHost admitted;
-      try {
-        admitted = _host = createHost(resources);
-      } catch (_) {
-        // Synchronous construction has admitted no host work. No peer/platform
-        // details escape this classification, and partial clients remain owned.
-        resources._release();
-        _lifetime = null;
-        _failed = true;
-        _changed();
-        return;
-      }
-      admitted.addListener(_changed);
-      final start = admitted
-          .start(); // eager, never dependent on UI consumption
-      if (_foreground) admitted.notifyForeground();
-      _changed();
-      await start;
-    }).catchError((Object _) {
-      // Failed replacement stays closed. Retired native clients are retained
-      // until the root's confirmed coordinator barrier, never released early.
-      if (_closing == null) { _failed = true; _changed(); }
-    });
+    _replacement = _replacement
+        .then((_) async {
+          await _drainHost(drain, lifetime);
+          if (_closing != null || epoch != _epoch || !coordinator.isReady) {
+            return;
+          }
+          final current = coordinator.identity.capture();
+          if (coordinator.generation != generation ||
+              !identical(current?.marker, marker)) {
+            return;
+          }
+          final resources = _lifetime = SyncTransportLifetime._();
+          final AccountSyncHost admitted;
+          try {
+            admitted = _host = createHost(resources);
+          } catch (_) {
+            // Synchronous construction has admitted no host work. No peer/platform
+            // details escape this classification, and partial clients remain owned.
+            resources._release();
+            _lifetime = null;
+            _failed = true;
+            _changed();
+            return;
+          }
+          admitted.addListener(_changed);
+          final start = admitted
+              .start(); // eager, never dependent on UI consumption
+          if (_foreground) admitted.notifyForeground();
+          _changed();
+          await start;
+        })
+        .catchError((Object _) {
+          // Failed replacement stays closed. Retired native clients are retained
+          // until the root's confirmed coordinator barrier, never released early.
+          if (_closing == null) {
+            _failed = true;
+            _changed();
+          }
+        });
     _changed();
   }
 
@@ -140,6 +150,9 @@ final class SyncRuntimeOwner extends ChangeNotifier {
     old?.removeListener(_changed);
     final hostDrain = old?.dispose();
     final coordinatorDrain = _coordinatorDrain = coordinator.close();
+    // Publish revocation while listeners are still usable, with the retained
+    // barrier already installed so a reentrant close observes the same future.
+    if (!_notifierDisposed) notifyListeners();
     unawaited(() async {
       try {
         await Future.wait<void>([
@@ -147,7 +160,9 @@ final class SyncRuntimeOwner extends ChangeNotifier {
           _drainHost(hostDrain, lifetime),
           coordinatorDrain,
         ]);
-        for (final retired in _retired) { retired._release(); }
+        for (final retired in _retired) {
+          retired._release();
+        }
         _retired.clear();
         coordinator.dispose();
         dispose();

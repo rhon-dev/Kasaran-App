@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kasaran/data/changelog/local_ledger_writer.dart';
 import 'package:kasaran/data/db/app_database.dart';
+import 'package:kasaran/sync/queue/account_sync_host.dart';
 import 'package:kasaran/ui/providers/account_store_provider.dart';
 import 'package:kasaran/ui/providers/auth_provider.dart';
 import 'package:kasaran/ui/providers/plan_provider.dart';
@@ -28,6 +29,74 @@ ProviderContainer runtimeContainer(RuntimeHarness harness) => ProviderContainer(
 );
 
 void main() {
+  test('close synchronously clears live provider authority and private values', () async {
+    final harness = await RuntimeHarness.open();
+    await harness.owner.settled;
+    final container = runtimeContainer(harness);
+    final subscriptions = [
+      container.listen(ledgerEntriesProvider, (_, _) {}),
+      container.listen(currentPlanIdProvider, (_, _) {}),
+      container.listen(syncHostStatusProvider, (_, _) {}),
+      container.listen(boundLedgerProvider, (_, _) {}),
+    ];
+    try {
+      final ledger = container.read(boundLedgerProvider)!;
+      await ledger.create(fixture.draft);
+      expect(await container.read(ledgerEntriesFutureProvider), hasLength(1));
+      expect(await container.read(currentPlanIdFutureProvider), wire.planId);
+      expect(container.read(syncHostStatusProvider), AccountSyncHostStatus.ready);
+      var notifications = 0;
+      Future<void>? reentrant;
+      harness.owner.addListener(() {
+        notifications++;
+        reentrant = harness.owner.close();
+      });
+      final closing = harness.owner.close();
+      void expectRevoked() {
+        expect(container.read(syncHostStatusProvider), AccountSyncHostStatus.stopped);
+        expect(container.read(syncHostProvider), isNull);
+        expect(container.read(boundLedgerProvider), isNull);
+        expect(container.read(ledgerEntriesProvider).value, isNull);
+        expect(container.read(currentPlanIdProvider).value, isNull);
+      }
+      expectRevoked();
+      expect(reentrant, same(closing));
+      expect(notifications, 1);
+      await expectLater(ledger.listLive(), throwsStateError);
+      await closing;
+      expectRevoked();
+      expect(harness.owner.close(), same(closing));
+      expect(notifications, 1);
+    } finally {
+      for (final subscription in subscriptions) { subscription.close(); }
+      container.dispose();
+      await harness.close();
+    }
+  });
+  test(
+    'revoked provider snapshot never retains previous account rows',
+    () async {
+      final harness = await RuntimeHarness.open();
+      await harness.owner.settled;
+      final container = runtimeContainer(harness);
+      final subscription = container.listen(ledgerEntriesProvider, (_, _) {});
+      try {
+        await container.read(boundLedgerProvider)!.create(fixture.draft);
+        expect(await container.read(ledgerEntriesFutureProvider), hasLength(1));
+        expect(await container.read(currentPlanIdFutureProvider), wire.planId);
+        harness.identity.marker = Object();
+        final transition = harness.coordinator.observeSession();
+        expect(container.read(ledgerEntriesProvider).value, isNull);
+        expect(container.read(currentPlanIdProvider).value, isNull);
+        await transition;
+      } finally {
+        subscription.close();
+        container.dispose();
+        await harness.close();
+      }
+    },
+  );
+
   test(
     'reentrant session revocation at commit notification suppresses result disclosure',
     () async {
@@ -73,7 +142,7 @@ void main() {
       final container = runtimeContainer(harness);
       final subscription = container.listen(ledgerEntriesProvider, (_, _) {});
       try {
-        expect(await container.read(ledgerEntriesProvider.future), isEmpty);
+        expect(await container.read(ledgerEntriesFutureProvider), isEmpty);
         harness.respond = (req, body) async {
           req.response.write(
             jsonEncode({
@@ -88,7 +157,7 @@ void main() {
         harness.owner.notifyForeground();
         await harness.owner.settled;
         expect(
-          (await container.read(ledgerEntriesProvider.future)).single.id,
+          (await container.read(ledgerEntriesFutureProvider)).single.id,
           row.id,
         );
         expect(harness.discoveries, 0);
@@ -125,13 +194,13 @@ void main() {
         final before = List.of(harness.requests);
         expect(
           await container
-              .read(currentPlanIdProvider.future)
+              .read(currentPlanIdFutureProvider)
               .timeout(const Duration(seconds: 2)),
           wire.planId,
         );
         expect(
           await container
-              .read(ledgerEntriesProvider.future)
+              .read(ledgerEntriesFutureProvider)
               .timeout(const Duration(seconds: 2)),
           isEmpty,
         );
@@ -179,7 +248,7 @@ void main() {
         );
         harness.commit.action = null;
         expect(
-          (await container.read(ledgerEntriesProvider.future)).single.id,
+          (await container.read(ledgerEntriesFutureProvider)).single.id,
           row.id,
         );
       } finally {
@@ -214,11 +283,11 @@ void main() {
       );
       final subscription = container.listen(planAccessProvider, (_, _) {});
       try {
-        expect(await container.read(currentPlanIdProvider.future), isNull);
+        expect(await container.read(currentPlanIdFutureProvider), isNull);
         expect(container.read(planAccessProvider), isNot(PlanAccess.none));
         fail = false;
         await harness.owner.host!.refreshMembership();
-        await container.read(currentPlanIdProvider.future);
+        await container.read(currentPlanIdFutureProvider);
         expect(container.read(planAccessProvider), PlanAccess.none);
       } finally {
         subscription.close();
@@ -247,14 +316,14 @@ void main() {
       final subscription = container.listen(ledgerEntriesProvider, (_, _) {});
       try {
         final before = List.of(harness.requests);
-        expect(await container.read(currentPlanIdProvider.future), wire.planId);
-        expect(await container.read(ledgerEntriesProvider.future), isEmpty);
+        expect(await container.read(currentPlanIdFutureProvider), wire.planId);
+        expect(await container.read(ledgerEntriesFutureProvider), isEmpty);
         expect(harness.discoveries, 0);
         expect(harness.requests, before);
         final ledger = container.read(boundLedgerProvider)!;
         final created = await ledger.create(fixture.draft);
         expect(
-          (await container.read(ledgerEntriesProvider.future)).single.id,
+          (await container.read(ledgerEntriesFutureProvider)).single.id,
           created.id,
         );
         await ledger.edit(
@@ -263,12 +332,12 @@ void main() {
         );
         expect(
           (await container.read(
-            ledgerEntriesProvider.future,
+            ledgerEntriesFutureProvider,
           )).single.supplierName,
           'Changed',
         );
         await ledger.delete(created.id);
-        expect(await container.read(ledgerEntriesProvider.future), isEmpty);
+        expect(await container.read(ledgerEntriesFutureProvider), isEmpty);
         expect(harness.requests, before);
         expect(timers.active.single.delay, const Duration(milliseconds: 250));
         await expectLater(
@@ -278,7 +347,7 @@ void main() {
           ),
           throwsA(anything),
         );
-        expect(await container.read(ledgerEntriesProvider.future), isEmpty);
+        expect(await container.read(ledgerEntriesFutureProvider), isEmpty);
       } finally {
         subscription.close();
         container.dispose();

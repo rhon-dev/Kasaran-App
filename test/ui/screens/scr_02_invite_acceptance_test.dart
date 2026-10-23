@@ -163,7 +163,7 @@ void main() {
         expect(harness.discoveries, 2);
         expect(
           await tester.runAsync(
-            () => container.read(currentPlanIdProvider.future),
+            () => container.read(currentPlanIdFutureProvider),
           ),
           wire.planId,
         );

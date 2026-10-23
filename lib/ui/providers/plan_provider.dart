@@ -56,8 +56,9 @@ final localPlanLookupProvider = Provider<LocalPlanLookup>((ref) {
   return _EncryptedLocalPlanLookup(coordinator);
 });
 
-/// Ordinary reads are finite encrypted-local operations, never discovery.
-final currentPlanIdProvider = FutureProvider<String?>((ref) async {
+typedef _PlanReadKey = (AccountStoreCoordinator?, int, String);
+_PlanReadKey? _planReadKey(Ref ref) {
+  ref.watch(syncRuntimeRevisionProvider);
   final account = ref.watch(accountStoreStateProvider);
   if (!account.isReady) return null;
   final userId = ref.watch(authUserIdProvider);
@@ -65,21 +66,43 @@ final currentPlanIdProvider = FutureProvider<String?>((ref) async {
       userId == null) {
     return null;
   }
-  final coordinator = ref.read(accountStoreCoordinatorProvider);
+  final coordinator = ref.watch(accountStoreCoordinatorProvider);
   if (coordinator != null && !coordinator.isReady) return null;
-  ref.watch(syncRuntimeRevisionProvider);
-  final result = await ref.watch(localPlanLookupProvider).currentPlanId();
-  // Dispose/invalidating a future is not enough: reject the stale result at
-  // its source, including same-user session replacement and A->B->A.
-  if (!ref.mounted) throw StateError('Account changed');
-  final current = ref.read(accountStoreStateProvider);
-  if (!current.isReady ||
-      current.generation != account.generation ||
-      coordinator != null && !coordinator.isReady ||
-      ref.read(authUserIdProvider) != userId) {
-    throw StateError('Account changed');
-  }
-  return result;
+  return (coordinator, account.generation, userId);
+}
+
+final _planReadsProvider = FutureProvider.autoDispose
+    .family<String?, _PlanReadKey>((ref, key) async {
+      ref.watch(syncRuntimeRevisionProvider);
+      final coordinator = key.$1;
+      final marker = coordinator?.identity.capture()?.marker;
+      final result = await ref.watch(localPlanLookupProvider).currentPlanId();
+      if (!ref.mounted) throw StateError('Account changed');
+      final current = ref.read(accountStoreStateProvider);
+      if (!current.isReady ||
+          current.generation != key.$2 ||
+          ref.read(authUserIdProvider) != key.$3 ||
+          coordinator != null &&
+              (!coordinator.isReady ||
+                  !identical(coordinator.identity.capture()?.marker, marker))) {
+        throw StateError('Account changed');
+      }
+      return result;
+    });
+
+/// Finite encrypted-local reads; generation-keyed to drop previous-account IDs.
+/// The public AsyncValue never retains a previous generation during loading.
+final currentPlanIdProvider = Provider<AsyncValue<String?>>((ref) {
+  final key = _planReadKey(ref);
+  return key == null
+      ? const AsyncData(null)
+      : ref.watch(_planReadsProvider(key));
+});
+final currentPlanIdFutureProvider = Provider<Future<String?>>((ref) {
+  final key = _planReadKey(ref);
+  return key == null
+      ? Future.value()
+      : ref.watch(_planReadsProvider(key).future);
 });
 
 final planAccessProvider = Provider<PlanAccess>((ref) {

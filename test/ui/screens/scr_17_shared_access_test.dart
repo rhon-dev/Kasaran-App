@@ -196,7 +196,7 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
-      await container.read(currentPlanIdProvider.future);
+      await container.read(currentPlanIdFutureProvider);
       expect(container.read(planAccessProvider), PlanAccess.loading);
       expect(lookup.calls, 0);
     },
@@ -250,9 +250,9 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    expect(await container.read(currentPlanIdProvider.future), 'plan-1');
+    expect(await container.read(currentPlanIdFutureProvider), 'plan-1');
     container.read(_identity.notifier).value = 'user-2';
-    expect(await container.read(currentPlanIdProvider.future), 'plan-2');
+    expect(await container.read(currentPlanIdFutureProvider), 'plan-2');
     expect(lookup.calls, 2);
   });
 
@@ -269,7 +269,9 @@ void main() {
           ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
-          currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+          currentPlanIdProvider.overrideWith(
+            (ref) => const AsyncData('plan-1'),
+          ),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
         child: const MaterialApp(home: Scr17SharedAccess()),
@@ -296,7 +298,9 @@ void main() {
           ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
-          currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+          currentPlanIdProvider.overrideWith(
+            (ref) => const AsyncData('plan-1'),
+          ),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
         child: const MaterialApp(home: Scr17SharedAccess()),
@@ -319,7 +323,9 @@ void main() {
           ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
-          currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+          currentPlanIdProvider.overrideWith(
+            (ref) => const AsyncData('plan-1'),
+          ),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
         child: const MaterialApp(home: Scr17SharedAccess()),
@@ -343,7 +349,9 @@ void main() {
           ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
-          currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+          currentPlanIdProvider.overrideWith(
+            (ref) => const AsyncData('plan-1'),
+          ),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
         child: const MaterialApp(home: Scr17SharedAccess()),
@@ -370,7 +378,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
-        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        currentPlanIdProvider.overrideWith((ref) => const AsyncData('plan-1')),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -408,7 +416,9 @@ void main() {
           ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
-          currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+          currentPlanIdProvider.overrideWith(
+            (ref) => const AsyncData('plan-1'),
+          ),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
         child: const MaterialApp(home: Scr17SharedAccess()),
@@ -436,7 +446,9 @@ void main() {
           ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
-          currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+          currentPlanIdProvider.overrideWith(
+            (ref) => const AsyncData('plan-1'),
+          ),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
         child: const MaterialApp(home: Scr17SharedAccess()),
@@ -475,7 +487,9 @@ void main() {
           ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
-          currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+          currentPlanIdProvider.overrideWith(
+            (ref) => const AsyncData('plan-1'),
+          ),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
         child: const MaterialApp(home: Scr17SharedAccess()),
@@ -504,7 +518,9 @@ void main() {
           ),
           authStateProvider.overrideWith((ref) => AuthState.authenticated),
           authUserIdProvider.overrideWithValue('user-1'),
-          currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+          currentPlanIdProvider.overrideWith(
+            (ref) => const AsyncData('plan-1'),
+          ),
           invitationRepositoryProvider.overrideWithValue(fake),
         ],
         child: const MaterialApp(home: Scr17SharedAccess()),
@@ -529,7 +545,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
-        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        currentPlanIdProvider.overrideWith((ref) => const AsyncData('plan-1')),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -558,7 +574,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => ref.watch(_auth)),
         authUserIdProvider.overrideWithValue('user-1'),
-        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        currentPlanIdProvider.overrideWith((ref) => const AsyncData('plan-1')),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -590,7 +606,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => ref.watch(_auth)),
         authUserIdProvider.overrideWithValue('user-1'),
-        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        currentPlanIdProvider.overrideWith((ref) => const AsyncData('plan-1')),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -631,7 +647,9 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
-        currentPlanIdProvider.overrideWith((ref) async => ref.watch(_plan)),
+        currentPlanIdProvider.overrideWith(
+          (ref) => AsyncData(ref.watch(_plan)),
+        ),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -670,7 +688,9 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
-        currentPlanIdProvider.overrideWith((ref) async => ref.watch(_plan)),
+        currentPlanIdProvider.overrideWith(
+          (ref) => AsyncData(ref.watch(_plan)),
+        ),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -711,7 +731,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
-        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        currentPlanIdProvider.overrideWith((ref) => const AsyncData('plan-1')),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -746,7 +766,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
-        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        currentPlanIdProvider.overrideWith((ref) => const AsyncData('plan-1')),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -789,7 +809,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
-        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        currentPlanIdProvider.overrideWith((ref) => const AsyncData('plan-1')),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -825,7 +845,7 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWith((ref) => ref.watch(_identity)),
-        currentPlanIdProvider.overrideWith((ref) async => 'plan-1'),
+        currentPlanIdProvider.overrideWith((ref) => const AsyncData('plan-1')),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );
@@ -856,7 +876,9 @@ void main() {
         ),
         authStateProvider.overrideWith((ref) => AuthState.authenticated),
         authUserIdProvider.overrideWithValue('user-1'),
-        currentPlanIdProvider.overrideWith((ref) async => ref.watch(_plan)),
+        currentPlanIdProvider.overrideWith(
+          (ref) => AsyncData(ref.watch(_plan)),
+        ),
         invitationRepositoryProvider.overrideWithValue(fake),
       ],
     );

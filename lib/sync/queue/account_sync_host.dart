@@ -145,10 +145,28 @@ final class AccountSyncHost {
     return done.future;
   }
 
+  Future<void>? _refresh;
+
   /// Explicit invite handoff; retained valid metadata is not an ongoing upsert.
+  /// An older discovery may already have captured none before acceptance. Queue
+  /// one explicit trailing pass on this immutable host, never a replacement.
   Future<void> refreshMembership() {
-    if (!_fresh()) return Future.value();
-    if (_operation != null) return _operation!;
+    if (!_fresh() || _terminal) return Future.value();
+    if (_refresh != null) return _refresh!;
+    final older = _operation;
+    if (older == null) return _refreshNow();
+    final done = Completer<void>();
+    _refresh = done.future;
+    unawaited(() async {
+      await older;
+      if (_fresh() && !_terminal) await _refreshNow();
+      _refresh = null;
+      done.complete();
+    }());
+    return done.future;
+  }
+
+  Future<void> _refreshNow() {
     if (_status == AccountSyncHostStatus.none) {
       _status = AccountSyncHostStatus.unknown;
     }
@@ -316,6 +334,7 @@ final class AccountSyncHost {
 
   Future<void> get settled async {
     await _operation;
+    await _refresh;
     await _worker?.settled;
   }
 
@@ -351,6 +370,7 @@ final class AccountSyncHost {
 
   Future<void> _drain(Future<void>? workerDrain) async {
     await _operation;
+    await _refresh;
     await workerDrain;
     await Future.wait(List.of(_reads));
     await _workerSubscription?.cancel();

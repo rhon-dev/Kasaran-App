@@ -357,7 +357,7 @@ class _PlanCheckScreen extends ConsumerWidget {
                   TextButton(
                     onPressed: () {
                       ref.invalidate(authIdentityStateProvider);
-                      ref.invalidate(currentPlanIdProvider);
+                      ref.invalidate(localPlanLookupProvider);
                     },
                     child: const Text('Retry'),
                   ),

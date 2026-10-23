@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kasaran/data/changelog/local_ledger_writer.dart';
+import 'package:kasaran/data/db/app_database.dart';
 import 'package:kasaran/data/repositories/bound_ledger_repository.dart';
 import 'package:kasaran/main.dart';
 import 'package:kasaran/ui/providers/account_store_provider.dart';
@@ -81,7 +83,7 @@ void main() {
             AppLifecycleState.resumed,
           );
           await harness.owner.settled;
-          expect(await container.read(currentPlanIdProvider.future), isNull);
+          expect(await container.read(currentPlanIdFutureProvider), isNull);
         });
         expect(attempts, 2);
         expect(container.read(planAccessProvider), isNot(PlanAccess.none));
@@ -89,7 +91,7 @@ void main() {
           timers.fire();
           await harness.owner.settled;
           expect(
-            await container.read(currentPlanIdProvider.future),
+            await container.read(currentPlanIdFutureProvider),
             wire.planId,
           );
         });
@@ -239,7 +241,7 @@ void main() {
     (tester) async {
       final harness = (await tester.runAsync(
         () => HttpOverrides.runWithHttpOverrides(
-          RuntimeHarness.open,
+          () => RuntimeHarness.open(schedule: TestTimers().schedule),
           _LoopbackHttp(),
         ),
       ))!;
@@ -276,7 +278,7 @@ void main() {
             );
             await req.response.close();
           };
-          await container.read(ledgerEntriesProvider.future);
+          await container.read(ledgerEntriesFutureProvider);
         });
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.inactive,
@@ -297,10 +299,49 @@ void main() {
             AppLifecycleState.resumed,
           );
           await harness.owner.settled;
-          await container.read(ledgerEntriesProvider.future);
+          await container.read(ledgerEntriesFutureProvider);
         });
         await tester.pump();
         expect(find.text(fixture.draft.supplierName), findsOneWidget);
+        expect(tester.element(find.byType(_VisibleLedger)), same(originalView));
+        await tester.runAsync(() async {
+          final ledger = container.read(boundLedgerProvider)!;
+          final remote = (await container.read(
+            ledgerEntriesFutureProvider,
+          )).single;
+          await ledger.delete(remote.id);
+          await container.read(ledgerEntriesFutureProvider);
+        });
+        await tester.pump();
+        expect(find.text('empty ledger'), findsOneWidget);
+        late String createdId;
+        await tester.runAsync(() async {
+          createdId =
+              (await container.read(boundLedgerProvider)!.create(fixture.draft))
+                  .id;
+          await container.read(ledgerEntriesFutureProvider);
+        });
+        await tester.pump();
+        expect(find.text(fixture.draft.supplierName), findsOneWidget);
+        await tester.runAsync(() async {
+          await container
+              .read(boundLedgerProvider)!
+              .edit(
+                createdId,
+                const LedgerEntriesCompanion(
+                  supplierName: Value('Visible committed edit'),
+                ),
+              );
+          await container.read(ledgerEntriesFutureProvider);
+        });
+        await tester.pump();
+        expect(find.text('Visible committed edit'), findsOneWidget);
+        await tester.runAsync(() async {
+          await container.read(boundLedgerProvider)!.delete(createdId);
+          await container.read(ledgerEntriesFutureProvider);
+        });
+        await tester.pump();
+        expect(find.text('empty ledger'), findsOneWidget);
         expect(tester.element(find.byType(_VisibleLedger)), same(originalView));
         await tester.runAsync(() => tester.pumpWidget(const SizedBox()));
       } finally {

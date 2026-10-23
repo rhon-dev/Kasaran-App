@@ -39,18 +39,38 @@ final syncHostProvider = Provider<AccountSyncHost?>((ref) {
 });
 final syncHostStatusProvider = Provider<AccountSyncHostStatus>((ref) {
   ref.watch(syncRuntimeRevisionProvider);
-  return ref.watch(syncRuntimeOwnerProvider)?.status ?? AccountSyncHostStatus.unknown;
+  return ref.watch(syncRuntimeOwnerProvider)?.status ??
+      AccountSyncHostStatus.unknown;
 });
 final boundLedgerProvider = Provider<BoundLedgerRepository?>((ref) {
   ref.watch(syncRuntimeRevisionProvider);
   final host = ref.watch(syncHostProvider);
   return host?.actor == null ? null : BoundLedgerRepository(host!);
 });
-final ledgerEntriesProvider = FutureProvider<List<LedgerEntry>>((ref) async {
+final _ledgerReadsProvider = FutureProvider.autoDispose
+    .family<List<LedgerEntry>, AccountSyncHost>((ref, host) async {
+      ref.watch(syncRuntimeRevisionProvider);
+      if (!identical(ref.watch(syncHostProvider), host)) {
+        throw StateError('Account changed');
+      }
+      final rows = await BoundLedgerRepository(host).listLive();
+      if (!ref.mounted) throw StateError('Account changed');
+      return rows;
+    });
+
+/// A synchronous facade deliberately drops AsyncValue's previous-account data.
+/// The finite query is keyed by immutable host, not merely user ID.
+final ledgerEntriesProvider = Provider<AsyncValue<List<LedgerEntry>>>((ref) {
   ref.watch(syncRuntimeRevisionProvider);
-  final ledger = ref.watch(boundLedgerProvider);
-  if (ledger == null) throw StateError('Ledger capability unavailable');
-  final rows = await ledger.listLive();
-  if (!ref.mounted) throw StateError('Account changed');
-  return rows;
+  final host = ref.watch(syncHostProvider);
+  if (host?.actor == null) return const AsyncLoading();
+  return ref.watch(_ledgerReadsProvider(host!));
+});
+final ledgerEntriesFutureProvider = Provider<Future<List<LedgerEntry>>>((ref) {
+  ref.watch(syncRuntimeRevisionProvider);
+  final host = ref.watch(syncHostProvider);
+  if (host?.actor == null) {
+    return Future.error(StateError('Ledger capability unavailable'));
+  }
+  return ref.watch(_ledgerReadsProvider(host!).future);
 });

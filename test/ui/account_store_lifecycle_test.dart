@@ -59,7 +59,9 @@ void main() {
             ),
             authStateProvider.overrideWithValue(AuthState.authenticated),
             authUserIdProvider.overrideWithValue('synthetic-a'),
-            currentPlanIdProvider.overrideWith((ref) async => 'plan-a'),
+            currentPlanIdProvider.overrideWith(
+              (ref) => const AsyncData('plan-a'),
+            ),
             invitationRepositoryProvider.overrideWithValue(invitations),
           ],
         );
@@ -236,7 +238,7 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    await container.read(currentPlanIdProvider.future);
+    await container.read(currentPlanIdFutureProvider);
     expect(lookup.calls, 0);
     expect(container.read(planAccessProvider), PlanAccess.error);
   });

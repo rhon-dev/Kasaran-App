@@ -778,6 +778,36 @@ void main() {
       );
     }
   }
+  test('explicit refresh trails older captured-none discovery on the same host', () async {
+    final entered = Completer<void>(), release = Completer<void>();
+    var accepted = false;
+    discovery = (binding) async {
+      expect(binding.marker, same(identity.marker));
+      discoveries++;
+      final captured = accepted ? wire.planId : null;
+      if (discoveries == 1) {
+        entered.complete();
+        await release.future;
+      }
+      return captured;
+    };
+    final starting = host.start();
+    await entered.future;
+    accepted = true;
+    final refresh = host.refreshMembership();
+    final repeated = host.refreshMembership();
+    expect(repeated, same(refresh));
+    expect(host.start(), same(starting));
+    host.notifyForeground();
+    expect(discoveries, 1);
+    release.complete();
+    await Future.wait([starting, refresh, repeated]);
+    await host.settled;
+    expect(discoveries, 2);
+    expect(host.status, AccountSyncHostStatus.ready);
+    expect(host.actor?.planId, wire.planId);
+    expect(requests.where((r) => r == 'sync_bootstrap'), hasLength(1));
+  });
   test(
     'explicit post-invite refresh retries session-only none then bootstraps once',
     () async {

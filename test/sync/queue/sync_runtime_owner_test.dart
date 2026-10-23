@@ -21,18 +21,23 @@ import 'account_sync_host_test.dart' show Metadata, TrackedClient, fixtureActor;
 import 'durable_outbox_pusher_test.dart' as fixture;
 
 void main() {
-  test('host factory failure is sanitized and cannot restart on foreground', () async {
-    final harness = await RuntimeHarness.open(failFactory: true);
-    try {
-      await harness.owner.settled;
-      expect(harness.owner.status, AccountSyncHostStatus.error);
-      expect(harness.owner.host, isNull);
-      harness.owner.notifyForeground();
-      await harness.owner.settled;
-      expect(harness.created, 1);
-    } finally { await harness.close(); }
-    expect(harness.clients.map((c) => c.closes), everyElement(1));
-  });
+  test(
+    'host factory failure is sanitized and cannot restart on foreground',
+    () async {
+      final harness = await RuntimeHarness.open(failFactory: true);
+      try {
+        await harness.owner.settled;
+        expect(harness.owner.status, AccountSyncHostStatus.error);
+        expect(harness.owner.host, isNull);
+        harness.owner.notifyForeground();
+        await harness.owner.settled;
+        expect(harness.created, 1);
+      } finally {
+        await harness.close();
+      }
+      expect(harness.clients.map((c) => c.closes), everyElement(1));
+    },
+  );
 
   test(
     'root shutdown defers owned transport closure through actual local mutation COMMIT',
